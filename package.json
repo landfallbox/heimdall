@@ -22,7 +22,7 @@
   "type": "module",
   "main": "gui/electron/main.js",
   "scripts": {
-    "check": "node --check src/config.js && node --check src/runtime-config.js && node --check src/logger.js && node --check src/openai-protocol.js && node --check src/router-urls.js && node --check src/usage.js && node --check src/usage-store.js && node --check src/vendor-circuit-breaker.js && node --check src/server.js && node --check gui/electron/config-store.js && node --check gui/electron/ipc-contracts.js && node --check gui/electron/log-store.js && node --check gui/electron/main.js && node --check gui/electron/tray-controller.js && node --check gui/electron/updater.js && node --check gui/electron/preload.cjs && node --check gui/src/app-controllers.js && node --check gui/src/app-model.js && node --check gui/src/config-draft.js && node --check gui/src/desktop-api.js && node --check scripts/start-electron-dev.mjs && node --check scripts/generate-release-notes.mjs && node --check test/openai-protocol.test.js && node --check test/usage.test.js && node --check test/vendor-circuit-breaker.test.js && node --check test/electron-lifecycle.test.js && node --check test/ipc-contracts.test.js",
+    "check": "tsc --noEmit && node --check gui/electron/preload.cjs && node --check scripts/start-electron-dev.mjs && node --check scripts/generate-release-notes.mjs",
     "test": "node test/config-and-urls.test.js && node test/config-draft.test.js && node test/ipc-contracts.test.js && node test/log-store.test.js && node test/openai-protocol.test.js && node test/usage.test.js && node test/vendor-circuit-breaker.test.js && node test/fallback-smoke.test.js",
     "test:electron": "node test/electron-lifecycle.test.js",
     "test:ci": "npm test && npm run test:electron",
@@ -50,15 +50,19 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@types/node": "^26.3.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
     "@vitejs/plugin-react": "^4.3.4",
     "electron": "42.7.0",
     "electron-builder": "^26.15.3",
     "playwright": "^1.61.1",
     "sharp": "0.33.5",
+    "typescript": "^7.0.2",
     "vite": "^6.0.3"
   },
   "engines": {
-    "node": ">=22.12.0"
+    "node": ">=22.18.0"
   },
   "build": {
     "appId": "local.heimdall",
