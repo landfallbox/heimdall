@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   closestCenter,
   DndContext,
@@ -6,6 +6,7 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  type DragEndEvent,
 } from "@dnd-kit/core";
 import {
   arrayMove,
@@ -38,14 +39,20 @@ import {
   Trash2,
   XCircle,
   X,
+  type LucideIcon,
 } from "lucide-react";
+import type { CloseBehavior } from "./config-draft.ts";
 import {
   defaultDraft,
   getVendorModels,
   normalizeVendorModelsForDraft,
   toConfig,
   toDraft,
-} from "./config-draft.js";
+  type ConfigInput,
+  type Draft,
+  type VendorDraft,
+  type VendorModelDraft,
+} from "./config-draft.ts";
 import {
   canLoadVendorModels,
   cloneVendor,
@@ -61,21 +68,23 @@ import {
   suggestCatalogSwitch,
   validateRouter,
   validateVendor,
-} from "./app-model.js";
-import { useLogsController, useUpdateController, useUsageController } from "./app-controllers.js";
-import { getDesktopApi } from "./desktop-api.js";
+  type ValidationResult,
+} from "./app-model.ts";
+import { useLogsController, useUpdateController, useUsageController } from "./app-controllers.ts";
+import { getDesktopApi, type SaveConfigResult } from "./desktop-api.ts";
 import { getCatalogPriceView } from "../../src/usage.js";
+import type { ChartSegment, HealthState, LogEntry, LogPage, UpdateState, UsageDaily, UsagePeriod, UsageSummary, VendorHealth } from "./types.ts";
 
 const defaultAppName = "Heimdall";
 
-const navItems = [
+const navItems: Array<{ id: Page; label: string; icon: LucideIcon }> = [
   { id: "application", label: "Application", icon: Settings2 },
   { id: "router", label: "Router", icon: Server },
   { id: "usage", label: "Usage", icon: Gauge },
   { id: "logs", label: "Logs", icon: Terminal },
 ];
 
-const closeBehaviorOptions = [
+const closeBehaviorOptions: Array<{ value: CloseBehavior; label: string }> = [
   { value: "tray", label: "Keep in tray" },
   { value: "exit", label: "Exit and stop" },
   { value: "ask", label: "Ask every time" },
@@ -83,22 +92,32 @@ const closeBehaviorOptions = [
 
 const currencyOptions = ["USD", "CNY"];
 
+type Page = "application" | "router" | "usage" | "logs" | "vendor-edit";
+
+type ModalState =
+  | { type: "delete"; index: number; name: string }
+  | { type: "deleteVendorModel"; index: number; name: string }
+  | { type: "revertVendor" }
+  | { type: "enableThinking"; modelIndex: number }
+  | { type: "close" }
+  | null;
+
 export default function App() {
-  const [page, setPage] = useState("application");
-  const [draft, setDraft] = useState(defaultDraft);
-  const [persistedDraft, setPersistedDraft] = useState(defaultDraft);
-  const [health, setHealth] = useState(null);
+  const [page, setPage] = useState<Page>("application");
+  const [draft, setDraft] = useState<Draft>(defaultDraft);
+  const [persistedDraft, setPersistedDraft] = useState<Draft>(defaultDraft);
+  const [health, setHealth] = useState<HealthState | null>(null);
   const [busy, setBusy] = useState("");
   const [toast, setToast] = useState("");
   const [showRouterKey, setShowRouterKey] = useState(false);
-  const [modal, setModal] = useState(null);
+  const [modal, setModal] = useState<ModalState>(null);
   const [showVendorKey, setShowVendorKey] = useState(false);
-  const [vendorEditorIndex, setVendorEditorIndex] = useState(null);
-  const [vendorEditorDraft, setVendorEditorDraft] = useState(null);
-  const [vendorEditorOriginal, setVendorEditorOriginal] = useState(null);
+  const [vendorEditorIndex, setVendorEditorIndex] = useState<number | null>(null);
+  const [vendorEditorDraft, setVendorEditorDraft] = useState<VendorDraft | null>(null);
+  const [vendorEditorOriginal, setVendorEditorOriginal] = useState<VendorDraft | null>(null);
   const [vendorEditorIsNew, setVendorEditorIsNew] = useState(false);
-  const [availableVendorModels, setAvailableVendorModels] = useState([]);
-  const [vendorModelsError, setVendorModelsError] = useState(null);
+  const [availableVendorModels, setAvailableVendorModels] = useState<string[]>([]);
+  const [vendorModelsError, setVendorModelsError] = useState<{ field: string; message: string } | null>(null);
   const [restartRequired, setRestartRequired] = useState(false);
   const [appName, setAppName] = useState(defaultAppName);
   const [appVersion, setAppVersion] = useState("");
@@ -107,6 +126,17 @@ export default function App() {
   const vendorModelsRequestRef = useRef(0);
   const vendorModelsSourceKeyRef = useRef("");
   const vendorScrollTargetRef = useRef(null);
+
+  const run = useCallback(async (name: string, action: () => Promise<void>) => {
+    setBusy(name);
+    try {
+      await action();
+    } catch (error) {
+      setToast((error as Error).message || String(error));
+    } finally {
+      setBusy("");
+    }
+  }, []);
 
   const endpoints = useMemo(() => endpointsFromDraft(draft), [draft]);
   const status = useMemo(() => getStatus(health), [health]);
@@ -188,7 +218,7 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
-  async function loadState({ toastMessage = "" } = {}) {
+  async function loadState({ toastMessage = "" }: { toastMessage?: string } = {}) {
     let configLoaded = false;
     setBusy("load");
     try {
@@ -196,7 +226,7 @@ export default function App() {
       setAppName(state.appName || defaultAppName);
       setAppVersion(state.appVersion || "");
       setIsDevelopmentRuntime(Boolean(state.isDevelopmentRuntime));
-      const loadedDraft = toDraft(state.config);
+      const loadedDraft = toDraft(state.config as ConfigInput);
       setConfigRevision(state.revision || "");
       setDraft(loadedDraft);
       setPersistedDraft(loadedDraft);
@@ -206,7 +236,7 @@ export default function App() {
         setToast(toastMessage);
       }
     } catch (error) {
-      setToast(error.message || String(error));
+      setToast((error as Error).message || String(error));
     } finally {
       setBusy("");
       window.requestAnimationFrame(() => {
@@ -278,7 +308,7 @@ export default function App() {
     });
   }
 
-  async function refreshHealth({ silent = false, fast = false } = {}) {
+  async function refreshHealth({ silent = false, fast = false }: { silent?: boolean; fast?: boolean } = {}) {
     try {
       const nextHealth = await getDesktopApi().checkHealth({ includeProcessCount: !fast });
       setHealth(nextHealth);
@@ -288,18 +318,18 @@ export default function App() {
       return nextHealth;
     } catch (error) {
       if (!silent) {
-        setToast(error.message || String(error));
+        setToast((error as Error).message || String(error));
       }
       return null;
     }
   }
 
-  async function writeConfig(nextDraft) {
+  async function writeConfig(nextDraft: Draft) {
     const result = await getDesktopApi().saveConfig({
       config: toConfig(nextDraft),
       revision: configRevision,
     });
-    const savedDraft = toDraft(result.config);
+    const savedDraft = toDraft(result.config as ConfigInput);
     setConfigRevision(result.revision || "");
     setPersistedDraft(savedDraft);
     setRestartRequired(result.restartRequired === true || Boolean(result.reloadError));
@@ -308,7 +338,7 @@ export default function App() {
 
   async function saveRouter() {
     if (routerValidation.hasErrors) {
-      setToast(routerValidation.firstError);
+      setToast(routerValidation.firstError || "");
       return;
     }
 
@@ -325,7 +355,7 @@ export default function App() {
     });
   }
 
-  async function persistVendorList(vendors, message) {
+  async function persistVendorList(vendors: VendorDraft[], message?: string) {
     try {
       const { savedDraft, saveResult } = await writeConfig({ ...persistedDraft, vendors });
       setDraft((current) => ({ ...current, vendors: savedDraft.vendors }));
@@ -338,7 +368,7 @@ export default function App() {
     }
   }
 
-  async function copyEndpoint(endpoint, label) {
+  async function copyEndpoint(endpoint: string, label: string) {
     await getDesktopApi().writeClipboard(endpoint);
     setToast(`${label} endpoint copied.`);
   }
@@ -363,17 +393,6 @@ export default function App() {
     setToast("Vendor API key copied.");
   }
 
-  async function run(name, action) {
-    setBusy(name);
-    try {
-      await action();
-    } catch (error) {
-      setToast(error.message || String(error));
-    } finally {
-      setBusy("");
-    }
-  }
-
   function clearVendorModelOptions() {
     vendorModelsRequestRef.current += 1;
     vendorModelsSourceKeyRef.current = "";
@@ -382,14 +401,14 @@ export default function App() {
     setBusy((current) => (current === "vendorModels" ? "" : current));
   }
 
-  function updateRouter(field, value) {
+  function updateRouter(field: string, value: string) {
     setDraft((current) => ({
       ...current,
       router: { ...current.router, [field]: value },
     }));
   }
 
-  async function setAppSetting(field, value) {
+  async function setAppSetting(field: "closeBehavior" | "startAtLogin", value: CloseBehavior | boolean) {
     if (busy === "saveApp" || value === persistedDraft.app[field]) {
       return;
     }
@@ -402,15 +421,15 @@ export default function App() {
         }),
         revision: configRevision,
       });
-      const savedDraft = toDraft(result.config);
+      const savedDraft = toDraft(result.config as ConfigInput);
       setConfigRevision(result.revision || "");
       setPersistedDraft(savedDraft);
       setDraft((current) => ({ ...current, app: savedDraft.app }));
     });
   }
 
-  function updateVendor(index, field, value) {
-    const nextVendor = { ...draft.vendors[index], [field]: value };
+  function updateVendor(index: number, field: string, value: unknown) {
+    const nextVendor: VendorDraft = { ...draft.vendors[index], [field]: value };
     if (field === "enabled" && value && validateVendor(nextVendor).hasErrors) {
       setToast("Fix the red Vendor errors before enabling it.");
       return;
@@ -422,7 +441,7 @@ export default function App() {
   }
 
   function addVendor() {
-    const vendor = {
+    const vendor: VendorDraft = {
       name: "new-vendor",
       baseUrl: "https://example.com/v1",
       models: [],
@@ -441,20 +460,21 @@ export default function App() {
     setPage("vendor-edit");
   }
 
-  function removeVendor(index) {
+  function removeVendor(index: number) {
     const vendorName = draft.vendors[index]?.name || "this vendor";
     setModal({ type: "delete", index, name: vendorName });
   }
 
   function confirmRemoveVendor() {
-    const index = modal.index;
+    if (!modal) return;
+    const index = modal.type === "delete" ? modal.index : 0;
     const vendors = draft.vendors.filter((_vendor, vendorIndex) => vendorIndex !== index);
     setDraft((current) => ({ ...current, vendors }));
     setModal(null);
     void run("vendors", () => persistVendorList(vendors, "Vendor deleted."));
   }
 
-  function reorderVendors(sourceIndex, targetIndex) {
+  function reorderVendors(sourceIndex: number, targetIndex: number) {
     if (
       sourceIndex === targetIndex
       || sourceIndex < 0
@@ -470,7 +490,7 @@ export default function App() {
     void run("vendors", () => persistVendorList(vendors));
   }
 
-  function openVendorEditor(index) {
+  function openVendorEditor(index: number) {
     const vendor = cloneVendor(draft.vendors[index]);
     setVendorEditorIndex(index);
     setVendorEditorDraft(vendor);
@@ -492,11 +512,11 @@ export default function App() {
     setPage("router");
   }
 
-  function updateVendorEditor(field, value) {
-    setVendorEditorDraft((current) => ({ ...current, [field]: value }));
+  function updateVendorEditor(field: string, value: unknown) {
+    setVendorEditorDraft((current) => (current ? { ...current, [field]: value } : current));
   }
 
-  function updateVendorEditorModel(modelIndex, field, value) {
+  function updateVendorEditorModel(modelIndex: number, field: string, value: unknown) {
     if (field === "enableThinking" && value === true) {
       setModal({ type: "enableThinking", modelIndex });
       return;
@@ -508,7 +528,8 @@ export default function App() {
   }
 
   function confirmEnableThinking() {
-    const modelIndex = modal.modelIndex;
+    if (!modal) return;
+    const modelIndex = modal.type === "enableThinking" ? modal.modelIndex : 0;
     setVendorEditorDraft((current) => {
       const models = getVendorModels(current).map((model, index) => (index === modelIndex ? { ...model, enableThinking: true } : model));
       return { ...current, models };
@@ -523,7 +544,7 @@ export default function App() {
     }));
   }
 
-  async function loadVendorModels(vendor, { silent = false, force = false, sourceKey = getVendorModelsSourceKey(vendor) } = {}) {
+  async function loadVendorModels(vendor: VendorDraft | null, { silent = false, force = false, sourceKey = getVendorModelsSourceKey(vendor) }: { silent?: boolean; force?: boolean; sourceKey?: string } = {}) {
     if (!vendor) {
       return;
     }
@@ -588,33 +609,36 @@ export default function App() {
     await loadVendorModels(vendorEditorDraft, { silent: true });
   }
 
-  function removeVendorEditorModel(modelIndex) {
+  function removeVendorEditorModel(modelIndex: number) {
     setVendorEditorDraft((current) => {
+      if (!current) return current;
       const models = getVendorModels(current).filter((_model, index) => index !== modelIndex);
       return { ...current, models };
     });
   }
 
-  function requestRemoveVendorEditorModel(modelIndex) {
+  function requestRemoveVendorEditorModel(modelIndex: number) {
     const modelId = getVendorModels(vendorEditorDraft)[modelIndex]?.id || "this model";
     setModal({ type: "deleteVendorModel", index: modelIndex, name: modelId });
   }
 
   function confirmRemoveVendorEditorModel() {
-    removeVendorEditorModel(modal.index);
+    if (!modal) return;
+    removeVendorEditorModel(modal.type === "deleteVendorModel" ? modal.index : 0);
     setModal(null);
   }
 
   async function saveVendorEditor() {
     await run("save", async () => {
-      const savedVendor = cloneVendor(vendorEditorDraft);
+      if (!vendorEditorDraft) return;
+      const savedVendor = cloneVendor(vendorEditorDraft)!;
       const validation = validateVendor(savedVendor);
       if (validation.hasErrors) {
         setToast("Fix the red Vendor errors before saving.");
         return;
       }
-      const savedIndex = vendorEditorIsNew ? persistedDraft.vendors.length : vendorEditorIndex;
-      const nextDraft = {
+      const savedIndex = vendorEditorIsNew ? persistedDraft.vendors.length : vendorEditorIndex!;
+      const nextDraft: Draft = {
         ...persistedDraft,
         vendors: vendorEditorIsNew
           ? [...persistedDraft.vendors, savedVendor]
@@ -633,7 +657,7 @@ export default function App() {
   }
 
   function revertVendorEditor() {
-    setVendorEditorDraft(cloneVendor(vendorEditorOriginal));
+    setVendorEditorDraft(cloneVendor(vendorEditorOriginal) ?? null);
     setToast("Vendor changes reverted.");
   }
 
@@ -927,7 +951,13 @@ export default function App() {
   );
 }
 
-function getStatus(health) {
+interface StatusView {
+  label: string;
+  tone: "neutral" | "success" | "warning";
+  detail: string;
+}
+
+function getStatus(health: HealthState | null): StatusView {
   if (!health) {
     return { label: "Checking", tone: "neutral", detail: "" };
   }
@@ -955,7 +985,7 @@ function getStatus(health) {
   };
 }
 
-function configSaveMessage(result, savedMessage) {
+function configSaveMessage(result: SaveConfigResult | null | undefined, savedMessage: string) {
   if (result?.reloadError) {
     return `Settings saved, but Router could not reload them: ${result.reloadError}`;
   }
@@ -971,7 +1001,7 @@ function configSaveMessage(result, savedMessage) {
   return savedMessage;
 }
 
-function EndpointRow({ label, endpoint, copyEndpoint }) {
+function EndpointRow({ label, endpoint, copyEndpoint }: { label: string; endpoint: string; copyEndpoint: (endpoint: string, label: string) => Promise<void> }) {
   return (
     <div className="endpoint-row">
       <span>{label}</span>
@@ -988,11 +1018,11 @@ function EndpointRow({ label, endpoint, copyEndpoint }) {
   );
 }
 
-function eyebrowForPage(page) {
+function eyebrowForPage(page: Page) {
   return page === "vendor-edit" ? "router" : page;
 }
 
-function titleForPage(page, vendorEditorDraft) {
+function titleForPage(page: Page, vendorEditorDraft: VendorDraft | null) {
   if (page === "vendor-edit") {
     return vendorEditorDraft?.name || "Vendor Settings";
   }
@@ -1005,7 +1035,17 @@ function titleForPage(page, vendorEditorDraft) {
   }[page];
 }
 
-function ActionButton({ icon: Icon, label, onClick, busy, variant = "default", title, disabled = false }) {
+interface ActionButtonProps {
+  icon: LucideIcon;
+  label: string;
+  onClick: () => void;
+  busy?: boolean;
+  variant?: string;
+  title?: string;
+  disabled?: boolean;
+}
+
+function ActionButton({ icon: Icon, label, onClick, busy = false, variant = "default", title, disabled = false }: ActionButtonProps) {
   return (
     <button type="button" className={`button ${variant}`} onClick={onClick} disabled={busy || disabled} title={title}>
       {busy ? <Loader2 className="spin" size={16} /> : <Icon size={16} />}
@@ -1014,7 +1054,7 @@ function ActionButton({ icon: Icon, label, onClick, busy, variant = "default", t
   );
 }
 
-function DockButton({ icon: Icon, label, onClick, busy, variant = "default" }) {
+function DockButton({ icon: Icon, label, onClick, busy, variant = "default" }: { icon: LucideIcon; label: string; onClick: () => void; busy: boolean; variant?: string }) {
   return (
     <button
       type="button"
@@ -1029,7 +1069,16 @@ function DockButton({ icon: Icon, label, onClick, busy, variant = "default" }) {
   );
 }
 
-function RouterPage({ draft, updateRouter, showRouterKey, setShowRouterKey, copyRouterApiKey, saveRouter, busy, validation }) {
+function RouterPage({ draft, updateRouter, showRouterKey, setShowRouterKey, copyRouterApiKey, saveRouter, busy, validation }: {
+  draft: Draft;
+  updateRouter: (field: string, value: string) => void;
+  showRouterKey: boolean;
+  setShowRouterKey: (value: boolean) => void;
+  copyRouterApiKey: () => Promise<void>;
+  saveRouter: () => Promise<void>;
+  busy: string;
+  validation: ValidationResult;
+}) {
   return (
     <div className="panel-grid single">
       <div className="panel wide">
@@ -1080,7 +1129,11 @@ function RouterPage({ draft, updateRouter, showRouterKey, setShowRouterKey, copy
   );
 }
 
-function AppSettingsPage({ app, setAppSetting, busy }) {
+function AppSettingsPage({ app, setAppSetting, busy }: {
+  app: Draft["app"];
+  setAppSetting: (field: "closeBehavior" | "startAtLogin", value: CloseBehavior | boolean) => Promise<void>;
+  busy: string;
+}) {
   return (
     <div className="panel-grid single">
       <div className="panel wide">
@@ -1118,7 +1171,13 @@ function AppSettingsPage({ app, setAppSetting, busy }) {
   );
 }
 
-function SidebarUpdateButton({ updateState, checkUpdate, downloadUpdate, installUpdate, busy }) {
+function SidebarUpdateButton({ updateState, checkUpdate, downloadUpdate, installUpdate, busy }: {
+  updateState: UpdateState;
+  checkUpdate: () => Promise<void>;
+  downloadUpdate: () => Promise<void>;
+  installUpdate: () => Promise<void>;
+  busy: string;
+}) {
   const isChecking = busy === "updateCheck" || updateState.status === "checking";
   const isDownloading = busy === "updateDownload" || updateState.status === "downloading";
   const isInstalling = busy === "updateInstall";
@@ -1223,13 +1282,22 @@ function VendorsPage({
   reorderVendors,
   openVendorEditor,
   busy,
+}: {
+  vendors: VendorDraft[];
+  vendorHealth: VendorHealth[] | undefined;
+  updateVendor: (index: number, field: string, value: unknown) => void;
+  addVendor: () => void;
+  removeVendor: (index: number) => void;
+  reorderVendors: (sourceIndex: number, targetIndex: number) => void;
+  openVendorEditor: (index: number) => void;
+  busy: boolean;
 }) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  function handleDragEnd({ active, over }) {
+  function handleDragEnd({ active, over }: DragEndEvent) {
     if (!over || active.id === over.id) {
       return;
     }
@@ -1275,7 +1343,15 @@ function VendorsPage({
   );
 }
 
-function SortableVendorCard({ vendor, health, index, updateVendor, removeVendor, openVendorEditor, busy }) {
+function SortableVendorCard({ vendor, health, index, updateVendor, removeVendor, openVendorEditor, busy }: {
+  vendor: VendorDraft;
+  health: VendorHealth | undefined;
+  index: number;
+  updateVendor: (index: number, field: string, value: unknown) => void;
+  removeVendor: (index: number) => void;
+  openVendorEditor: (index: number) => void;
+  busy: boolean;
+}) {
   const {
     attributes,
     listeners,
@@ -1391,6 +1467,23 @@ function VendorEditorPage({
   revertVendor,
   busy,
   onBack,
+}: {
+  vendor: VendorDraft | null;
+  updateVendor: (field: string, value: unknown) => void;
+  updateVendorModel: (modelIndex: number, field: string, value: unknown) => void;
+  addVendorModel: () => void;
+  removeVendorModel: (modelIndex: number) => void;
+  availableModels: string[];
+  vendorModelsError: { field: string; message: string } | null;
+  refreshVendorModels: () => Promise<void>;
+  loadVendorModelsOnSelect: () => Promise<void>;
+  showVendorKey: boolean;
+  setShowVendorKey: (value: boolean) => void;
+  copyVendorApiKey: () => Promise<void>;
+  saveVendor: () => Promise<void>;
+  revertVendor: () => void;
+  busy: string;
+  onBack: () => void;
 }) {
   if (!vendor) {
     return (
@@ -1580,6 +1673,13 @@ function ModelPricingRow({
   updateVendorModel,
   removeVendorModel,
   loadVendorModelsOnSelect,
+}: {
+  model: VendorModelDraft;
+  index: number;
+  modelOptions: string[];
+  updateVendorModel: (modelIndex: number, field: string, value: unknown) => void;
+  removeVendorModel: (modelIndex: number) => void;
+  loadVendorModelsOnSelect: () => Promise<void>;
 }) {
   const customPricing = model.pricingMode === "custom";
   const catalogKey = model.pricingMode === "deepseek" ? "deepseek" : "openai";
@@ -1710,7 +1810,7 @@ function ModelPricingRow({
   );
 }
 
-function formatPeakHours(peakHours) {
+function formatPeakHours(peakHours: number[][] | null | undefined) {
   if (!Array.isArray(peakHours) || !peakHours.length) {
     return "";
   }
@@ -1719,18 +1819,26 @@ function formatPeakHours(peakHours) {
     .join(", ")} UTC`;
 }
 
-function PricingFields({ currency, input, cached, output, editable, available, onChange }) {
+function PricingFields({ currency, input, cached, output, editable, available, onChange }: {
+  currency: string | undefined;
+  input: string | number | undefined;
+  cached: string | number | undefined;
+  output: string | number | undefined;
+  editable: boolean;
+  available: boolean;
+  onChange: (field: string, value: string) => void;
+}) {
   return (
     <div className="pricing-fields">
       <CurrencySelect value={currency || "USD"} disabled={!editable} onChange={(value) => onChange("pricingCurrency", value)} />
-      <PriceInput label="Input / 1M" value={input ?? ""} onChange={(value) => onChange("inputPerMillion", value)} numeric readOnly={!editable} unavailable={!available} />
-      <PriceInput label="Cached / 1M" value={cached ?? ""} onChange={(value) => onChange("cachedInputPerMillion", value)} numeric optional readOnly={!editable} unavailable={!available} />
-      <PriceInput label="Output / 1M" value={output ?? ""} onChange={(value) => onChange("outputPerMillion", value)} numeric readOnly={!editable} unavailable={!available} />
+      <PriceInput label="Input / 1M" value={String(input ?? "")} onChange={(value) => onChange("inputPerMillion", value)} numeric readOnly={!editable} unavailable={!available} />
+      <PriceInput label="Cached / 1M" value={String(cached ?? "")} onChange={(value) => onChange("cachedInputPerMillion", value)} numeric optional readOnly={!editable} unavailable={!available} />
+      <PriceInput label="Output / 1M" value={String(output ?? "")} onChange={(value) => onChange("outputPerMillion", value)} numeric readOnly={!editable} unavailable={!available} />
     </div>
   );
 }
 
-function CurrencySelect({ value, disabled = false, onChange }) {
+function CurrencySelect({ value, disabled = false, onChange }: { value: string; disabled?: boolean; onChange: (value: string) => void }) {
   const normalizedCurrency = String(value || "USD").trim().toUpperCase();
   const currency = currencyOptions.includes(normalizedCurrency) ? normalizedCurrency : "USD";
 
@@ -1747,7 +1855,15 @@ function CurrencySelect({ value, disabled = false, onChange }) {
   );
 }
 
-function PriceInput({ label, value, onChange, numeric = false, optional = false, readOnly = false, unavailable = false }) {
+function PriceInput({ label, value, onChange, numeric = false, optional = false, readOnly = false, unavailable = false }: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  numeric?: boolean;
+  optional?: boolean;
+  readOnly?: boolean;
+  unavailable?: boolean;
+}) {
   return (
     <label className="price-input">
       <span>{label}</span>
@@ -1762,7 +1878,11 @@ function PriceInput({ label, value, onChange, numeric = false, optional = false,
   );
 }
 
-function UsagePage({ usage, refreshUsage, busy }) {
+function UsagePage({ usage, refreshUsage, busy }: {
+  usage: UsageSummary | null;
+  refreshUsage: (options?: { vendor?: string; model?: string }) => void;
+  busy: string;
+}) {
   const [vendorFilter, setVendorFilter] = useState("");
   const [modelFilter, setModelFilter] = useState("");
 
@@ -1780,13 +1900,13 @@ function UsagePage({ usage, refreshUsage, busy }) {
     );
   }
 
-  const periods = [
+  const periods: Array<[string, UsagePeriod]> = [
     ["Today", usage.periods.day],
     ["This week", usage.periods.week],
     ["This month", usage.periods.month],
   ];
 
-  function applyFilters(vendor, model) {
+  function applyFilters(vendor: string, model: string) {
     setVendorFilter(vendor);
     setModelFilter(model);
     void refreshUsage({ vendor, model });
@@ -1832,7 +1952,14 @@ function UsagePage({ usage, refreshUsage, busy }) {
   );
 }
 
-function UsageFilter({ label, value, options, allLabel, disabled, onChange }) {
+function UsageFilter({ label, value, options, allLabel, disabled, onChange }: {
+  label: string;
+  value: string;
+  options: string[];
+  allLabel: string;
+  disabled: boolean;
+  onChange: (value: string) => void;
+}) {
   return (
     <label className="usage-filter">
       <span>{label}</span>
@@ -1847,7 +1974,7 @@ function UsageFilter({ label, value, options, allLabel, disabled, onChange }) {
   );
 }
 
-function UsagePeriod({ label, period }) {
+function UsagePeriod({ label, period }: { label: string; period: UsagePeriod }) {
   return (
     <section className="usage-period">
       <div className="usage-period-label">{label}</div>
@@ -1889,7 +2016,7 @@ function UsagePeriod({ label, period }) {
   );
 }
 
-function UsageChart({ days }) {
+function UsageChart({ days }: { days: UsageDaily[] }) {
   const chartMaximum = niceChartMaximum(Math.max(1, ...days.map((day) => day.totalTokens)));
   const modelTotals = new Map();
   for (const day of days) {
@@ -1911,7 +2038,7 @@ function UsageChart({ days }) {
       <div className="usage-chart-legend" aria-label="Chart legend">
         {legendModels.map((model) => (
           <span key={model} title={model}>
-            <i style={{ "--series-color": modelColors.get(model) }} />
+            <i style={{ "--series-color": modelColors.get(model) } as React.CSSProperties} />
             {model}
           </span>
         ))}
@@ -1937,7 +2064,7 @@ function UsageChart({ days }) {
                         style={{
                           "--segment-height": `${segment.totalTokens / chartMaximum * 100}%`,
                           "--series-color": segment.color,
-                        }}
+                        } as React.CSSProperties}
                       />
                     ))}
                   </div>
@@ -1958,7 +2085,7 @@ function UsageChart({ days }) {
   );
 }
 
-function UsageChartTooltip({ day, segments, edge }) {
+function UsageChartTooltip({ day, segments, edge }: { day: UsageDaily; segments: ChartSegment[]; edge: string }) {
   return (
     <div className={`usage-chart-tooltip ${edge ? `is-${edge}` : ""}`}>
       <strong>{day.date}</strong>
@@ -1972,7 +2099,7 @@ function UsageChartTooltip({ day, segments, edge }) {
         <div className="usage-chart-tooltip-models">
           {segments.filter((segment) => segment.totalTokens > 0).map((segment) => (
             <span key={segment.name}>
-              <i style={{ "--series-color": segment.color }} />
+              <i style={{ "--series-color": segment.color } as React.CSSProperties} />
               <b title={segment.name}>{segment.name}</b>
               {formatTokenCount(segment.totalTokens)}
             </span>
@@ -1983,9 +2110,9 @@ function UsageChartTooltip({ day, segments, edge }) {
   );
 }
 
-function usageModelSegments(day, visibleModels, hasOtherModels, modelColors) {
+function usageModelSegments(day: UsageDaily, visibleModels: string[], hasOtherModels: boolean, modelColors: Map<string, string>): ChartSegment[] {
   const totals = new Map((day.models || []).map((model) => [model.name, model.totalTokens]));
-  const segments = visibleModels.map((name) => ({ name, totalTokens: totals.get(name) || 0, color: modelColors.get(name) }));
+  const segments: ChartSegment[] = visibleModels.map((name) => ({ name, totalTokens: totals.get(name) || 0, color: modelColors.get(name) }));
   if (hasOtherModels) {
     segments.push({
       name: "Other",
@@ -1996,7 +2123,7 @@ function usageModelSegments(day, visibleModels, hasOtherModels, modelColors) {
   return segments;
 }
 
-function usageModelColor(index, model) {
+function usageModelColor(index: number, model: string) {
   if (model === "Other") {
     return "#64748b";
   }
@@ -2004,29 +2131,29 @@ function usageModelColor(index, model) {
   return colors[index % colors.length];
 }
 
-function niceChartMaximum(value) {
+function niceChartMaximum(value: number) {
   const magnitude = 10 ** Math.floor(Math.log10(value));
   const normalized = value / magnitude;
   const rounded = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
   return rounded * magnitude;
 }
 
-function formatCompactTokenCount(value) {
+function formatCompactTokenCount(value: number) {
   return new Intl.NumberFormat(undefined, {
     notation: "compact",
     maximumFractionDigits: 1,
   }).format(value);
 }
 
-function formatTokenCount(value) {
+function formatTokenCount(value: number) {
   return Number(value || 0).toLocaleString();
 }
 
-function formatPercent(value) {
+function formatPercent(value: number) {
   return `${Math.round(Number(value || 0) * 100)}%`;
 }
 
-function formatCostAmount(currency, amount) {
+function formatCostAmount(currency: string, amount: number) {
   return new Intl.NumberFormat(undefined, {
     style: "currency",
     currency,
@@ -2034,7 +2161,7 @@ function formatCostAmount(currency, amount) {
   }).format(amount);
 }
 
-function formatCosts(costs) {
+function formatCosts(costs: Array<{ currency: string; amount: number }> | undefined) {
   if (!Array.isArray(costs) || !costs.length) {
     return "Cost unavailable";
   }
@@ -2044,17 +2171,24 @@ function formatCosts(costs) {
   )).join(" + ");
 }
 
-function formatPlainAmount(amount) {
+function formatPlainAmount(amount: number) {
   return new Intl.NumberFormat(undefined, {
     maximumFractionDigits: amount < 0.01 ? 6 : 2,
   }).format(amount);
 }
 
-function LogsPage({ logs, refreshLogs, loadOlderLogs, openLog, openConfig, busy }) {
-  const listRef = useRef(null);
-  const rows = parseLogRows(logs.lines);
+function LogsPage({ logs, refreshLogs, loadOlderLogs, openLog, openConfig, busy }: {
+  logs: LogPage;
+  refreshLogs: () => Promise<void>;
+  loadOlderLogs: () => Promise<void>;
+  openLog: () => Promise<void>;
+  openConfig: () => Promise<void>;
+  busy: string;
+}) {
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const rows: LogEntry[] = parseLogRows(logs.lines);
 
-  function handleScroll(event) {
+  function handleScroll(event: React.UIEvent<HTMLDivElement>) {
     const element = event.currentTarget;
     const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
     if (distanceFromBottom < 80 && logs.hasMore && busy !== "olderLogs") {
@@ -2106,7 +2240,7 @@ function LogsPage({ logs, refreshLogs, loadOlderLogs, openLog, openConfig, busy 
   );
 }
 
-function PanelHeader({ icon: Icon, title }) {
+function PanelHeader({ icon: Icon, title }: { icon: LucideIcon; title: string }) {
   return (
     <div className="panel-heading">
       <div className="panel-icon">
@@ -2117,7 +2251,13 @@ function PanelHeader({ icon: Icon, title }) {
   );
 }
 
-function Field({ label, children, wide, message, tone }) {
+function Field({ label, children, wide, message, tone }: {
+  label: string;
+  children: React.ReactNode;
+  wide?: boolean;
+  message?: string;
+  tone?: string;
+}) {
   return (
     <div className={["field", wide && "wide", tone && "has-" + tone].filter(Boolean).join(" ")}>
       <span>{label}</span>
@@ -2127,7 +2267,12 @@ function Field({ label, children, wide, message, tone }) {
   );
 }
 
-function Modal({ title, children, onClose, tone = "default" }) {
+function Modal({ title, children, onClose, tone = "default" }: {
+  title: string;
+  children: React.ReactNode;
+  onClose: () => void;
+  tone?: string;
+}) {
   return (
     <div className="modal-backdrop">
       <div className={`modal ${tone}`}>

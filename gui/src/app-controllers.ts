@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { getDesktopApi } from "./desktop-api.js";
+import { getDesktopApi } from "./desktop-api.ts";
+import type { LogPage, UpdateState, UsageSummary } from "./types.ts";
 
-const defaultUpdateState = {
+const defaultUpdateState: UpdateState = {
   status: "unsupported",
   supported: false,
   currentVersion: "",
@@ -13,8 +14,8 @@ const defaultUpdateState = {
   lastCheckedAt: "",
 };
 
-export function useLogsController({ busy, run }) {
-  const [logs, setLogs] = useState({ path: "", lines: [], nextBefore: null, hasMore: false });
+export function useLogsController({ busy, run }: { busy: string; run: (name: string, action: () => Promise<void>) => Promise<void> }) {
+  const [logs, setLogs] = useState<LogPage>({ path: "", lines: [], nextBefore: null, hasMore: false });
 
   async function refreshLogs() {
     const result = await getDesktopApi().readLogs({ limit: 80 });
@@ -41,9 +42,9 @@ export function useLogsController({ busy, run }) {
 }
 
 export function useUsageController() {
-  const [usage, setUsage] = useState(null);
+  const [usage, setUsage] = useState<UsageSummary | null>(null);
 
-  async function refreshUsage(options) {
+  async function refreshUsage(options?: { vendor?: string; model?: string }) {
     const result = await getDesktopApi().readUsageSummary(options);
     setUsage(result);
   }
@@ -51,8 +52,8 @@ export function useUsageController() {
   return { usage, refreshUsage };
 }
 
-export function useUpdateController({ run, setToast }) {
-  const [updateState, setUpdateState] = useState(defaultUpdateState);
+export function useUpdateController({ run, setToast }: { run: (name: string, action: () => Promise<void>) => Promise<void>; setToast: (toast: string) => void }) {
+  const [updateState, setUpdateState] = useState<UpdateState>(defaultUpdateState);
 
   useEffect(() => {
     const api = getDesktopApi();
@@ -98,7 +99,7 @@ export function useUpdateController({ run, setToast }) {
   return { updateState, checkAppUpdate, downloadAppUpdate, installAppUpdate };
 }
 
-function updateToastForState(updateState, fallback) {
+function updateToastForState(updateState: UpdateState, fallback: string): string {
   if (!updateState) {
     return fallback;
   }

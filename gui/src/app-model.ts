@@ -1,7 +1,27 @@
-import { getVendorModels } from "./config-draft.js";
+import { getVendorModels, type ConfigVendorInput, type Draft, type VendorDraft, type VendorModelDraft } from "./config-draft.ts";
 import { getCatalogPriceView } from "../../src/usage.js";
+import type { LogEntry, Tone, VendorHealth } from "./types.ts";
 
-export function getVendorModelOptions(vendor, availableModels = []) {
+export interface FieldIssue {
+  tone: "error" | "warning";
+  message: string;
+}
+
+export interface ValidationIssueMap {
+  [field: string]: FieldIssue | undefined;
+}
+
+export interface ValidationResult {
+  errors: string[];
+  warnings: string[];
+  fields: ValidationIssueMap;
+  hasErrors: boolean;
+  firstError?: string;
+}
+
+export type VendorLike = VendorDraft | ConfigVendorInput | null | undefined;
+
+export function getVendorModelOptions(vendor: VendorLike, availableModels: string[] = []): string[] {
   return [
     ...new Set([
       ...availableModels.map((modelId) => String(modelId || "").trim()).filter(Boolean),
@@ -10,11 +30,11 @@ export function getVendorModelOptions(vendor, availableModels = []) {
   ];
 }
 
-export function getVendorModelsSourceKey(vendor) {
+export function getVendorModelsSourceKey(vendor: VendorLike): string {
   return String(vendor?.baseUrl || "").trim();
 }
 
-export function validateVendorBaseUrl(value) {
+export function validateVendorBaseUrl(value: unknown): string {
   const baseUrl = String(value || "").trim();
   if (!baseUrl) {
     return "Base URL is required.";
@@ -35,7 +55,7 @@ export function validateVendorBaseUrl(value) {
   return "";
 }
 
-export function getVendorModelsLoadMessage(vendor) {
+export function getVendorModelsLoadMessage(vendor: VendorLike): string {
   const baseUrlError = validateVendorBaseUrl(vendor?.baseUrl);
   if (baseUrlError) {
     return baseUrlError;
@@ -46,19 +66,19 @@ export function getVendorModelsLoadMessage(vendor) {
   return "";
 }
 
-export function canLoadVendorModels(vendor) {
+export function canLoadVendorModels(vendor: VendorLike): boolean {
   if (getVendorModelsLoadMessage(vendor)) {
     return false;
   }
   return vendor?.authentication !== "api-key" || Boolean(vendor?.apiKey);
 }
 
-function numberValue(value, fallback) {
+function numberValue(value: unknown, fallback: number): number {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
 }
 
-function validateInteger(value, label, { min, max }) {
+function validateInteger(value: unknown, label: string, { min, max }: { min: number; max: number }): string {
   const text = String(value ?? "").trim();
   const number = Number(text);
   if (!text || !Number.isInteger(number)) {
@@ -70,11 +90,11 @@ function validateInteger(value, label, { min, max }) {
   return "";
 }
 
-export function validateRouter(router) {
-  const errors = [];
-  const fields = {};
+export function validateRouter(router: Draft["router"]): ValidationResult {
+  const errors: string[] = [];
+  const fields: ValidationIssueMap = {};
 
-  function addError(field, message) {
+  function addError(field: string, message: string) {
     fields[field] = { tone: "error", message };
     errors.push(message);
   }
@@ -84,10 +104,10 @@ export function validateRouter(router) {
     addError("port", portError);
   }
 
-  return { errors, fields, hasErrors: errors.length > 0, firstError: errors[0] || "" };
+  return { errors, warnings: [], fields, hasErrors: errors.length > 0, firstError: errors[0] || "" };
 }
 
-export function endpointsFromDraft(draft) {
+export function endpointsFromDraft(draft: Draft): { chatCompletions: string; responses: string } {
   const rawHost = draft.router.host.trim() || "127.0.0.1";
   const host = rawHost.includes(":") && !rawHost.startsWith("[") ? `[${rawHost}]` : rawHost;
   const port = numberValue(draft.router.port, 4000);
@@ -98,18 +118,18 @@ export function endpointsFromDraft(draft) {
   };
 }
 
-export function suggestCatalogSwitch(pricingMode, modelId) {
+export function suggestCatalogSwitch(pricingMode: unknown, modelId: string): "openai" | "deepseek" | null {
   if (pricingMode === "custom" || !modelId) {
     return null;
   }
-  if (getCatalogPriceView(pricingMode, modelId)) {
+  if (getCatalogPriceView(pricingMode as "openai" | "deepseek", modelId)) {
     return null;
   }
   const otherKey = pricingMode === "deepseek" ? "openai" : "deepseek";
   return getCatalogPriceView(otherKey, modelId) ? otherKey : null;
 }
 
-export function getVendorCircuitSummary(vendorHealth) {
+export function getVendorCircuitSummary(vendorHealth: VendorHealth | undefined): { tone: Tone; label: string } | null {
   const models = Array.isArray(vendorHealth?.models) ? vendorHealth.models : [];
   const openModels = models.filter((model) => model?.circuit?.state === "open");
   const recoveringModels = models.filter((model) => model?.circuit?.state === "half-open");
@@ -129,10 +149,10 @@ export function getVendorCircuitSummary(vendorHealth) {
   return null;
 }
 
-export function validateVendor(vendor) {
-  const errors = [];
-  const warnings = [];
-  const fields = {};
+export function validateVendor(vendor: VendorLike): ValidationResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const fields: ValidationIssueMap = {};
   const name = String(vendor?.name || "").trim();
   const baseUrl = String(vendor?.baseUrl || "").trim();
   const models = getVendorModels(vendor);
@@ -151,8 +171,11 @@ export function validateVendor(vendor) {
     errors.push("Base URL required");
   }
 
-  {
-    const seenModelIds = new Set();
+  if (!enabledModels.length) {
+    fields.models = { tone: "error", message: "Add at least one enabled model." };
+    errors.push("No enabled model");
+  } else {
+    const seenModelIds = new Set<string>();
     for (const model of enabledModels) {
       if (!model.id) {
         fields.models = { tone: "error", message: "Every enabled model needs a name." };
@@ -190,10 +213,10 @@ export function validateVendor(vendor) {
   return { errors, warnings, fields, hasErrors: errors.length > 0 };
 }
 
-export function getVendorModelsErrorField(error, vendor) {
-  const rawMessage = String(error?.message || error || "Failed to refresh models.");
+export function getVendorModelsErrorField(error: unknown, vendor: VendorLike): { field: string; message: string } {
+  const rawMessage = String((error as { message?: unknown })?.message || error || "Failed to refresh models.");
   const jsonCode = rawMessage.match(/"code"\s*:\s*"([^"]+)"/i)?.[1] || "";
-  const code = String(error?.code || jsonCode || "").toUpperCase();
+  const code = String((error as { code?: unknown })?.code || jsonCode || "").toUpperCase();
   const message = code ? code.replace(/_/g, " ") : rawMessage.replace(/^Error invoking remote method '[^']+':\s*/i, "").replace(/^Error:\s*/i, "");
   if (code.includes("API_KEY") || code.includes("AUTH") || code.includes("UNAUTHORIZED") || /api key|unauthorized|forbidden/i.test(message)) {
     if (vendor?.authentication !== "api-key") {
@@ -207,32 +230,32 @@ export function getVendorModelsErrorField(error, vendor) {
   return { field: "models", message };
 }
 
-export function cloneVendor(vendor) {
+export function cloneVendor(vendor: VendorLike): VendorDraft | null {
   return vendor ? JSON.parse(JSON.stringify(vendor)) : null;
 }
 
-export function parseLogRows(lines) {
+export function parseLogRows(lines: unknown): LogEntry[] {
   return (Array.isArray(lines) ? lines : [])
     .map((line) => String(line || "").trim())
     .filter(Boolean)
-    .map((line, index) => {
+    .map((line, index): LogEntry => {
       try {
-        const entry = JSON.parse(line);
+        const entry = JSON.parse(line) as Record<string, unknown>;
         const level = String(entry.level || "info").toLowerCase();
         return {
           id: `${index}-${entry.time || ""}-${entry.event || ""}`,
           raw: line,
-          time: entry.time || "",
+          time: String(entry.time || ""),
           level,
           tone: level === "error" ? "danger" : level === "warn" ? "warning" : "success",
-          event: entry.event || "log_event",
-          vendor: entry.vendor || "",
-          statusCode: entry.statusCode,
-          elapsedMs: entry.elapsedMs,
-          totalElapsedMs: entry.totalElapsedMs,
-          model: entry.model || "",
-          requestId: entry.requestId || "",
-          message: entry.errorMessage || "",
+          event: String(entry.event || "log_event"),
+          vendor: String(entry.vendor || ""),
+          statusCode: entry.statusCode as number | undefined,
+          elapsedMs: entry.elapsedMs as number | undefined,
+          totalElapsedMs: entry.totalElapsedMs as number | undefined,
+          model: String(entry.model || ""),
+          requestId: String(entry.requestId || ""),
+          message: String(entry.errorMessage || ""),
         };
       } catch {
         return {
@@ -242,6 +265,9 @@ export function parseLogRows(lines) {
           level: "text",
           tone: "neutral",
           event: "log_line",
+          vendor: "",
+          model: "",
+          requestId: "",
           message: line,
         };
       }
@@ -249,7 +275,7 @@ export function parseLogRows(lines) {
     .reverse();
 }
 
-export function formatLogTime(value) {
+export function formatLogTime(value: string): string {
   if (!value) {
     return "";
   }
@@ -262,14 +288,14 @@ export function formatLogTime(value) {
   return date.toLocaleString();
 }
 
-export function isValidCustomPricing(model) {
+export function isValidCustomPricing(model: VendorModelDraft): boolean {
   return Boolean(String(model.pricingCurrency || "").trim())
     && isNonnegativeNumber(model.inputPerMillion, false)
     && isNonnegativeNumber(model.cachedInputPerMillion, true)
     && isNonnegativeNumber(model.outputPerMillion, false);
 }
 
-function isNonnegativeNumber(value, optional) {
+function isNonnegativeNumber(value: unknown, optional: boolean): boolean {
   const text = String(value ?? "").trim();
   if (!text) {
     return optional;

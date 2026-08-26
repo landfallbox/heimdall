@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { normalizeConfig } from "../src/config.js";
-import { getVendorCircuitSummary, suggestCatalogSwitch } from "../gui/src/app-model.js";
-import { normalizeVendorModelsForDraft, toConfig, toDraft } from "../gui/src/config-draft.js";
+import { getVendorCircuitSummary, suggestCatalogSwitch } from "../gui/src/app-model.ts";
+import { normalizeVendorModelsForDraft, toConfig, toDraft } from "../gui/src/config-draft.ts";
 
 const config = normalizeConfig({
   router: {
