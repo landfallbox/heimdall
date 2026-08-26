@@ -18,13 +18,6 @@ export const DEFAULT_CONFIG = {
     fallbackStatusCodes: [408, 409, 425, 429, 500, 502, 503, 504],
     logFile: "logs/router.log",
   },
-  model: {
-    id: "model-id",
-    name: "Model Name",
-    ownedBy: "local-router",
-    maxInputTokens: 200000,
-    maxOutputTokens: 64000,
-  },
   vendors: [],
 };
 
@@ -106,16 +99,7 @@ export const vendorSchema = z.object({
     });
   }
 
-  const enabledModels = vendor.models.filter((model) => model.enabled !== false);
-  if (!enabledModels.length) {
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["models"],
-      message: `Vendor ${vendor.name || "(unnamed)"} needs at least one enabled model.`,
-    });
-  }
-
-  enabledModels.forEach((model, index) => {
+  vendor.models.forEach((model, index) => {
     if (!model.id) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
@@ -139,13 +123,6 @@ export const configSchema = z.object({
     maxBodyBytes: z.number().int().min(1024),
     fallbackStatusCodes: z.array(statusCodeSchema).min(1),
     logFile: z.string().trim().min(1),
-  }),
-  model: z.object({
-    id: z.string().trim().min(1),
-    name: z.string().trim().min(1),
-    ownedBy: z.string().trim().min(1),
-    maxInputTokens: z.number().int().min(1),
-    maxOutputTokens: z.number().int().min(1),
   }),
   vendors: z.array(vendorSchema),
 });
@@ -178,14 +155,6 @@ export function normalizeConfig(config) {
   const merged = deepMerge(DEFAULT_CONFIG, isPlainObject(config) ? config : {});
   const app = merged.app || {};
   const router = merged.router || {};
-  const model = merged.model || {};
-  const normalizedModel = {
-    id: String(model.id || DEFAULT_CONFIG.model.id).trim() || DEFAULT_CONFIG.model.id,
-    name: String(model.name || DEFAULT_CONFIG.model.name).trim() || DEFAULT_CONFIG.model.name,
-    ownedBy: String(model.ownedBy || DEFAULT_CONFIG.model.ownedBy).trim() || DEFAULT_CONFIG.model.ownedBy,
-    maxInputTokens: Number(model.maxInputTokens || DEFAULT_CONFIG.model.maxInputTokens),
-    maxOutputTokens: Number(model.maxOutputTokens || DEFAULT_CONFIG.model.maxOutputTokens),
-  };
 
   return {
     app: {
@@ -201,8 +170,7 @@ export function normalizeConfig(config) {
       fallbackStatusCodes: normalizeStatusCodes(router.fallbackStatusCodes),
       logFile: String(router.logFile || DEFAULT_CONFIG.router.logFile).trim() || DEFAULT_CONFIG.router.logFile,
     },
-    model: normalizedModel,
-    vendors: Array.isArray(merged.vendors) ? merged.vendors.map((vendor) => normalizeVendor(vendor, normalizedModel.id)) : [],
+    vendors: Array.isArray(merged.vendors) ? merged.vendors.map((vendor) => normalizeVendor(vendor)) : [],
   };
 }
 
@@ -215,7 +183,7 @@ function normalizeStatusCodes(value) {
   return [...new Set(codes.map(Number).filter((code) => Number.isInteger(code) && code >= 100 && code <= 599))];
 }
 
-export function normalizeVendor(vendor, defaultModelId = DEFAULT_CONFIG.model.id) {
+export function normalizeVendor(vendor) {
   const authentication = vendor?.authentication === "api-key" || (!vendor?.authentication && vendor?.apiKey)
     ? "api-key"
     : "none";
@@ -224,7 +192,6 @@ export function normalizeVendor(vendor, defaultModelId = DEFAULT_CONFIG.model.id
     name: String(vendor?.name || "").trim(),
     baseUrl: String(vendor?.baseUrl || "").trim(),
     models: normalizeVendorModels(vendor?.models, {
-      defaultModelId,
       hasExplicitModels: Array.isArray(vendor?.models),
       legacyModelId: vendor?.model,
     }),
@@ -260,12 +227,11 @@ function normalizeApiKeyHeader(value) {
   return apiKeyHeaderSchema.safeParse(header).success ? header : "authorization";
 }
 
-export function normalizeVendorModels(value, { defaultModelId = DEFAULT_CONFIG.model.id, hasExplicitModels = Array.isArray(value), legacyModelId = "" } = {}) {
+export function normalizeVendorModels(value, { hasExplicitModels = Array.isArray(value), legacyModelId = "" } = {}) {
   const legacyId = String(legacyModelId || "").trim();
-  const fallbackId = legacyId || String(defaultModelId || DEFAULT_CONFIG.model.id).trim() || DEFAULT_CONFIG.model.id;
 
   if (!hasExplicitModels) {
-    return [{ id: fallbackId, enabled: true }];
+    return legacyId ? [{ id: legacyId, enabled: true }] : [];
   }
 
   if (!Array.isArray(value)) {
@@ -273,17 +239,17 @@ export function normalizeVendorModels(value, { defaultModelId = DEFAULT_CONFIG.m
   }
 
   return value
-    .map((model) => normalizeVendorModel(model, fallbackId))
+    .map((model) => normalizeVendorModel(model))
     .filter((model) => model.id);
 }
 
-function normalizeVendorModel(model, fallbackId) {
+function normalizeVendorModel(model) {
   if (typeof model === "string") {
     const id = model.trim();
     return { id, enabled: true };
   }
 
-  const id = String(model?.id || model?.model || fallbackId).trim();
+  const id = String(model?.id || model?.model || "").trim();
   const normalized = {
     ...model,
     id,

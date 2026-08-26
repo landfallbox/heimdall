@@ -399,7 +399,7 @@ export default function App() {
     const vendor = {
       name: "new-vendor",
       baseUrl: "https://example.com/v1",
-      models: [{ id: draft.model.id || "model-id", enabled: true }],
+      models: [],
       authentication: "none",
       requestFormat: "chat-completions",
       enabled: false,

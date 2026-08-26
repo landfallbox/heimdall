@@ -59,7 +59,6 @@ function sendJson(res, statusCode, body, extraHeaders = {}) {
 function runtimeConfigRevision(config) {
   const runtimeConfig = {
     router: config.router,
-    model: config.model,
     vendors: config.vendors,
   };
   return createHash("sha256").update(JSON.stringify(runtimeConfig)).digest("hex");
@@ -339,7 +338,7 @@ async function handleGeneration(req, res, config, logger, circuitBreaker, usageS
   const startedAt = Date.now();
   const requestBody = await readJsonBody(req, config.router.maxBodyBytes);
   logger.debug("inbound_request", { requestId, body: requestBody });
-  
+
   // 确定目标模型（请求必须显式指定 model，缺失直接报错）
   const requestedModel = String(requestBody.model ?? "").trim();
   if (!requestedModel) {
@@ -624,7 +623,7 @@ function handleModels(_req, res, config) {
     data: modelIds.map((id) => ({
       id,
       object: "model",
-      owned_by: config.model.ownedBy,
+      owned_by: "heimdall",
     })),
   });
 }
@@ -637,7 +636,6 @@ function handleHealth(_req, res, runtime) {
     configRevision: runtime.configRevision,
     restartRequired: runtime.restartFields.length > 0,
     restartFields: runtime.restartFields,
-    model: config.model.id,
     vendorCount: config.vendors.length,
     vendors: config.vendors.map((vendor) => ({
       name: vendor.name,
@@ -814,7 +812,6 @@ function main() {
       host: config.router.host,
       port: config.router.port,
       configPath,
-      model: config.model.id,
       vendors: config.vendors.map((vendor) => vendor.name),
     });
   });

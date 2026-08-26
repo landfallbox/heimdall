@@ -151,10 +151,7 @@ export function validateVendor(vendor) {
     errors.push("Base URL required");
   }
 
-  if (!enabledModels.length) {
-    fields.models = { tone: "error", message: "Add at least one enabled model." };
-    errors.push("No enabled model");
-  } else {
+  {
     const seenModelIds = new Set();
     for (const model of enabledModels) {
       if (!model.id) {
