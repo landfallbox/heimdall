@@ -281,11 +281,6 @@ function baseConfig(port, vendors, overrides = {}) {
       requestTimeoutMs: 500,
       ...overrides.router,
     },
-    model: {
-      id: "model-id",
-      name: "Model Name",
-      ...overrides.model,
-    },
     vendors,
   };
 }
@@ -312,7 +307,7 @@ async function testStatusFallback() {
     const port = await findFreePort();
     await withRouter("status-fallback", baseConfig(port, [
       { name: "vendor-a", baseUrl: vendorA.baseUrl, apiKey: "a-key", model: "model-id" },
-      { name: "vendor-b", baseUrl: vendorB.baseUrl, model: "" },
+      { name: "vendor-b", baseUrl: vendorB.baseUrl, model: "model-id" },
     ]), async ({ port: routerPort }) => {
       const response = await requestChat(routerPort);
       const body = await response.json();

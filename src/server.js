@@ -59,7 +59,6 @@ function sendJson(res, statusCode, body, extraHeaders = {}) {
 function runtimeConfigRevision(config) {
   const runtimeConfig = {
     router: config.router,
-    model: config.model,
     vendors: config.vendors,
   };
   return createHash("sha256").update(JSON.stringify(runtimeConfig)).digest("hex");
@@ -338,8 +337,8 @@ async function handleGeneration(req, res, config, logger, circuitBreaker, usageS
   const startedAt = Date.now();
   const requestBody = await readJsonBody(req, config.router.maxBodyBytes);
   logger.debug("inbound_request", { requestId, body: requestBody });
-  const requestedModel = String(requestBody.model || config.model.id).trim() || config.model.id;
-  const vendors = getVendorsForModel(config.vendors, requestedModel);
+  const requestedModel = String(requestBody.model || "").trim();
+  const vendors = requestedModel ? getVendorsForModel(config.vendors, requestedModel) : [];
   const failures = [];
 
   if (!vendors.length) {
@@ -584,7 +583,7 @@ function handleModels(_req, res, config) {
     data: modelIds.map((id) => ({
       id,
       object: "model",
-      owned_by: config.model.ownedBy,
+      owned_by: "heimdall",
     })),
   });
 }
@@ -597,7 +596,6 @@ function handleHealth(_req, res, runtime) {
     configRevision: runtime.configRevision,
     restartRequired: runtime.restartFields.length > 0,
     restartFields: runtime.restartFields,
-    model: config.model.id,
     vendorCount: config.vendors.length,
     vendors: config.vendors.map((vendor) => ({
       name: vendor.name,
@@ -774,7 +772,6 @@ function main() {
       host: config.router.host,
       port: config.router.port,
       configPath,
-      model: config.model.id,
       vendors: config.vendors.map((vendor) => vendor.name),
     });
   });

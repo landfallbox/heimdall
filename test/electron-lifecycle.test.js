@@ -29,13 +29,6 @@ function createConfig(port) {
       fallbackStatusCodes: [408, 409, 425, 429, 500, 502, 503, 504],
       logFile: "logs/router.log",
     },
-    model: {
-      id: "model-id",
-      name: "Model Name",
-      ownedBy: "local-router",
-      maxInputTokens: 200000,
-      maxOutputTokens: 64000,
-    },
     vendors: [{
       name: "test-vendor",
       baseUrl: "http://127.0.0.1:1/v1",

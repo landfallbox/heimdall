@@ -10,13 +10,6 @@ export const defaultDraft = {
     fallbackStatusCodesText: "408, 409, 425, 429, 500, 502, 503, 504",
     logFile: "logs/router.log",
   },
-  model: {
-    id: "model-id",
-    name: "Model Name",
-    ownedBy: "local-router",
-    maxInputTokens: "200000",
-    maxOutputTokens: "64000",
-  },
   vendors: [],
 };
 
@@ -31,22 +24,21 @@ export function normalizeCloseBehavior(value) {
   return closeBehaviorValues.has(value) ? value : defaultDraft.app.closeBehavior;
 }
 
-export function normalizeVendorModelsForDraft(vendor, defaultModelId = defaultDraft.model.id) {
-  const fallbackId = String(defaultModelId || defaultDraft.model.id).trim() || defaultDraft.model.id;
+export function normalizeVendorModelsForDraft(vendor) {
   if (!Array.isArray(vendor?.models)) {
-    const id = String(vendor?.model || fallbackId).trim() || fallbackId;
-    return [{ id, enabled: true }];
+    const id = String(vendor?.model || "").trim();
+    return id ? [{ id, enabled: true }] : [];
   }
 
-  return vendor.models.map((model) => normalizeVendorModelForDraft(model, fallbackId));
+  return vendor.models.map((model) => normalizeVendorModelForDraft(model));
 }
 
-function normalizeVendorModelForDraft(model, fallbackId) {
+function normalizeVendorModelForDraft(model) {
   if (typeof model === "string") {
     return { id: model.trim(), enabled: true };
   }
   if (!model || typeof model !== "object") {
-    return { id: fallbackId, enabled: true };
+    return { id: "", enabled: true };
   }
 
   const hasExplicitId = Object.prototype.hasOwnProperty.call(model, "id");
@@ -56,7 +48,7 @@ function normalizeVendorModelForDraft(model, fallbackId) {
     : pricing ? pricing.mode : "openai";
   return {
     ...model,
-    id: String(hasExplicitId ? model.id || "" : model.model || fallbackId).trim(),
+    id: String(hasExplicitId ? model.id || "" : model.model || "").trim(),
     enabled: model.enabled !== false,
     pricingMode,
     pricingCurrency: normalizePricingCurrency(model.pricingCurrency ?? pricing?.currency),
@@ -66,15 +58,13 @@ function normalizeVendorModelForDraft(model, fallbackId) {
   };
 }
 
-export function getVendorModels(vendor, defaultModelId = defaultDraft.model.id) {
-  return normalizeVendorModelsForDraft(vendor, defaultModelId);
+export function getVendorModels(vendor) {
+  return normalizeVendorModelsForDraft(vendor);
 }
 
 export function toDraft(config) {
   const app = config.app || {};
   const router = config.router || {};
-  const model = config.model || {};
-  const modelId = model.id || defaultDraft.model.id;
 
   return {
     app: {
@@ -94,17 +84,10 @@ export function toDraft(config) {
         : defaultDraft.router.fallbackStatusCodesText,
       logFile: router.logFile || defaultDraft.router.logFile,
     },
-    model: {
-      id: model.id || defaultDraft.model.id,
-      name: model.name || defaultDraft.model.name,
-      ownedBy: model.ownedBy || defaultDraft.model.ownedBy,
-      maxInputTokens: String(model.maxInputTokens ?? 200000),
-      maxOutputTokens: String(model.maxOutputTokens ?? 64000),
-    },
     vendors: Array.isArray(config.vendors)
       ? config.vendors.map((vendor) => ({
           ...vendor,
-          models: normalizeVendorModelsForDraft(vendor, modelId),
+          models: normalizeVendorModelsForDraft(vendor),
           authentication: vendor.authentication === "api-key" || vendor.apiKey ? "api-key" : "none",
           apiKeyHeader: vendor.apiKeyHeader || "authorization",
           requestFormat: normalizeRequestFormat(vendor.requestFormat),
@@ -128,19 +111,12 @@ export function toConfig(draft) {
       fallbackStatusCodes: parseStatusCodes(draft.router.fallbackStatusCodesText),
       logFile: draft.router.logFile.trim() || defaultDraft.router.logFile,
     },
-    model: {
-      id: draft.model.id.trim() || defaultDraft.model.id,
-      name: draft.model.name.trim() || defaultDraft.model.name,
-      ownedBy: draft.model.ownedBy.trim() || defaultDraft.model.ownedBy,
-      maxInputTokens: numberValue(draft.model.maxInputTokens, 200000),
-      maxOutputTokens: numberValue(draft.model.maxOutputTokens, 64000),
-    },
     vendors: draft.vendors.map((vendor) => {
       const normalized = {
         ...vendor,
         name: String(vendor.name || "").trim(),
         baseUrl: String(vendor.baseUrl || "").trim(),
-        models: normalizeVendorModelsForDraft(vendor, draft.model.id).map((model) => ({
+        models: normalizeVendorModelsForDraft(vendor).map((model) => ({
           id: String(model.id || "").trim(),
           enabled: model.enabled !== false,
           ...(model.pricingMode === "custom" ? {
