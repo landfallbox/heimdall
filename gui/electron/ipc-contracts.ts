@@ -113,10 +113,10 @@ const usageSummarySchema = z.object({
   models: z.array(namedUsageAggregateSchema),
 });
 
-const optionalOptionsRequest = (schema) => z.tuple([schema.optional()]);
-const contract = (request, response) => ({ request, response });
+const optionalOptionsRequest = (schema: z.ZodType) => z.tuple([schema.optional()]);
+const contract = (request: z.ZodType, response: z.ZodType) => ({ request, response });
 
-export const ipcContracts = Object.freeze({
+export const ipcContracts: Record<string, { request: z.ZodType; response: z.ZodType }> = Object.freeze({
   "app:getState": contract(emptyRequest, configResultSchema.extend({ health: healthSchema, appVersion: z.string() })),
   "app:rendererReady": contract(emptyRequest, okResponse),
   "app:hideToTray": contract(emptyRequest, okResponse),
@@ -156,17 +156,17 @@ export const ipcContracts = Object.freeze({
   "clipboard:writeText": contract(z.tuple([z.string()]), okResponse),
 });
 
-export const ipcContractChannels = Object.freeze(Object.keys(ipcContracts));
+export const ipcContractChannels = Object.freeze(Object.keys(ipcContracts)) as readonly string[];
 
-export function parseIpcRequest(channel, args) {
+export function parseIpcRequest(channel: string, args: unknown): unknown {
   return parseContractValue(channel, "request", args);
 }
 
-export function parseIpcResponse(channel, value) {
+export function parseIpcResponse(channel: string, value: unknown): unknown {
   return parseContractValue(channel, "response", value);
 }
 
-function parseContractValue(channel, direction, value) {
+function parseContractValue(channel: string, direction: "request" | "response", value: unknown): unknown {
   const schema = ipcContracts[channel]?.[direction];
   if (!schema) {
     throw new Error(`Missing IPC ${direction} contract for ${channel}.`);

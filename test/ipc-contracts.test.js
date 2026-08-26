@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { ipcContractChannels, parseIpcRequest, parseIpcResponse } from "../gui/electron/ipc-contracts.js";
+import { ipcContractChannels, parseIpcRequest, parseIpcResponse } from "../gui/electron/ipc-contracts.ts";
 
 const health = {
   ok: true,

@@ -1,6 +1,6 @@
 import electron from "electron";
 import electronUpdater from "electron-updater";
-import { updateStateSchema } from "./ipc-contracts.js";
+import { updateStateSchema } from "./ipc-contracts.ts";
 
 const { app, BrowserWindow, shell } = electron;
 const RELEASES_URL = "https://github.com/landfallbox/heimdall/releases/latest";

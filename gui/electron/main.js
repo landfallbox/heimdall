@@ -10,7 +10,7 @@ import { DEFAULT_CONFIG, normalizeConfig } from "../../src/config.js";
 import { getChatCompletionsUrl, getRouterBaseUrl } from "../../src/router-urls.js";
 import { readUsageSummary } from "../../src/usage-store.js";
 import { readConfigStore, writeConfigStore } from "./config-store.js";
-import { parseIpcRequest, parseIpcResponse } from "./ipc-contracts.js";
+import { parseIpcRequest, parseIpcResponse } from "./ipc-contracts.ts";
 import { ensureLogFile, readLogPage, resolveLogPath } from "./log-store.js";
 import { createTrayController, healthDetail } from "./tray-controller.js";
 import {
