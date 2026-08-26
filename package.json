@@ -20,7 +20,7 @@
     "electron"
   ],
   "type": "module",
-  "main": "gui/electron/main.js",
+  "main": "gui/electron/main.ts",
   "scripts": {
     "check": "tsc --noEmit && node --check gui/electron/preload.cjs && node --check scripts/start-electron-dev.mjs && node --check scripts/generate-release-notes.mjs",
     "test": "node test/config-and-urls.test.js && node test/config-draft.test.js && node test/ipc-contracts.test.js && node test/log-store.test.js && node test/openai-protocol.test.js && node test/usage.test.js && node test/vendor-circuit-breaker.test.js && node test/fallback-smoke.test.js",

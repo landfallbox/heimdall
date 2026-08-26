@@ -1,6 +1,28 @@
-import { Menu, nativeImage, Notification, Tray } from "electron";
+import { Menu, nativeImage, Notification, Tray, type MenuItemConstructorOptions } from "electron";
+import type { HealthState, RouterActionResult, UpdateState } from "../src/types.ts";
 
 const REFRESH_INTERVAL_MS = 15000;
+
+interface TrayStatus {
+  label: string;
+  detail: string;
+  isRouterActive: boolean;
+}
+
+interface TrayControllerOptions {
+  createAppIcon: () => ReturnType<typeof nativeImage.createFromPath> | null;
+  downloadUpdate: () => Promise<unknown>;
+  getHealth: () => Promise<HealthState | null>;
+  getUpdateState: () => UpdateState;
+  installUpdate: () => Promise<unknown>;
+  isQuitting: () => boolean;
+  openLogFile: () => Promise<unknown>;
+  quitApplication: () => void;
+  restartRouter: () => Promise<RouterActionResult>;
+  showSettingsWindow: () => void;
+  startRouter: () => Promise<RouterActionResult>;
+  stopRouter: () => Promise<RouterActionResult>;
+}
 
 export function createTrayController({
   createAppIcon,
@@ -15,13 +37,13 @@ export function createTrayController({
   showSettingsWindow,
   startRouter,
   stopRouter,
-}) {
-  let tray = null;
-  let refreshTimer = null;
+}: TrayControllerOptions) {
+  let tray: Tray | null = null;
+  let refreshTimer: NodeJS.Timeout | null = null;
   let busyAction = "";
-  let status = { label: "Checking", detail: "", isRouterActive: false };
+  let status: TrayStatus = { label: "Checking", detail: "", isRouterActive: false };
 
-  function showNotification(title, body) {
+  function showNotification(title: string, body: string) {
     if (Notification.isSupported()) {
       new Notification({ title, body: String(body || "") }).show();
     }
@@ -33,11 +55,11 @@ export function createTrayController({
     }
 
     const updateState = getUpdateState();
-    const items = [
+    const items: MenuItemConstructorOptions[] = [
       { label: `Current status: ${status.label}`, enabled: false },
       { type: "separator" },
       { label: "Open Settings", click: showSettingsWindow },
-      { label: "Open Logs", click: () => void openLogFile().catch((error) => showNotification("Heimdall", error.message || String(error))) },
+      { label: "Open Logs", click: () => void openLogFile().catch((error: unknown) => showNotification("Heimdall", (error as Error).message || String(error))) },
     ];
 
     if (busyAction) {
@@ -73,7 +95,7 @@ export function createTrayController({
     tray.setContextMenu(Menu.buildFromTemplate(items));
   }
 
-  function create() {
+  function create(): Tray {
     if (tray) {
       return tray;
     }
@@ -89,17 +111,17 @@ export function createTrayController({
     return tray;
   }
 
-  function setConfigurationIssue(detail) {
+  function setConfigurationIssue(detail: string) {
     status = { label: "Stopped", detail, isRouterActive: false };
     updateMenu();
   }
 
-  async function refreshStatus(health = null, { notifyOnUnexpectedStop = false } = {}) {
+  async function refreshStatus(health: HealthState | null = null, { notifyOnUnexpectedStop = false }: { notifyOnUnexpectedStop?: boolean } = {}): Promise<HealthState | null> {
     if (!tray) {
       return health;
     }
 
-    const nextHealth = health || await getHealth();
+    const nextHealth = health || (await getHealth());
     const nextStatus = statusFromHealth(nextHealth);
     if (notifyOnUnexpectedStop && status.isRouterActive && !nextStatus.isRouterActive && !isQuitting()) {
       showNotification("Heimdall stopped", nextStatus.detail || "The router process is no longer running.");
@@ -110,7 +132,7 @@ export function createTrayController({
     return nextHealth;
   }
 
-  async function runRouterAction(label, action, errorTitle, unhealthyTitle = "") {
+  async function runRouterAction(label: string, action: () => Promise<RouterActionResult>, errorTitle: string, unhealthyTitle = "") {
     setBusy(label);
     try {
       const result = await action();
@@ -118,7 +140,7 @@ export function createTrayController({
         showNotification(unhealthyTitle, healthDetail(result?.health));
       }
     } catch (error) {
-      showNotification(errorTitle, error.message || String(error));
+      showNotification(errorTitle, (error as Error).message || String(error));
     } finally {
       setBusy("");
     }
@@ -129,6 +151,7 @@ export function createTrayController({
     try {
       await downloadUpdate();
     } catch {
+      // Download failures are surfaced through the update state.
     } finally {
       setBusy("");
     }
@@ -138,11 +161,11 @@ export function createTrayController({
     try {
       await installUpdate();
     } catch (error) {
-      showNotification("Heimdall update failed", error.message || String(error));
+      showNotification("Heimdall update failed", (error as Error).message || String(error));
     }
   }
 
-  function setBusy(label) {
+  function setBusy(label: string) {
     busyAction = label;
     updateMenu();
   }
@@ -165,15 +188,15 @@ export function createTrayController({
   };
 }
 
-export function healthDetail(health) {
+export function healthDetail(health: HealthState | null | undefined): string {
   if (!health) {
     return "No health result is available.";
   }
 
-  return health.error || health.text || health.body?.model || health.url || "Router did not report healthy.";
+  return health.error || health.text || (health.body as { model?: string } | null | undefined)?.model || health.url || "Router did not report healthy.";
 }
 
-function statusFromHealth(health) {
+function statusFromHealth(health: HealthState | null): TrayStatus {
   if (!health) {
     return { label: "Checking", detail: "", isRouterActive: false };
   }

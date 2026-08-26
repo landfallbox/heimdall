@@ -1,3 +1,11 @@
+/**
+ * Electron preload bridge.
+ *
+ * This file intentionally stays CommonJS: Electron preload scripts cannot
+ * load ES modules or TypeScript. The renderer-facing surface it exposes is
+ * declared as the `HeimdallDesktopApi` interface in `../src/desktop-api.ts`,
+ * which the renderer imports for full type safety. Keep the two in sync.
+ */
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("heimdall", {

@@ -1,6 +1,9 @@
 import electron from "electron";
 import electronUpdater from "electron-updater";
+import type { UpdateDownloadedEvent } from "electron-updater";
+import type { ProgressInfo, UpdateInfo } from "builder-util-runtime";
 import { updateStateSchema } from "./ipc-contracts.ts";
+import { z } from "zod";
 
 const { app, BrowserWindow, shell } = electron;
 const RELEASES_URL = "https://github.com/landfallbox/heimdall/releases/latest";
@@ -10,14 +13,18 @@ const isRealUpdaterSupported = Boolean(app?.isPackaged && ["darwin", "win32"].in
 const isUpdaterSupported = isRealUpdaterSupported || isMockUpdateEnabled;
 const mockUpdateVersion = String(process.env.HEIMDALL_MOCK_UPDATE_VERSION || "0.3.0-dev-preview").trim();
 
-let updateState = createInitialState();
-let initialized = false;
-let checkingPromise = null;
-let downloadPromise = null;
-let updater = null;
-const stateListeners = new Set();
+type UpdateState = z.infer<typeof updateStateSchema>;
+type UpdateStatePatch = Partial<UpdateState>;
+type AutoUpdater = typeof electronUpdater.autoUpdater;
 
-function getAutoUpdater() {
+let updateState: UpdateState = createInitialState();
+let initialized = false;
+let checkingPromise: Promise<UpdateState> | null = null;
+let downloadPromise: Promise<UpdateState> | null = null;
+let updater: AutoUpdater | null = null;
+const stateListeners = new Set<(state: UpdateState) => void>();
+
+function getAutoUpdater(): AutoUpdater {
   if (!updater) {
     updater = electronUpdater.autoUpdater;
   }
@@ -25,11 +32,11 @@ function getAutoUpdater() {
   return updater;
 }
 
-function getCurrentVersion() {
+function getCurrentVersion(): string {
   return typeof app?.getVersion === "function" ? app.getVersion() : "";
 }
 
-function createInitialState() {
+function createInitialState(): UpdateState {
   return {
     status: isUpdaterSupported ? "idle" : "unsupported",
     supported: isUpdaterSupported,
@@ -44,7 +51,7 @@ function createInitialState() {
   };
 }
 
-function normalizeUpdateInfo(info = {}) {
+function normalizeUpdateInfo(info: UpdateInfo = {} as UpdateInfo): Pick<UpdateState, "availableVersion" | "releaseName" | "releaseNotes"> {
   return {
     availableVersion: String(info.version || ""),
     releaseName: String(info.releaseName || ""),
@@ -52,10 +59,10 @@ function normalizeUpdateInfo(info = {}) {
   };
 }
 
-function normalizeReleaseNotes(value) {
+function normalizeReleaseNotes(value: unknown): string {
   if (Array.isArray(value)) {
     return value
-      .map((item) => String(item?.note || item?.version || "").trim())
+      .map((item: { note?: unknown; version?: unknown }) => String(item?.note || item?.version || "").trim())
       .filter(Boolean)
       .join("\n\n");
   }
@@ -63,16 +70,16 @@ function normalizeReleaseNotes(value) {
   return String(value || "").trim();
 }
 
-function normalizeProgress(info = {}) {
+function normalizeProgress(info: Partial<ProgressInfo> = {}) {
   return {
-    percent: Number.isFinite(info.percent) ? Math.max(0, Math.min(100, info.percent)) : 0,
-    bytesPerSecond: Number.isFinite(info.bytesPerSecond) ? info.bytesPerSecond : 0,
-    transferred: Number.isFinite(info.transferred) ? info.transferred : 0,
-    total: Number.isFinite(info.total) ? info.total : 0,
+    percent: Number.isFinite(info.percent) ? Math.max(0, Math.min(100, info.percent as number)) : 0,
+    bytesPerSecond: Number.isFinite(info.bytesPerSecond) ? (info.bytesPerSecond as number) : 0,
+    transferred: Number.isFinite(info.transferred) ? (info.transferred as number) : 0,
+    total: Number.isFinite(info.total) ? (info.total as number) : 0,
   };
 }
 
-function update(nextState) {
+function update(nextState: UpdateStatePatch): UpdateState {
   updateState = {
     ...updateState,
     ...nextState,
@@ -99,12 +106,12 @@ function broadcastUpdateState() {
   }
 }
 
-export function onUpdateState(listener) {
+export function onUpdateState(listener: (state: UpdateState) => void): () => void {
   stateListeners.add(listener);
   return () => stateListeners.delete(listener);
 }
 
-export function initializeUpdater() {
+export function initializeUpdater(): UpdateState {
   if (initialized) {
     return updateState;
   }
@@ -124,7 +131,7 @@ export function initializeUpdater() {
     update({ status: "checking", error: "", progress: null });
   });
 
-  autoUpdater.on("update-available", (info) => {
+  autoUpdater.on("update-available", (info: UpdateInfo) => {
     update({
       status: "available",
       ...normalizeUpdateInfo(info),
@@ -134,7 +141,7 @@ export function initializeUpdater() {
     });
   });
 
-  autoUpdater.on("update-not-available", (info) => {
+  autoUpdater.on("update-not-available", (info: UpdateInfo) => {
     update({
       status: "not-available",
       ...normalizeUpdateInfo(info),
@@ -145,11 +152,11 @@ export function initializeUpdater() {
     });
   });
 
-  autoUpdater.on("download-progress", (info) => {
+  autoUpdater.on("download-progress", (info: ProgressInfo) => {
     update({ status: "downloading", progress: normalizeProgress(info), error: "" });
   });
 
-  autoUpdater.on("update-downloaded", (event) => {
+  autoUpdater.on("update-downloaded", (event: UpdateDownloadedEvent) => {
     update({
       status: "downloaded",
       ...normalizeUpdateInfo(event),
@@ -158,7 +165,7 @@ export function initializeUpdater() {
     });
   });
 
-  autoUpdater.on("error", (error) => {
+  autoUpdater.on("error", (error: Error) => {
     update({
       status: "error",
       error: error?.message || String(error),
@@ -169,11 +176,11 @@ export function initializeUpdater() {
   return updateState;
 }
 
-export function getUpdateState() {
+export function getUpdateState(): UpdateState {
   return updateState;
 }
 
-export async function checkForUpdates({ manual = false } = {}) {
+export async function checkForUpdates({ manual = false }: { manual?: boolean } = {}): Promise<UpdateState> {
   initializeUpdater();
 
   if (isMockUpdateEnabled) {
@@ -194,10 +201,10 @@ export async function checkForUpdates({ manual = false } = {}) {
 
   checkingPromise = getAutoUpdater().checkForUpdates()
     .then(() => updateState)
-    .catch((error) => {
+    .catch((error: unknown) => {
       update({
         status: "error",
-        error: error?.message || String(error),
+        error: (error as Error)?.message || String(error),
         progress: null,
       });
       if (manual) {
@@ -212,7 +219,7 @@ export async function checkForUpdates({ manual = false } = {}) {
   return checkingPromise;
 }
 
-export async function downloadUpdate() {
+export async function downloadUpdate(): Promise<UpdateState> {
   initializeUpdater();
 
   if (isMockUpdateEnabled) {
@@ -245,10 +252,10 @@ export async function downloadUpdate() {
   update({ status: "downloading", error: "", progress: normalizeProgress() });
   downloadPromise = getAutoUpdater().downloadUpdate()
     .then(() => updateState)
-    .catch((error) => {
+    .catch((error: unknown) => {
       update({
         status: "error",
-        error: error?.message || String(error),
+        error: (error as Error)?.message || String(error),
         progress: null,
       });
       throw error;
@@ -260,7 +267,7 @@ export async function downloadUpdate() {
   return downloadPromise;
 }
 
-export function installUpdate() {
+export function installUpdate(): UpdateState {
   initializeUpdater();
 
   if (isMockUpdateEnabled) {
@@ -291,7 +298,7 @@ export function installUpdate() {
   return updateState;
 }
 
-async function checkForMockUpdate() {
+async function checkForMockUpdate(): Promise<UpdateState> {
   update({ status: "checking", error: "", progress: null });
   await delay(350);
 
@@ -327,7 +334,7 @@ async function checkForMockUpdate() {
   });
 }
 
-async function downloadMockUpdate() {
+async function downloadMockUpdate(): Promise<UpdateState> {
   if (downloadPromise) {
     return downloadPromise;
   }
@@ -370,11 +377,11 @@ async function downloadMockUpdate() {
   return downloadPromise;
 }
 
-function delay(milliseconds) {
+function delay(milliseconds: number): Promise<void> {
   return new Promise((resolvePromise) => setTimeout(resolvePromise, milliseconds));
 }
 
-export async function openReleasePage() {
+export async function openReleasePage(): Promise<{ ok: boolean }> {
   if (typeof shell?.openExternal !== "function") {
     return { ok: false };
   }

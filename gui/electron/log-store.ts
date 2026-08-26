@@ -1,21 +1,31 @@
 import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
+import type { FileHandle } from "node:fs/promises";
 import { dirname, isAbsolute, join } from "node:path";
 import { DEFAULT_CONFIG } from "../../src/config.js";
 
-export function resolveLogPath(config, dataDirectory) {
+type LogConfig = { router?: { logFile?: string } };
+
+export function resolveLogPath(config: LogConfig, dataDirectory: string): string {
   const logFile = config.router?.logFile || DEFAULT_CONFIG.router.logFile;
   return isAbsolute(logFile) ? logFile : join(dataDirectory, logFile);
 }
 
-export async function ensureLogFile(logPath) {
+export async function ensureLogFile(logPath: string): Promise<void> {
   await fs.mkdir(dirname(logPath), { recursive: true });
   if (!existsSync(logPath)) {
     await fs.writeFile(logPath, "", "utf8");
   }
 }
 
-export async function readLogPage(logPath, { limit, before }) {
+export interface LogPage {
+  path: string;
+  lines: string[];
+  nextBefore: number | null;
+  hasMore: boolean;
+}
+
+export async function readLogPage(logPath: string, { limit, before }: { limit: number; before: number | null }): Promise<LogPage> {
   const handle = await fs.open(logPath, "r");
   try {
     const stat = await handle.stat();
@@ -32,8 +42,8 @@ export async function readLogPage(logPath, { limit, before }) {
   }
 }
 
-async function readLinesBefore(handle, end, limit) {
-  const chunks = [];
+async function readLinesBefore(handle: FileHandle, end: number, limit: number): Promise<{ lines: string[]; start: number }> {
+  const chunks: Buffer[] = [];
   let position = end;
   let lineBreaks = 0;
   const chunkSize = 16 * 1024;

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { readConfigStore, writeConfigStore } from "../gui/electron/config-store.js";
+import { readConfigStore, writeConfigStore } from "../gui/electron/config-store.ts";
 import { getChatCompletionsUrl, getResponsesUrl, getRouterBaseUrl } from "../src/router-urls.js";
 import { normalizeConfig, validateConfig, vendorModelSchema } from "../src/config.js";
 

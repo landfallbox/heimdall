@@ -12,14 +12,28 @@ export interface VendorHealth {
 
 export interface HealthBody {
   model?: string;
+  instanceId?: string;
   vendors?: VendorHealth[];
 }
 
 export interface HealthState {
   ok: boolean;
-  processCount: number;
+  status?: number;
+  url: string;
+  body?: HealthBody | null;
+  text?: string;
   error?: string;
-  body?: HealthBody;
+  processCount: number;
+  processLogPath?: string;
+}
+
+export interface RouterActionResult {
+  health: HealthState;
+  started?: boolean;
+  stopped?: boolean;
+  via?: "existing" | "process";
+  pid?: number;
+  error?: string;
 }
 
 export interface LogEntry {

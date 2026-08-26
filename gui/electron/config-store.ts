@@ -3,13 +3,20 @@ import fs from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { normalizeConfig, validateConfig } from "../../src/config.js";
 
-let writeQueue = Promise.resolve();
+type NormalizedConfig = ReturnType<typeof normalizeConfig>;
 
-function revisionFor(text) {
+let writeQueue: Promise<unknown> = Promise.resolve();
+
+function revisionFor(text: string): string {
   return createHash("sha256").update(text).digest("hex");
 }
 
-export async function readConfigStore(configPath) {
+export interface ConfigStoreResult {
+  config: NormalizedConfig;
+  revision: string;
+}
+
+export async function readConfigStore(configPath: string): Promise<ConfigStoreResult> {
   const text = (await fs.readFile(configPath, "utf8")).replace(/^\uFEFF/, "");
   return {
     config: normalizeConfig(JSON.parse(text)),
@@ -21,11 +28,11 @@ export async function readConfigStore(configPath) {
  * Serializes writes and rejects stale renderer snapshots. The temporary file is
  * kept beside config.json so rename remains an atomic filesystem operation.
  */
-export function writeConfigStore(configPath, config, expectedRevision) {
+export function writeConfigStore(configPath: string, config: NormalizedConfig, expectedRevision?: string): Promise<ConfigStoreResult> {
   const operation = writeQueue.then(async () => {
     const current = await readConfigStore(configPath);
     if (expectedRevision && current.revision !== expectedRevision) {
-      const error = new Error("Config changed since it was loaded. Reload settings and try again.");
+      const error = new Error("Config changed since it was loaded. Reload settings and try again.") as Error & { code?: string };
       error.code = "CONFIG_CONFLICT";
       throw error;
     }

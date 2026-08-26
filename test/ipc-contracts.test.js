@@ -39,7 +39,7 @@ assert.throws(
   /Missing IPC request contract for unknown:channel/,
 );
 
-const mainSource = readFileSync(new URL("../gui/electron/main.js", import.meta.url), "utf8");
+const mainSource = readFileSync(new URL("../gui/electron/main.ts", import.meta.url), "utf8");
 const registeredChannels = [...mainSource.matchAll(/registerIpcHandler\("([^"]+)"/g)].map((match) => match[1]).sort();
 assert.deepEqual([...ipcContractChannels].sort(), registeredChannels);
 

@@ -1,5 +1,5 @@
-import { app, BrowserWindow, clipboard, ipcMain, nativeImage, nativeTheme, shell } from "electron";
-import { spawn } from "node:child_process";
+import { app, BrowserWindow, clipboard, ipcMain, nativeImage, nativeTheme, shell, type IpcMainInvokeEvent } from "electron";
+import { spawn, type ChildProcess } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
 import { closeSync, existsSync, openSync } from "node:fs";
 import fs from "node:fs/promises";
@@ -9,10 +9,10 @@ import { fileURLToPath } from "node:url";
 import { DEFAULT_CONFIG, normalizeConfig } from "../../src/config.js";
 import { getChatCompletionsUrl, getRouterBaseUrl } from "../../src/router-urls.js";
 import { readUsageSummary } from "../../src/usage-store.js";
-import { readConfigStore, writeConfigStore } from "./config-store.js";
+import { readConfigStore, writeConfigStore } from "./config-store.ts";
 import { parseIpcRequest, parseIpcResponse } from "./ipc-contracts.ts";
-import { ensureLogFile, readLogPage, resolveLogPath } from "./log-store.js";
-import { createTrayController, healthDetail } from "./tray-controller.js";
+import { ensureLogFile, readLogPage, resolveLogPath } from "./log-store.ts";
+import { createTrayController, healthDetail } from "./tray-controller.ts";
 import {
   checkForUpdates,
   downloadUpdate,
@@ -21,7 +21,45 @@ import {
   installUpdate,
   onUpdateState,
   openReleasePage,
-} from "./updater.js";
+} from "./updater.ts";
+import type { HealthBody, HealthState, RouterActionResult, UpdateState } from "../src/types.ts";
+
+type NormalizedConfig = ReturnType<typeof normalizeConfig>;
+
+interface Paths {
+  appDir: string;
+  dataDir: string;
+  configPath: string;
+  serverPath: string;
+  pidPath: string;
+  packageRoot: string;
+  nodePath: string;
+}
+
+interface ManagedRouterMetadata {
+  pid: number;
+  instanceId: string;
+  managementToken: string;
+  configPath: string;
+  startedAt: string;
+}
+
+interface PendingRouterReload {
+  resolve: (message: { applied?: boolean; restartRequired?: boolean; restartFields?: string[] }) => void;
+  reject: (error: Error) => void;
+}
+
+interface RouterReloadResult {
+  applied: boolean;
+  restartRequired: boolean;
+  restartFields: string[];
+  reloadError: string;
+}
+
+interface HealthOptions {
+  includeProcessCount?: boolean;
+  managementToken?: string;
+}
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const HIDDEN_START_ARGS = new Set(["--hidden", "--background", "--minimized", "--tray"]);
@@ -29,16 +67,16 @@ const isDevelopmentRuntime = process.env.HEIMDALL_DEV_MODE === "1";
 const APP_DISPLAY_NAME = isDevelopmentRuntime ? "Heimdall Dev" : "Heimdall";
 const APP_USER_MODEL_ID = isDevelopmentRuntime ? "local.heimdall.dev" : "local.heimdall";
 
-let mainWindow = null;
+let mainWindow: BrowserWindow | null = null;
 let isQuitting = false;
 let closePromptActive = false;
-let routerLifecycleQueue = Promise.resolve();
-let managedRouterChild = null;
-const pendingRouterReloads = new Map();
-const windowsToShowOnReady = new WeakSet();
+let routerLifecycleQueue: Promise<unknown> = Promise.resolve();
+let managedRouterChild: ChildProcess | null = null;
+const pendingRouterReloads = new Map<string, PendingRouterReload>();
+const windowsToShowOnReady = new WeakSet<BrowserWindow>();
 
-function resolveAppDir() {
-  const candidates = [process.env.HEIMDALL_APP_DIR];
+function resolveAppDir(): string {
+  const candidates: (string | undefined)[] = [process.env.HEIMDALL_APP_DIR];
 
   if (app.isPackaged) {
     candidates.push(
@@ -53,7 +91,7 @@ function resolveAppDir() {
     resolve(process.resourcesPath || "", "app"),
   );
 
-  for (const candidate of candidates.filter(Boolean)) {
+  for (const candidate of candidates.filter((value): value is string => Boolean(value))) {
     if (existsSync(join(candidate, "src", "server.js"))) {
       return candidate;
     }
@@ -62,7 +100,7 @@ function resolveAppDir() {
   throw new Error("Could not find the router app directory.");
 }
 
-function getPaths() {
+function getPaths(): Paths {
   const appDir = resolveAppDir();
   const dataDir = process.env.HEIMDALL_DATA_DIR || (app.isPackaged ? app.getPath("userData") : appDir);
   const configPath = process.env.ROUTER_CONFIG || join(dataDir, "config.json");
@@ -82,7 +120,7 @@ function getPaths() {
   };
 }
 
-function resolveNodePath(packageRoot) {
+function resolveNodePath(packageRoot: string): string {
   if (process.env.HEIMDALL_NODE) {
     return process.env.HEIMDALL_NODE;
   }
@@ -106,15 +144,15 @@ function resolveNodePath(packageRoot) {
   return executableName;
 }
 
-function resolveAppIconPath() {
+function resolveAppIconPath(): string {
   const iconName = process.platform === "darwin" ? "icon.png" : "icon.ico";
   const candidates = [
     process.env.HEIMDALL_ICON,
     app.isPackaged ? join(process.resourcesPath, "assets", iconName) : "",
     resolve(__dirname, "..", "..", "build", iconName),
-  ];
+  ].filter((value): value is string => Boolean(value));
 
-  return candidates.filter(Boolean).find((candidate) => existsSync(candidate)) || "";
+  return candidates.find((candidate) => existsSync(candidate)) || "";
 }
 
 function createAppIcon() {
@@ -136,8 +174,8 @@ function createTrayIcon() {
     process.env.HEIMDALL_TRAY_ICON,
     app.isPackaged ? join(process.resourcesPath, "assets", "trayTemplate.png") : "",
     resolve(__dirname, "..", "..", "build", "trayTemplate.png"),
-  ];
-  const iconPath = candidates.filter(Boolean).find((candidate) => existsSync(candidate));
+  ].filter((value): value is string => Boolean(value));
+  const iconPath = candidates.find((candidate) => existsSync(candidate));
   if (!iconPath) {
     return null;
   }
@@ -150,7 +188,7 @@ function createTrayIcon() {
   return icon;
 }
 
-function ensureConfigFile(paths = getPaths()) {
+function ensureConfigFile(paths: Paths = getPaths()) {
   if (existsSync(paths.configPath)) {
     return;
   }
@@ -180,7 +218,7 @@ function configureRuntimeIdentity() {
   }
 }
 
-function generateRouterApiKey() {
+function generateRouterApiKey(): string {
   return `lmr_${randomBytes(24).toString("base64url")}`;
 }
 
@@ -200,11 +238,11 @@ async function loadConfig() {
   };
 }
 
-function getEndpoint(config) {
+function getEndpoint(config: NormalizedConfig): string {
   return getChatCompletionsUrl(config);
 }
 
-function getVendorModelsUrl(vendor) {
+function getVendorModelsUrl(vendor: { baseUrl?: string }): string {
   const baseUrl = String(vendor?.baseUrl || "").trim();
   if (!baseUrl) {
     throw new Error("Enter the vendor Base URL before refreshing models.");
@@ -221,7 +259,7 @@ function getVendorModelsUrl(vendor) {
   return url.toString();
 }
 
-async function fetchVendorModels(_event, vendor) {
+async function fetchVendorModels(_event: IpcMainInvokeEvent, vendor: { baseUrl?: string; authentication?: string; apiKey?: string; apiKeyHeader?: string }): Promise<{ models: string[]; url: string }> {
   const url = getVendorModelsUrl(vendor);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
@@ -235,7 +273,7 @@ async function fetchVendorModels(_event, vendor) {
       signal: controller.signal,
     });
     const text = await response.text();
-    let body = null;
+    let body: unknown = null;
     try {
       body = JSON.parse(text);
     } catch {
@@ -243,15 +281,17 @@ async function fetchVendorModels(_event, vendor) {
     }
 
     if (!response.ok) {
-      const upstreamError = body?.error && typeof body.error === "object" ? body.error : body;
-      const message = upstreamError?.message || text || `HTTP ${response.status}`;
-      const error = new Error(message);
-      error.code = upstreamError?.code || `HTTP_${response.status}`;
+      const upstreamError = body && typeof body === "object" && "error" in body && typeof (body as { error: unknown }).error === "object"
+        ? (body as { error: unknown }).error
+        : body;
+      const message = (upstreamError as { message?: string } | null | undefined)?.message || text || `HTTP ${response.status}`;
+      const error = new Error(message) as Error & { code?: string; statusCode?: number };
+      error.code = (upstreamError as { code?: string } | null | undefined)?.code || `HTTP_${response.status}`;
       error.statusCode = response.status;
       throw error;
     }
 
-    const data = Array.isArray(body?.data) ? body.data : [];
+    const data = Array.isArray((body as { data?: unknown[] } | null)?.data) ? (body as { data: Array<{ id?: string }> }).data : [];
     const models = [...new Set(data.map((model) => String(model?.id || "").trim()).filter(Boolean))];
     if (!models.length) {
       throw new Error("The vendor did not return any models.");
@@ -259,7 +299,7 @@ async function fetchVendorModels(_event, vendor) {
 
     return { models, url };
   } catch (error) {
-    if (error.name === "AbortError") {
+    if ((error as Error).name === "AbortError") {
       throw new Error("Refreshing models timed out.");
     }
     throw error;
@@ -268,11 +308,11 @@ async function fetchVendorModels(_event, vendor) {
   }
 }
 
-function hasUsableVendor(config) {
+function hasUsableVendor(config: NormalizedConfig): boolean {
   return Array.isArray(config.vendors) && config.vendors.some(isUsableVendor);
 }
 
-function isUsableVendor(vendor) {
+function isUsableVendor(vendor: NormalizedConfig["vendors"][number]): boolean {
   if (!vendor || vendor.enabled === false) {
     return false;
   }
@@ -296,17 +336,17 @@ function isUsableVendor(vendor) {
   return authentication !== "api-key" || Boolean(vendor.apiKey);
 }
 
-async function saveConfig(_event, payload) {
+async function saveConfig(_event: IpcMainInvokeEvent, payload: unknown) {
   const { paths } = await loadConfig();
-  const config = payload?.config || payload;
-  const revision = payload?.revision || "";
-  const saved = await writeConfigStore(paths.configPath, config, revision);
+  const config = (payload as { config?: unknown } | null)?.config || payload;
+  const revision = (payload as { revision?: string } | null)?.revision || "";
+  const saved = await writeConfigStore(paths.configPath, config as NormalizedConfig, revision);
   applyPackagedLoginStartup(saved.config.app.startAtLogin);
   const reload = await reloadManagedRouterAfterSave(paths);
   return { ...saved, paths, endpoint: getEndpoint(saved.config), ...reload };
 }
 
-async function reloadManagedRouterAfterSave(paths) {
+async function reloadManagedRouterAfterSave(paths: Paths): Promise<RouterReloadResult> {
   const child = getRunningManagedRouterChild();
   if (child) {
     try {
@@ -316,7 +356,7 @@ async function reloadManagedRouterAfterSave(paths) {
         applied: false,
         restartRequired: true,
         restartFields: [],
-        reloadError: error.message || String(error),
+        reloadError: (error as Error).message || String(error),
       };
     }
   }
@@ -334,7 +374,7 @@ async function reloadManagedRouterAfterSave(paths) {
   return { applied: false, restartRequired: false, restartFields: [], reloadError: "" };
 }
 
-function requestRouterConfigReload(child, timeoutMs = 3000) {
+function requestRouterConfigReload(child: ChildProcess, timeoutMs = 3000): Promise<RouterReloadResult> {
   const requestId = randomUUID();
 
   return new Promise((resolvePromise, rejectPromise) => {
@@ -375,20 +415,20 @@ function requestRouterConfigReload(child, timeoutMs = 3000) {
   });
 }
 
-async function countRouterProcesses(paths = getPaths()) {
+async function countRouterProcesses(paths: Paths = getPaths()): Promise<number> {
   return (await getManagedRouterMetadata(paths)) ? 1 : 0;
 }
 
-async function getManagedRouterMetadata(paths = getPaths()) {
+async function getManagedRouterMetadata(paths: Paths = getPaths()): Promise<ManagedRouterMetadata | null> {
   try {
-    const metadata = JSON.parse(await fs.readFile(paths.pidPath, "utf8"));
-    if (!Number.isInteger(metadata.pid) || metadata.pid <= 0 || !metadata.instanceId) {
+    const metadata = JSON.parse(await fs.readFile(paths.pidPath, "utf8")) as Partial<ManagedRouterMetadata>;
+    if (!Number.isInteger(metadata.pid) || (metadata.pid as number) <= 0 || !metadata.instanceId) {
       await removeRouterPid(paths);
       return null;
     }
 
-    if (await isProcessRunning(metadata.pid)) {
-      return metadata;
+    if (await isProcessRunning(metadata.pid as number)) {
+      return metadata as ManagedRouterMetadata;
     }
 
     await removeRouterPid(paths);
@@ -399,16 +439,16 @@ async function getManagedRouterMetadata(paths = getPaths()) {
   }
 }
 
-async function writeRouterPid(paths, metadata) {
+async function writeRouterPid(paths: Paths, metadata: ManagedRouterMetadata): Promise<void> {
   mkdirSync(dirname(paths.pidPath), { recursive: true });
   await fs.writeFile(paths.pidPath, `${JSON.stringify(metadata, null, 2)}\n`, "utf8");
 }
 
-async function removeRouterPid(paths = getPaths()) {
+async function removeRouterPid(paths: Paths = getPaths()): Promise<void> {
   await fs.rm(paths.pidPath, { force: true }).catch(() => null);
 }
 
-async function isProcessRunning(pid) {
+async function isProcessRunning(pid: number): Promise<boolean> {
   if (!Number.isInteger(pid) || pid <= 0) {
     return false;
   }
@@ -417,21 +457,21 @@ async function isProcessRunning(pid) {
     process.kill(pid, 0);
     return true;
   } catch (error) {
-    return error.code === "EPERM";
+    return (error as NodeJS.ErrnoException).code === "EPERM";
   }
 }
 
-function enqueueRouterLifecycle(operation) {
+function enqueueRouterLifecycle<T>(operation: () => Promise<T>): Promise<T> {
   const result = routerLifecycleQueue.then(operation, operation);
   routerLifecycleQueue = result.catch(() => null);
   return result;
 }
 
-function startRouter() {
+function startRouter(): Promise<RouterActionResult> {
   return enqueueRouterLifecycle(startRouterInternal);
 }
 
-async function startRouterInternal() {
+async function startRouterInternal(): Promise<RouterActionResult> {
   const { config, paths } = await loadConfig();
 
   if (!hasUsableVendor(config)) {
@@ -450,7 +490,7 @@ async function startRouterInternal() {
   const processLogFd = openSync(processLog.path, "a");
   const instanceId = randomUUID();
   const managementToken = randomBytes(32).toString("base64url");
-  let child;
+  let child: ChildProcess;
   try {
     child = spawn(paths.nodePath, [paths.serverPath], {
       cwd: paths.appDir,
@@ -474,15 +514,15 @@ async function startRouterInternal() {
     await waitForChildSpawn(child);
   } catch (error) {
     const health = await getHealth(config);
-    const message = `Router process could not start: ${error.message || String(error)}`;
-    const failedHealth = { ...health, ok: false, error: message, processLogPath: processLog.path };
+    const message = `Router process could not start: ${(error as Error).message || String(error)}`;
+    const failedHealth: HealthState = { ...health, ok: false, error: message, processLogPath: processLog.path };
     await recordRouterStartFailure(config, message, processLog.path);
     await trayController.refreshStatus(failedHealth);
     return { started: false, via: "process", health: failedHealth, error: message };
   }
 
   await writeRouterPid(paths, {
-    pid: child.pid,
+    pid: child.pid as number,
     instanceId,
     managementToken,
     configPath: paths.configPath,
@@ -495,7 +535,7 @@ async function startRouterInternal() {
     const output = await readProcessLogSince(processLog.path, processLog.offset);
     const detail = summarizeProcessOutput(output) || health.error || "Router process exited before becoming healthy.";
     const message = `Router failed to start: ${detail}`;
-    const failedHealth = { ...health, error: message, processLogPath: processLog.path };
+    const failedHealth: HealthState = { ...health, error: message, processLogPath: processLog.path };
     await recordRouterStartFailure(config, message, processLog.path);
     await trayController.refreshStatus(failedHealth);
     return {
@@ -510,10 +550,10 @@ async function startRouterInternal() {
   return { started: true, via: "process", pid: child.pid, health };
 }
 
-function trackManagedRouterChild(child, paths, instanceId) {
+function trackManagedRouterChild(child: ChildProcess, paths: Paths, instanceId: string) {
   managedRouterChild = child;
 
-  child.on("message", (message) => {
+  child.on("message", (message: any) => {
     if (!message?.requestId || !["config-reloaded", "config-reload-failed"].includes(message.type)) {
       return;
     }
@@ -548,16 +588,18 @@ function trackManagedRouterChild(child, paths, instanceId) {
   });
 }
 
-async function removeRouterPidForInstance(paths, instanceId) {
+async function removeRouterPidForInstance(paths: Paths, instanceId: string): Promise<void> {
   try {
-    const metadata = JSON.parse(await fs.readFile(paths.pidPath, "utf8"));
+    const metadata = JSON.parse(await fs.readFile(paths.pidPath, "utf8")) as { instanceId?: string };
     if (metadata.instanceId === instanceId) {
       await removeRouterPid(paths);
     }
-  } catch {}
+  } catch {
+    // Stale or missing pid files are ignored.
+  }
 }
 
-async function prepareProcessLog(paths) {
+async function prepareProcessLog(paths: Paths): Promise<{ path: string; offset: number }> {
   const path = join(paths.dataDir, "logs", "router-process.log");
   await fs.mkdir(dirname(path), { recursive: true });
   await fs.appendFile(path, `\n[${new Date().toISOString()}] Starting Router\n`, "utf8");
@@ -565,7 +607,7 @@ async function prepareProcessLog(paths) {
   return { path, offset: size };
 }
 
-async function readProcessLogSince(path, offset, maxBytes = 8192) {
+async function readProcessLogSince(path: string, offset: number, maxBytes = 8192): Promise<string> {
   try {
     const handle = await fs.open(path, "r");
     try {
@@ -587,19 +629,19 @@ async function readProcessLogSince(path, offset, maxBytes = 8192) {
   }
 }
 
-function waitForChildSpawn(child) {
+function waitForChildSpawn(child: ChildProcess): Promise<void> {
   return new Promise((resolvePromise, rejectPromise) => {
     child.once("spawn", resolvePromise);
     child.once("error", rejectPromise);
   });
 }
 
-function summarizeProcessOutput(output) {
+function summarizeProcessOutput(output: string): string {
   const lines = String(output || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   return lines.find((line) => /^Error(?:\s|\[|:)/.test(line)) || lines.at(-1) || "";
 }
 
-async function recordRouterStartFailure(config, message, processLogPath) {
+async function recordRouterStartFailure(config: NormalizedConfig, message: string, processLogPath: string): Promise<void> {
   try {
     const logPath = await getLogPath(config);
     await fs.mkdir(dirname(logPath), { recursive: true });
@@ -615,11 +657,11 @@ async function recordRouterStartFailure(config, message, processLogPath) {
   }
 }
 
-function stopRouter() {
+function stopRouter(): Promise<RouterActionResult> {
   return enqueueRouterLifecycle(stopRouterInternal);
 }
 
-async function stopRouterInternal() {
+async function stopRouterInternal(): Promise<RouterActionResult> {
   const paths = getPaths();
   const child = getRunningManagedRouterChild();
   if (child) {
@@ -655,14 +697,14 @@ async function stopRouterInternal() {
   return { stopped: true, health };
 }
 
-function getRunningManagedRouterChild() {
+function getRunningManagedRouterChild(): ChildProcess | null {
   if (!managedRouterChild || managedRouterChild.exitCode !== null || managedRouterChild.signalCode !== null) {
     return null;
   }
   return managedRouterChild;
 }
 
-async function stopManagedRouterChild(child, timeoutMs = 3000) {
+async function stopManagedRouterChild(child: ChildProcess, timeoutMs = 3000): Promise<void> {
   if (child.exitCode !== null || child.signalCode !== null) {
     return;
   }
@@ -670,7 +712,9 @@ async function stopManagedRouterChild(child, timeoutMs = 3000) {
   if (child.connected) {
     try {
       child.send({ type: "shutdown" }, () => {});
-    } catch {}
+    } catch {
+      // The process may already be gone.
+    }
   }
 
   if (await waitForChildExit(child, timeoutMs)) {
@@ -683,7 +727,7 @@ async function stopManagedRouterChild(child, timeoutMs = 3000) {
   }
 }
 
-function waitForChildExit(child, timeoutMs) {
+function waitForChildExit(child: ChildProcess, timeoutMs: number): Promise<boolean> {
   if (child.exitCode !== null || child.signalCode !== null) {
     return Promise.resolve(true);
   }
@@ -701,7 +745,7 @@ function waitForChildExit(child, timeoutMs) {
   });
 }
 
-async function terminateProcess(pid) {
+async function terminateProcess(pid: number): Promise<void> {
   if (!Number.isInteger(pid) || pid <= 0) {
     return;
   }
@@ -709,7 +753,7 @@ async function terminateProcess(pid) {
   try {
     process.kill(pid, "SIGTERM");
   } catch (error) {
-    if (error.code !== "ESRCH") {
+    if ((error as NodeJS.ErrnoException).code !== "ESRCH") {
       throw error;
     }
     return;
@@ -721,7 +765,7 @@ async function terminateProcess(pid) {
   }
 }
 
-async function waitForProcessExit(pid, timeoutMs = 3000) {
+async function waitForProcessExit(pid: number, timeoutMs = 3000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (!await isProcessRunning(pid)) {
@@ -731,14 +775,14 @@ async function waitForProcessExit(pid, timeoutMs = 3000) {
   }
 }
 
-function restartRouter() {
+function restartRouter(): Promise<RouterActionResult> {
   return enqueueRouterLifecycle(async () => {
     await stopRouterInternal();
     return startRouterInternal();
   });
 }
 
-async function waitForHealth(config, options = {}) {
+async function waitForHealth(config: NormalizedConfig, options: HealthOptions = {}): Promise<HealthState> {
   for (let index = 0; index < 8; index += 1) {
     const health = await getHealth(config, { ...options, includeProcessCount: false });
     if (health.ok) {
@@ -750,13 +794,13 @@ async function waitForHealth(config, options = {}) {
   return getHealth(config, options);
 }
 
-async function getHealth(configArg = null, options = {}) {
+async function getHealth(configArg: NormalizedConfig | null = null, options: HealthOptions = {}): Promise<HealthState> {
   const includeProcessCount = options.includeProcessCount !== false;
   const loaded = configArg ? { config: configArg, paths: getPaths() } : await loadConfig();
   const url = `${getRouterBaseUrl(loaded.config)}/health`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 2500);
-  const headers = options.managementToken
+  const headers: Record<string, string> = options.managementToken
     ? { "x-router-management-token": options.managementToken }
     : loaded.config.router.apiKey
       ? { authorization: `Bearer ${loaded.config.router.apiKey}` }
@@ -765,9 +809,9 @@ async function getHealth(configArg = null, options = {}) {
   try {
     const response = await fetch(url, { headers, signal: controller.signal });
     const text = await response.text();
-    let body = null;
+    let body: HealthBody | null = null;
     try {
-      body = JSON.parse(text);
+      body = JSON.parse(text) as HealthBody;
     } catch {
       body = null;
     }
@@ -785,7 +829,7 @@ async function getHealth(configArg = null, options = {}) {
     return {
       ok: false,
       url,
-      error: error.name === "AbortError" ? "Health check timed out." : error.message,
+      error: (error as Error).name === "AbortError" ? "Health check timed out." : (error as Error).message,
       processCount: includeProcessCount ? await countRouterProcesses(loaded.paths) : 0,
     };
   } finally {
@@ -793,16 +837,16 @@ async function getHealth(configArg = null, options = {}) {
   }
 }
 
-async function getLogPath(configArg = null) {
+async function getLogPath(configArg: NormalizedConfig | null = null): Promise<string> {
   const { config, paths } = configArg ? { config: configArg, paths: getPaths() } : await loadConfig();
   return resolveLogPath(config, paths.dataDir);
 }
 
-async function readLogs(_event, options = {}) {
+async function readLogs(_event: IpcMainInvokeEvent, options: { limit?: number; before?: number } = {}) {
   const { config } = await loadConfig();
   const logPath = await getLogPath(config);
   const limit = clampNumber(options.limit, 80, 20, 500);
-  const before = Number.isInteger(options.before) ? options.before : null;
+  const before: number | null = Number.isInteger(options.before) ? (options.before as number) : null;
 
   if (!existsSync(logPath)) {
     return { path: logPath, lines: [], nextBefore: null, hasMore: false };
@@ -811,7 +855,7 @@ async function readLogs(_event, options = {}) {
   return readLogPage(logPath, { limit, before });
 }
 
-async function readUsage(_event, options = {}) {
+async function readUsage(_event: IpcMainInvokeEvent, options: { vendor?: string; model?: string } = {}) {
   const { paths } = await loadConfig();
   return readUsageSummary(paths.dataDir, {
     vendor: options.vendor,
@@ -819,7 +863,7 @@ async function readUsage(_event, options = {}) {
   });
 }
 
-function clampNumber(value, fallback, min, max) {
+function clampNumber(value: unknown, fallback: number, min: number, max: number): number {
   const number = Number(value);
   if (!Number.isFinite(number)) {
     return fallback;
@@ -827,12 +871,12 @@ function clampNumber(value, fallback, min, max) {
   return Math.min(max, Math.max(min, Math.trunc(number)));
 }
 
-async function openConfigFile() {
+async function openConfigFile(): Promise<string> {
   const { paths } = await loadConfig();
   return shell.openPath(paths.configPath);
 }
 
-async function openLogFile() {
+async function openLogFile(): Promise<string> {
   const logPath = await getLogPath();
   await ensureLogFile(logPath);
   return shell.openPath(logPath);
@@ -847,11 +891,11 @@ async function getAppState() {
   };
 }
 
-function hasHiddenStartArg(args = process.argv) {
+function hasHiddenStartArg(args: string[] = process.argv): boolean {
   return args.some((arg) => HIDDEN_START_ARGS.has(String(arg).toLowerCase())) || process.env.HEIMDALL_START_HIDDEN === "1";
 }
 
-function isBackgroundStartup() {
+function isBackgroundStartup(): boolean {
   if (hasHiddenStartArg()) {
     return true;
   }
@@ -861,7 +905,7 @@ function isBackgroundStartup() {
     && app.getLoginItemSettings().wasOpenedAtLogin === true;
 }
 
-async function installDownloadedUpdate() {
+async function installDownloadedUpdate(): Promise<UpdateState> {
   const updateState = getUpdateState();
   if (updateState.mock || updateState.status !== "downloaded") {
     return installUpdate();
@@ -873,7 +917,7 @@ async function installDownloadedUpdate() {
   try {
     await stopRouter();
   } catch (error) {
-    trayController.showNotification("Heimdall", `Failed to stop Router before update: ${error.message || String(error)}`);
+    trayController.showNotification("Heimdall", `Failed to stop Router before update: ${(error as Error).message || String(error)}`);
     isQuitting = false;
     trayController.setBusy("");
     throw error;
@@ -892,7 +936,7 @@ function handleUpdateStateChanged() {
   trayController.updateMenu();
 }
 
-async function startRouterForBackgroundStartup() {
+async function startRouterForBackgroundStartup(): Promise<void> {
   try {
     const { config } = await loadConfig();
     if (!hasUsableVendor(config)) {
@@ -906,7 +950,7 @@ async function startRouterForBackgroundStartup() {
     }
   } catch (error) {
     await trayController.refreshStatus().catch(() => null);
-    trayController.showNotification("Heimdall failed to start", error.message || String(error));
+    trayController.showNotification("Heimdall failed to start", (error as Error).message || String(error));
   }
 }
 
@@ -934,7 +978,7 @@ function showSettingsWindow() {
   sendOpenSettingsEvent();
 }
 
-function requestWindowCloseConfirmation(window) {
+function requestWindowCloseConfirmation(window: BrowserWindow | null) {
   if (closePromptActive || !window || window.isDestroyed()) {
     return;
   }
@@ -950,7 +994,7 @@ function requestWindowCloseConfirmation(window) {
   window.webContents.send("app:confirmClose");
 }
 
-async function handleWindowClose(window) {
+async function handleWindowClose(window: BrowserWindow | null): Promise<void> {
   try {
     const { config } = await loadConfig();
     const closeBehavior = config.app?.closeBehavior || DEFAULT_CONFIG.app.closeBehavior;
@@ -970,12 +1014,12 @@ async function handleWindowClose(window) {
       window.hide();
     }
   } catch (error) {
-    trayController.showNotification("Heimdall", `Failed to read close behavior: ${error.message || String(error)}`);
+    trayController.showNotification("Heimdall", `Failed to read close behavior: ${(error as Error).message || String(error)}`);
     requestWindowCloseConfirmation(window);
   }
 }
 
-async function quitApplication() {
+async function quitApplication(): Promise<void> {
   if (isQuitting) {
     return;
   }
@@ -986,14 +1030,14 @@ async function quitApplication() {
   try {
     await stopRouter();
   } catch (error) {
-    trayController.showNotification("Heimdall", `Failed to stop Router: ${error.message || String(error)}`);
+    trayController.showNotification("Heimdall", `Failed to stop Router: ${(error as Error).message || String(error)}`);
   } finally {
     trayController.dispose();
     app.quit();
   }
 }
 
-function createWindow({ showWhenReady = true } = {}) {
+function createWindow({ showWhenReady = true }: { showWhenReady?: boolean } = {}): BrowserWindow {
   if (mainWindow && !mainWindow.isDestroyed()) {
     if (showWhenReady) {
       showSettingsWindow();
@@ -1041,7 +1085,7 @@ function createWindow({ showWhenReady = true } = {}) {
     if (showFallback) {
       clearTimeout(showFallback);
     }
-    windowsToShowOnReady.delete(mainWindow);
+    windowsToShowOnReady.delete(mainWindow as BrowserWindow);
     mainWindow = null;
   });
 
@@ -1060,7 +1104,7 @@ function createWindow({ showWhenReady = true } = {}) {
   return mainWindow;
 }
 
-function validateRendererUrl(value) {
+function validateRendererUrl(value: string): string {
   if (app.isPackaged) {
     throw new Error("ELECTRON_RENDERER_URL is only allowed in development.");
   }
@@ -1073,7 +1117,7 @@ function validateRendererUrl(value) {
   return url.toString();
 }
 
-function applyPackagedLoginStartup(enabled) {
+function applyPackagedLoginStartup(enabled: boolean) {
   if (!app.isPackaged || !["darwin", "win32"].includes(process.platform)) {
     return;
   }
@@ -1090,12 +1134,15 @@ function applyPackagedLoginStartup(enabled) {
   app.setLoginItemSettings({ openAtLogin: enabled === true, openAsHidden: true });
 }
 
-function registerIpcHandler(channel, handler) {
+function registerIpcHandler(
+  channel: string,
+  handler: (event: IpcMainInvokeEvent, ...args: any[]) => unknown | Promise<unknown>,
+) {
   ipcMain.handle(channel, async (event, ...args) => {
     if (!mainWindow || mainWindow.isDestroyed() || event.sender !== mainWindow.webContents) {
       throw new Error(`Rejected IPC request from an untrusted sender: ${channel}`);
     }
-    const parsedArgs = parseIpcRequest(channel, args);
+    const parsedArgs = parseIpcRequest(channel, args) as unknown[];
     const response = await handler(event, ...parsedArgs);
     return parseIpcResponse(channel, response);
   });
@@ -1184,7 +1231,7 @@ if (!hasSingleInstanceLock) {
       const { config } = await loadConfig();
       applyPackagedLoginStartup(config.app.startAtLogin);
     } catch (error) {
-      trayController.showNotification("Heimdall", `Failed to load startup settings: ${error.message || String(error)}`);
+      trayController.showNotification("Heimdall", `Failed to load startup settings: ${(error as Error).message || String(error)}`);
     }
     initializeUpdater();
     onUpdateState(handleUpdateStateChanged);

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { readLogPage } from "../gui/electron/log-store.js";
+import { readLogPage } from "../gui/electron/log-store.ts";
 
 const tempDirectory = mkdtempSync(join(tmpdir(), "local-router-log-test-"));
 const logPath = join(tempDirectory, "router.log");
