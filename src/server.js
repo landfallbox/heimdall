@@ -334,14 +334,27 @@ function recordUsage(usageStore, logger, context, usage, customPricing) {
 }
 
 async function handleGeneration(req, res, config, logger, circuitBreaker, usageStore, inboundFormat) {
+  // 生成请求 ID 并读取请求体（受 maxBodyBytes 限制，超限返回 413，JSON 非法返回 400）
   const requestId = randomUUID();
   const startedAt = Date.now();
   const requestBody = await readJsonBody(req, config.router.maxBodyBytes);
   logger.debug("inbound_request", { requestId, body: requestBody });
-  const requestedModel = String(requestBody.model || config.model.id).trim() || config.model.id;
-  const vendors = getVendorsForModel(config.vendors, requestedModel);
-  const failures = [];
+  
+  // 确定目标模型（请求必须显式指定 model，缺失直接报错）
+  const requestedModel = String(requestBody.model ?? "").trim();
+  if (!requestedModel) {
+    sendJson(res, 400, {
+      error: {
+        message: "Missing required parameter: model.",
+        type: "invalid_request_error",
+        param: "model",
+      },
+    });
+    return;
+  }
 
+  // 找出所有启用了该模型的供应商（同一模型可由多个供应商提供），没有任何供应商支持该模型，直接返回 404
+  const vendors = getVendorsForModel(config.vendors, requestedModel);
   if (!vendors.length) {
     sendJson(res, 404, {
       error: {
@@ -353,16 +366,24 @@ async function handleGeneration(req, res, config, logger, circuitBreaker, usageS
     return;
   }
 
+  // 累积各供应商的失败明细（用于全部失败时的日志与 400/502 响应）
+  const failures = [];
+
+  // 熔断器按优先级排序候选供应商（熔断打开的供应商可能被标记为"强制探测"），按顺序逐个尝试
   const candidates = circuitBreaker.candidates(vendors, requestedModel);
   for (const { vendor, forced } of candidates) {
+    // 熔断打开且非探测请求时，跳过该供应商
     const circuitPermission = circuitBreaker.acquire(vendor, requestedModel, { forced });
     if (!circuitPermission) {
       continue;
     }
 
     const vendorStartedAt = Date.now();
-    const timeout = createTimeoutSignal(vendor.timeoutMs);
-    const unlinkClientAbort = linkClientAbort(req, res, timeout.abort);
+    // 为该供应商创建超时控制句柄（仅限制连接与响应头的等待时间）
+    const timeoutSignal = createTimeoutSignal(vendor.timeoutMs);
+    
+    // 客户端断开时联动中止上游请求，避免无谓消耗与计费
+    const unlinkClientAbort = linkClientAbort(req, res, timeoutSignal.abort);
 
     try {
       logger.info("vendor_request_started", {
@@ -376,13 +397,14 @@ async function handleGeneration(req, res, config, logger, circuitBreaker, usageS
         circuitForcedProbe: circuitPermission.forced,
       });
 
-      const { response: upstream, upstreamFormat } = await callVendor(vendor, requestBody, inboundFormat, timeout.signal, logger);
-      // requestTimeoutMs limits connection and response-header wait time. Once a
-      // vendor responds, long-running streams may continue until completion or
-      // until the client disconnects.
-      timeout.cancel();
+      // 向上游供应商发出请求，阻塞到供应商返回响应头
+      const { response: upstream, upstreamFormat } = await callVendor(vendor, requestBody, inboundFormat, timeoutSignal.signal, logger);
+
+      // 上游已响应，取消超时；后续流式传输不再受此限制
+      timeoutSignal.cancel();
       const elapsedMs = Date.now() - vendorStartedAt;
 
+      // 上游返回错误状态码
       if (!upstream.ok) {
         const errorText = await readBoundedText(upstream);
         const failure = {
@@ -397,6 +419,7 @@ async function handleGeneration(req, res, config, logger, circuitBreaker, usageS
           ...failure,
         });
 
+        // 属于可切换状态码（在 fallbackStatusCodes 中或 5xx）：记录熔断失败，切换下一个供应商
         if (shouldFallback(upstream.status, config)) {
           recordCircuitFailure(circuitBreaker, circuitPermission, logger, {
             requestId,
@@ -407,6 +430,7 @@ async function handleGeneration(req, res, config, logger, circuitBreaker, usageS
           continue;
         }
 
+        // 否则（如 4xx 客户端错误）：供应商本身无故障，记录熔断成功并把错误原样透传给客户端
         recordCircuitSuccess(circuitBreaker, circuitPermission, logger, {
           requestId,
           vendor: vendor.name,
@@ -419,6 +443,7 @@ async function handleGeneration(req, res, config, logger, circuitBreaker, usageS
         return;
       }
 
+      // 上游成功，记录熔断成功
       logger.info("vendor_request_selected", {
         requestId,
         vendor: vendor.name,
@@ -433,10 +458,13 @@ async function handleGeneration(req, res, config, logger, circuitBreaker, usageS
         vendor: vendor.name,
         model: requestedModel,
       });
+
+      // 判断是否流式响应（仅当上下游格式一致时才直接透传，否则需缓冲后转换）
       res.statusCode = upstream.status;
       const responseIsStream = upstreamFormat === inboundFormat && (
         requestBody.stream === true || upstream.headers.get("content-type")?.includes("text/event-stream")
       );
+
       const usageContext = {
         requestId,
         vendor: vendor.name,
@@ -444,11 +472,14 @@ async function handleGeneration(req, res, config, logger, circuitBreaker, usageS
         format: upstreamFormat,
         stream: responseIsStream,
       };
+
       if (responseIsStream) {
+        // 流式：SSE 流直接透传给客户端，同时旁路解析提取 token 用量
         copyUpstreamHeaders(upstream, res, vendor.name);
         const usage = await pipeUpstreamWithUsage(upstream, res, upstreamFormat, logger);
         recordUsage(usageStore, logger, usageContext, usage, vendor.selectedModel.pricing);
       } else {
+        // 非流式：读取完整响应体
         const upstreamText = await upstream.text();
         let upstreamBody = null;
         try {
@@ -459,6 +490,7 @@ async function handleGeneration(req, res, config, logger, circuitBreaker, usageS
           }
         }
         const usage = normalizeUsage(upstreamBody, upstreamFormat);
+        // 格式与请求一致则原样透传，否则转换回请求格式后返回
         if (upstreamFormat === inboundFormat) {
           copyUpstreamHeaders(upstream, res, vendor.name);
           res.end(upstreamText);
@@ -470,8 +502,10 @@ async function handleGeneration(req, res, config, logger, circuitBreaker, usageS
         }
         recordUsage(usageStore, logger, usageContext, usage, vendor.selectedModel.pricing);
       }
+
       return;
     } catch (error) {
+      // 异常处理。协议转换失败（400 + errorType）不算供应商故障
       const isProtocolFailure = error.statusCode === 400 && Boolean(error.errorType);
       const failure = {
         vendor: vendor.name,
@@ -488,24 +522,26 @@ async function handleGeneration(req, res, config, logger, circuitBreaker, usageS
         ...failure,
       });
 
+      // 客户端已断开：释放熔断许可并直接结束（无需再尝试其他供应商）
       if (req.aborted || res.destroyed) {
         circuitBreaker.release(circuitPermission);
         return;
       }
 
-      // Once response bytes are committed, another vendor would corrupt the stream
-      // and may duplicate a billable upstream request.
+      // 响应已开始发送则不能再切换供应商（会破坏流并可能重复计费），只能断开连接
       if (res.headersSent) {
         circuitBreaker.release(circuitPermission);
         res.destroy(error);
         return;
       }
 
+      // 协议失败：请求本身与该供应商格式不兼容，跳过并尝试下一个
       if (isProtocolFailure) {
         circuitBreaker.release(circuitPermission);
         continue;
       }
 
+      // 超时 / 网络错误：记录熔断失败，尝试下一个供应商
       recordCircuitFailure(circuitBreaker, circuitPermission, logger, {
         requestId,
         vendor: vendor.name,
@@ -513,17 +549,20 @@ async function handleGeneration(req, res, config, logger, circuitBreaker, usageS
         reason: error.name === "AbortError" ? "timeout" : "network_error",
       });
     } finally {
+      // 清理客户端断开监听与超时定时器
       unlinkClientAbort();
-      timeout.cancel();
+      timeoutSignal.cancel();
     }
   }
 
+  // 所有供应商均失败
   logger.error("all_vendors_failed", {
     requestId,
     totalElapsedMs: Date.now() - startedAt,
     failures,
   });
 
+  // 若全部是协议失败，返回 400 并带上具体协议错误
   const protocolFailures = failures.filter((failure) => failure.protocolFailure);
   if (protocolFailures.length === failures.length && protocolFailures.length) {
     sendJson(res, 400, {
@@ -535,6 +574,7 @@ async function handleGeneration(req, res, config, logger, circuitBreaker, usageS
     return;
   }
 
+  // 否则返回 502，附带各供应商的失败明细
   sendJson(res, 502, {
     error: {
       message: "All configured vendors failed before a response could be returned.",
