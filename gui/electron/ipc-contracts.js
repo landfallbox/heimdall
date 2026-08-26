@@ -2,7 +2,7 @@ import { z } from "zod";
 import { configSchema } from "../../src/config.js";
 
 const emptyRequest = z.tuple([]);
-const okResponse = z.object({ ok: z.boolean() }).passthrough();
+const okResponse = z.object({ ok: z.boolean() }).loose();
 const pathsSchema = z.object({
   appDir: z.string(),
   dataDir: z.string(),
@@ -22,7 +22,7 @@ export const healthSchema = z.object({
   error: z.string().optional(),
   processCount: z.number().int().nonnegative(),
   processLogPath: z.string().optional(),
-}).passthrough();
+}).loose();
 
 export const updateStateSchema = z.object({
   status: z.string().min(1),
@@ -40,14 +40,14 @@ export const updateStateSchema = z.object({
   }).nullable(),
   error: z.string(),
   lastCheckedAt: z.string(),
-}).passthrough();
+}).loose();
 
 const configResultSchema = z.object({
   config: configSchema,
   revision: z.string(),
   paths: pathsSchema,
   endpoint: z.string().url(),
-}).passthrough();
+}).loose();
 
 const configSaveResultSchema = configResultSchema.extend({
   applied: z.boolean(),
@@ -60,7 +60,7 @@ const vendorRequestSchema = z.object({
   baseUrl: z.string(),
   authentication: z.enum(["none", "api-key"]).optional(),
   apiKey: z.string().optional(),
-}).passthrough();
+}).loose();
 
 const routerResultSchema = z.object({
   health: healthSchema,
@@ -69,7 +69,7 @@ const routerResultSchema = z.object({
   via: z.enum(["existing", "process"]).optional(),
   pid: z.number().int().positive().optional(),
   error: z.string().optional(),
-}).passthrough();
+}).loose();
 
 const usageCostSchema = z.object({
   currency: z.string().min(1),

@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { normalizeRequestFormat } from "./openai-protocol.js";
 
+// ============================================================
+// 常量
+// ============================================================
 export const DEFAULT_CONFIG = {
   app: {
     closeBehavior: "tray",
@@ -27,6 +30,9 @@ export const DEFAULT_CONFIG = {
 
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
 
+// ============================================================
+// Schema
+// ============================================================
 const httpUrlSchema = z.string().trim().refine((value) => {
   try {
     const url = new URL(value);
@@ -57,7 +63,7 @@ export const vendorModelSchema = z.object({
   enabled: z.boolean().optional().default(true),
   pricing: modelPricingSchema.optional(),
   enableThinking: z.boolean().optional().default(false),
-}).passthrough();
+}).loose();
 
 export const vendorSchema = z.object({
   name: z.string().trim().optional().default(""),
@@ -71,7 +77,7 @@ export const vendorSchema = z.object({
   requestFormat: z.enum(["chat-completions", "responses"]).optional().default("chat-completions"),
   chatCompletionsPath: z.string().trim().optional(),
   responsesPath: z.string().trim().optional(),
-}).passthrough().superRefine((vendor, context) => {
+}).loose().superRefine((vendor, context) => {
   if (vendor.enabled === false) {
     return;
   }
@@ -144,6 +150,10 @@ export const configSchema = z.object({
   vendors: z.array(vendorSchema),
 });
 
+
+// ============================================================
+// 归一化与校验
+// ============================================================
 export function deepMerge(base, override) {
   if (Array.isArray(base) || Array.isArray(override)) {
     return override ?? base;
