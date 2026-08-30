@@ -106,6 +106,7 @@ export default function App() {
   const [configRevision, setConfigRevision] = useState("");
   const vendorModelsRequestRef = useRef(0);
   const vendorModelsSourceKeyRef = useRef("");
+  const vendorScrollTargetRef = useRef(null);
 
   const endpoints = useMemo(() => endpointsFromDraft(draft), [draft]);
   const status = useMemo(() => getStatus(health), [health]);
@@ -128,6 +129,7 @@ export default function App() {
 
   useEffect(() => {
     const unsubscribe = getDesktopApi().onOpenSettings?.(() => {
+      vendorScrollTargetRef.current = null;
       closeVendorEditor();
       setPage("application");
       void refreshHealth({ silent: true });
@@ -151,6 +153,30 @@ export default function App() {
     if (page === "usage") {
       void run("usage", refreshUsage);
     }
+  }, [page]);
+
+  useEffect(() => {
+    if (page !== "router" || vendorScrollTargetRef.current == null) {
+      return undefined;
+    }
+
+    const top = vendorScrollTargetRef.current;
+    vendorScrollTargetRef.current = null;
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top });
+    });
+    return undefined;
+  }, [page]);
+
+  useEffect(() => {
+    if (page !== "vendor-edit") {
+      return undefined;
+    }
+
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0 });
+    });
+    return undefined;
   }, [page]);
 
   useEffect(() => {
@@ -411,6 +437,7 @@ export default function App() {
     setVendorEditorIsNew(true);
     setShowVendorKey(false);
     clearVendorModelOptions();
+    vendorScrollTargetRef.current = window.scrollY;
     setPage("vendor-edit");
   }
 
@@ -451,6 +478,7 @@ export default function App() {
     setVendorEditorIsNew(false);
     setShowVendorKey(false);
     clearVendorModelOptions();
+    vendorScrollTargetRef.current = window.scrollY;
     setPage("vendor-edit");
   }
 
@@ -660,6 +688,9 @@ export default function App() {
                 className={`nav-item ${activePage === item.id ? "active" : ""}`}
                 type="button"
                 onClick={() => {
+                  if (item.id !== "router") {
+                    vendorScrollTargetRef.current = null;
+                  }
                   closeVendorEditor();
                   setPage(item.id);
                 }}
