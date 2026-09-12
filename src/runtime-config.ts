@@ -31,17 +31,14 @@ function readJsonFile(path: string): unknown {
 export function loadRuntimeConfig(): { config: RuntimeConfig; configPath: string } {
   const configPath = process.env.ROUTER_CONFIG || resolve(projectRoot, "config.json");
   const fileConfig = existsSync(configPath) ? readJsonFile(configPath) : {};
-  const config = normalizeConfig(fileConfig) as RuntimeConfig;
+  const config = normalizeConfig(fileConfig);
 
   config.router.host = process.env.HOST || process.env.ROUTER_HOST || config.router.host;
   config.router.port = Number(process.env.PORT || process.env.ROUTER_PORT || config.router.port);
   config.router.apiKey = process.env.ROUTER_API_KEY ?? config.router.apiKey;
 
-  if (!config.vendors.length) {
-    config.vendors = vendorsFromEnvironment() as RuntimeVendor[];
-  }
-
-  config.vendors = (config.vendors as NormalizedVendor[])
+  const sourceVendors: NormalizedVendor[] = config.vendors.length ? config.vendors : vendorsFromEnvironment();
+  const runtimeVendors: RuntimeVendor[] = sourceVendors
     .map((vendor, priority) => ({ ...vendor, priority }))
     .filter((vendor) => vendor.enabled !== false)
     .map((vendor) => ({
@@ -49,18 +46,19 @@ export function loadRuntimeConfig(): { config: RuntimeConfig; configPath: string
       models: normalizeRuntimeVendorModels(vendor, config.model.id),
       timeoutMs: Number(config.router.requestTimeoutMs),
     }))
-    .filter((vendor) => vendor.models.some((model) => model.enabled !== false)) as RuntimeVendor[];
+    .filter((vendor) => vendor.models.some((model) => model.enabled !== false));
 
-  validateConfig(config, { configPath });
-  return { config, configPath };
+  const runtimeConfig: RuntimeConfig = { ...config, vendors: runtimeVendors };
+  validateConfig(runtimeConfig, { configPath });
+  return { config: runtimeConfig, configPath };
 }
 
 function normalizeRuntimeVendorModels(vendor: NormalizedVendor, defaultModelId: string): RuntimeVendorModel[] {
   const models = Array.isArray(vendor.models) ? vendor.models : [];
   if (!models.length) {
-    const id = String((vendor as any).model || defaultModelId || "model-id").trim();
+    const id = String(vendor.model || defaultModelId || "model-id").trim();
     const model: RuntimeVendorModel = { id, enabled: true };
-    if ((vendor as any).enableThinking === true) {
+    if (vendor.enableThinking === true) {
       model.enableThinking = true;
     }
     return [model];
@@ -76,7 +74,8 @@ function normalizeRuntimeVendorModels(vendor: NormalizedVendor, defaultModelId: 
 }
 
 function vendorsFromEnvironment(): NormalizedVendor[] {
-  return [vendorFromEnvironment("VENDOR_A", "vendor-a"), vendorFromEnvironment("VENDOR_B", "vendor-b")].filter(Boolean) as NormalizedVendor[];
+  return [vendorFromEnvironment("VENDOR_A", "vendor-a"), vendorFromEnvironment("VENDOR_B", "vendor-b")]
+    .filter((vendor): vendor is NormalizedVendor => vendor !== null);
 }
 
 function vendorFromEnvironment(prefix: string, fallbackName: string): NormalizedVendor | null {
@@ -88,12 +87,14 @@ function vendorFromEnvironment(prefix: string, fallbackName: string): Normalized
 
   return {
     name: process.env[`${prefix}_NAME`] || fallbackName,
-    baseUrl,
-    apiKey,
+    baseUrl: baseUrl ?? "",
+    models: [],
+    apiKeyHeader: "authorization",
+    apiKey: apiKey ?? undefined,
     model: process.env[`${prefix}_MODEL`] || "model-id",
     requestFormat: process.env[`${prefix}_REQUEST_FORMAT`] === "responses" ? "responses" : "chat-completions",
     authentication: apiKey ? "api-key" : "none",
     enabled: true,
     enableThinking: process.env[`${prefix}_ENABLE_THINKING`] === "1",
-  } as unknown as NormalizedVendor;
+  };
 }
