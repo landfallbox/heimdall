@@ -70,8 +70,8 @@ npm test
 
 **阅读入口**
 
-- [`src/server.js`](../src/server.js)
-- [`src/runtime-config.js`](../src/runtime-config.js)
+- [`src/server.ts`](../src/server.ts)
+- [`src/runtime-config.ts`](../src/runtime-config.ts)
 - [`test/fallback-smoke.test.js`](../test/fallback-smoke.test.js)
 
 **目标**
@@ -115,7 +115,7 @@ npm test
 
 **阅读入口**
 
-- [`src/vendor-circuit-breaker.js`](../src/vendor-circuit-breaker.js)
+- [`src/vendor-circuit-breaker.ts`](../src/vendor-circuit-breaker.ts)
 - [`test/vendor-circuit-breaker.test.js`](../test/vendor-circuit-breaker.test.js)
 
 **目标**
@@ -156,10 +156,10 @@ stateDiagram-v2
 
 **阅读入口**
 
-- [`gui/electron/config-store.js`](../gui/electron/config-store.js)
-- [`src/config.js`](../src/config.js)
-- [`src/runtime-config.js`](../src/runtime-config.js)
-- [`src/server.js`](../src/server.js)
+- [`gui/electron/config-store.ts`](../gui/electron/config-store.ts)
+- [`src/config.ts`](../src/config.ts)
+- [`src/runtime-config.ts`](../src/runtime-config.ts)
+- [`src/server.ts`](../src/server.ts)
 - [`test/config-and-urls.test.js`](../test/config-and-urls.test.js)
 - [`test/electron-lifecycle.test.js`](../test/electron-lifecycle.test.js)
 
@@ -203,9 +203,9 @@ stateDiagram-v2
 
 **阅读入口**
 
-- [`src/openai-protocol.js`](../src/openai-protocol.js)
+- [`src/openai-protocol.ts`](../src/openai-protocol.ts)
 - [`test/openai-protocol.test.js`](../test/openai-protocol.test.js)
-- [`src/server.js`](../src/server.js)
+- [`src/server.ts`](../src/server.ts)
 
 **目标**
 
@@ -236,9 +236,9 @@ stateDiagram-v2
 
 **阅读入口**
 
-- [`gui/electron/main.js`](../gui/electron/main.js)
+- [`gui/electron/main.ts`](../gui/electron/main.ts)
 - [`gui/electron/preload.cjs`](../gui/electron/preload.cjs)
-- [`gui/electron/ipc-contracts.js`](../gui/electron/ipc-contracts.js)
+- [`gui/electron/ipc-contracts.ts`](../gui/electron/ipc-contracts.ts)
 - [`test/ipc-contracts.test.js`](../test/ipc-contracts.test.js)
 - [`test/electron-lifecycle.test.js`](../test/electron-lifecycle.test.js)
 
@@ -278,10 +278,10 @@ npm run test:electron
 
 完成六个核心阶段后，再按优先级审阅以下内容：
 
-1. [`src/logger.js`](../src/logger.js)：递归敏感信息脱敏和结构化日志。
-2. [`gui/electron/log-store.js`](../gui/electron/log-store.js)：基于字节游标的日志分页和文件增长处理。
-3. [`gui/electron/updater.js`](../gui/electron/updater.js)：自动更新状态机、失败恢复和发布元数据。
-4. [`gui/src/config-draft.js`](../gui/src/config-draft.js)：持久化配置与表单状态之间的无损转换。
+1. [`src/logger.ts`](../src/logger.ts)：递归敏感信息脱敏和结构化日志。
+2. [`gui/electron/log-store.ts`](../gui/electron/log-store.ts)：基于字节游标的日志分页和文件增长处理。
+3. [`gui/electron/updater.ts`](../gui/electron/updater.ts)：自动更新状态机、失败恢复和发布元数据。
+4. [`gui/src/config-draft.ts`](../gui/src/config-draft.ts)：持久化配置与表单状态之间的无损转换。
 5. [`.github/workflows`](../.github/workflows)：Windows/macOS CI、打包、签名、公证和 GitHub Releases。
 
 ## 5. 单次 Review 模板

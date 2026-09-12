@@ -54,7 +54,7 @@ In the GUI, set:
 
 Each vendor can support multiple models. Requests are routed only to vendors that list the requested model id, and the same model id is sent to the selected upstream provider.
 
-The Usage page reports daily, weekly, and monthly input/output token totals, a 30-day trend, and current-month vendor/model breakdowns. Known model ids use the standard USD API prices published at <https://developers.openai.com/api/docs/pricing> and <https://api-docs.deepseek.com/quick_start/pricing>; the bundled catalogs record their update dates in `src/usage.js`. DeepSeek moved to peak/off-peak billing on 2026-08-16, so DeepSeek estimates pick the peak or off-peak rate card from the request's UTC hour (peak hours 01:00-04:00 and 06:00-10:00 UTC). Select `Custom` in Vendor Settings to override prices or price models outside the built-in catalogs. Each event stores its price snapshot so later configuration changes do not rewrite historical estimates.
+The Usage page reports daily, weekly, and monthly input/output token totals, a 30-day trend, and current-month vendor/model breakdowns. Known model ids use the standard USD API prices published at <https://developers.openai.com/api/docs/pricing> and <https://api-docs.deepseek.com/quick_start/pricing>; the bundled catalogs record their update dates in `src/usage.ts`. DeepSeek moved to peak/off-peak billing on 2026-08-16, so DeepSeek estimates pick the peak or off-peak rate card from the request's UTC hour (peak hours 01:00-04:00 and 06:00-10:00 UTC). Select `Custom` in Vendor Settings to override prices or price models outside the built-in catalogs. Each event stores its price snapshot so later configuration changes do not rewrite historical estimates.
 
 Keep `config.json` private. It is ignored by git and may contain API keys. The desktop app manages the Router process and performs health checks internally.
 
@@ -107,16 +107,16 @@ Example client entry:
 
 The main runtime boundaries are:
 
-- `src/server.js`: HTTP routing, upstream failover, and stream ownership.
-- `src/vendor-circuit-breaker.js`: per-vendor, per-model passive failure tracking and half-open recovery.
-- `src/runtime-config.js`: file and environment configuration for the Router process.
-- `src/logger.js`: structured logging and recursive secret redaction.
-- `src/usage.js`: usage normalization and provider catalog (OpenAI, DeepSeek peak/off-peak) / custom token pricing.
-- `src/usage-store.js`: monthly JSONL persistence and local-calendar aggregation.
-- `gui/electron/main.js`: Electron lifecycle, tray, IPC registration, and orchestration.
-- `gui/electron/config-store.js`: validated, revision-checked, atomic configuration writes.
-- `gui/electron/log-store.js`: byte-cursor log pagination.
-- `gui/src/config-draft.js`: lossless conversion between persisted configuration and form state.
+- `src/server.ts`: HTTP routing, upstream failover, and stream ownership.
+- `src/vendor-circuit-breaker.ts`: per-vendor, per-model passive failure tracking and half-open recovery.
+- `src/runtime-config.ts`: file and environment configuration for the Router process.
+- `src/logger.ts`: structured logging and recursive secret redaction.
+- `src/usage.ts`: usage normalization and provider catalog (OpenAI, DeepSeek peak/off-peak) / custom token pricing.
+- `src/usage-store.ts`: monthly JSONL persistence and local-calendar aggregation.
+- `gui/electron/main.ts`: Electron lifecycle, tray, IPC registration, and orchestration.
+- `gui/electron/config-store.ts`: validated, revision-checked, atomic configuration writes.
+- `gui/electron/log-store.ts`: byte-cursor log pagination.
+- `gui/src/config-draft.ts`: lossless conversion between persisted configuration and form state.
 
 The Router process is owned by the Electron main process and does not outlive an explicit app exit. The current app session uses a private parent-child IPC channel for graceful shutdown, with forced termination only as a timeout fallback. PID metadata and instance identity are retained for recovery after an abnormal app exit.
 

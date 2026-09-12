@@ -18,12 +18,12 @@ Use `npm run gui` for the desktop development app.
 
 ## Architecture Rules
 
-- Keep persisted configuration normalization in `src/config.js`; form-only conversion belongs in `gui/src/config-draft.js`.
-- Write desktop configuration through `gui/electron/config-store.js` so revision checks and atomic replacement are preserved.
+- Keep persisted configuration normalization in `src/config.ts`; form-only conversion belongs in `gui/src/config-draft.ts`.
+- Write desktop configuration through `gui/electron/config-store.ts` so revision checks and atomic replacement are preserved.
 - Keep Router process ownership in the Electron main process. Desktop-started Router processes must remain attached to Electron and use parent-child IPC for graceful shutdown; do not add `detached` or `unref()`.
 - Treat PID metadata and Router instance identity as abnormal-exit recovery data. Never terminate a recovered PID without matching the Router instance identity.
 - Treat downstream response commitment as the failover boundary. Do not retry another vendor after headers or body bytes have reached the client.
-- Register privileged renderer operations through the guarded IPC helper in `gui/electron/main.js`.
+- Register privileged renderer operations through the guarded IPC helper in `gui/electron/main.ts`.
 
 ## Pull Requests
 
