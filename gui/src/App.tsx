@@ -72,7 +72,7 @@ import {
 } from "./app-model.ts";
 import { useLogsController, useUpdateController, useUsageController } from "./app-controllers.ts";
 import { getDesktopApi, type SaveConfigResult } from "./desktop-api.ts";
-import { getCatalogPriceView } from "../../src/usage.js";
+import { getCatalogPriceView } from "../../src/usage.ts";
 import type { ChartSegment, HealthState, LogEntry, LogPage, UpdateState, UsageDaily, UsagePeriod, UsageSummary, VendorHealth } from "./types.ts";
 
 const defaultAppName = "Heimdall";

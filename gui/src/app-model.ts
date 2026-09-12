@@ -1,5 +1,5 @@
 import { getVendorModels, type ConfigVendorInput, type Draft, type VendorDraft, type VendorModelDraft } from "./config-draft.ts";
-import { getCatalogPriceView } from "../../src/usage.js";
+import { getCatalogPriceView } from "../../src/usage.ts";
 import type { LogEntry, Tone, VendorHealth } from "./types.ts";
 
 export interface FieldIssue {

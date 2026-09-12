@@ -6,9 +6,9 @@ import fs from "node:fs/promises";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { DEFAULT_CONFIG, normalizeConfig } from "../../src/config.js";
-import { getChatCompletionsUrl, getRouterBaseUrl } from "../../src/router-urls.js";
-import { readUsageSummary } from "../../src/usage-store.js";
+import { DEFAULT_CONFIG, normalizeConfig } from "../../src/config.ts";
+import { getChatCompletionsUrl, getRouterBaseUrl } from "../../src/router-urls.ts";
+import { readUsageSummary } from "../../src/usage-store.ts";
 import { readConfigStore, writeConfigStore } from "./config-store.ts";
 import { parseIpcRequest, parseIpcResponse } from "./ipc-contracts.ts";
 import { ensureLogFile, readLogPage, resolveLogPath } from "./log-store.ts";
@@ -92,7 +92,7 @@ function resolveAppDir(): string {
   );
 
   for (const candidate of candidates.filter((value): value is string => Boolean(value))) {
-    if (existsSync(join(candidate, "src", "server.js"))) {
+    if (existsSync(join(candidate, "src", "server.ts"))) {
       return candidate;
     }
   }
@@ -104,7 +104,7 @@ function getPaths(): Paths {
   const appDir = resolveAppDir();
   const dataDir = process.env.HEIMDALL_DATA_DIR || (app.isPackaged ? app.getPath("userData") : appDir);
   const configPath = process.env.ROUTER_CONFIG || join(dataDir, "config.json");
-  const serverPath = join(appDir, "src", "server.js");
+  const serverPath = join(appDir, "src", "server.ts");
   const pidPath = join(dataDir, "router.pid");
   const packageRoot = app.isPackaged ? process.resourcesPath : dirname(appDir);
   const nodePath = resolveNodePath(packageRoot);

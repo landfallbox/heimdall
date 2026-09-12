@@ -1,10 +1,75 @@
 import { z } from "zod";
-import { normalizeRequestFormat } from "./openai-protocol.js";
+import { normalizeRequestFormat } from "./openai-protocol.ts";
 
-// ============================================================
-// 常量
-// ============================================================
-export const DEFAULT_CONFIG = {
+export type CloseBehavior = "tray" | "exit" | "ask";
+export type RequestFormat = "chat-completions" | "responses";
+export type ApiKeyHeader = "authorization" | "api-key" | "x-api-key";
+export type VendorAuthentication = "none" | "api-key";
+
+export type ModelPricing =
+  | { mode: "openai" }
+  | { mode: "deepseek" }
+  | {
+      mode: "custom";
+      currency: string;
+      inputPerMillion: number;
+      cachedInputPerMillion: number | null;
+      outputPerMillion: number;
+    };
+
+export type NormalizedVendorModel = {
+  id: string;
+  enabled: boolean;
+  pricing?: ModelPricing;
+  enableThinking?: boolean;
+  [key: string]: unknown;
+};
+
+export type NormalizedVendor = {
+  name: string;
+  baseUrl: string;
+  models: NormalizedVendorModel[];
+  authentication: VendorAuthentication;
+  apiKeyHeader: ApiKeyHeader;
+  requestFormat: RequestFormat;
+  enabled: boolean;
+  apiKey?: string;
+  chatCompletionsPath?: string;
+  responsesPath?: string;
+  [key: string]: unknown;
+};
+
+export type NormalizedAppConfig = {
+  closeBehavior: CloseBehavior;
+  startAtLogin: boolean;
+};
+
+export type NormalizedRouterConfig = {
+  host: string;
+  port: number;
+  apiKey: string;
+  requestTimeoutMs: number;
+  maxBodyBytes: number;
+  fallbackStatusCodes: number[];
+  logFile: string;
+};
+
+export type NormalizedModelConfig = {
+  id: string;
+  name: string;
+  ownedBy: string;
+  maxInputTokens: number;
+  maxOutputTokens: number;
+};
+
+export type NormalizedConfig = {
+  app: NormalizedAppConfig;
+  router: NormalizedRouterConfig;
+  model: NormalizedModelConfig;
+  vendors: NormalizedVendor[];
+};
+
+export const DEFAULT_CONFIG: NormalizedConfig = {
   app: {
     closeBehavior: "tray",
     startAtLogin: false,
@@ -18,14 +83,18 @@ export const DEFAULT_CONFIG = {
     fallbackStatusCodes: [408, 409, 425, 429, 500, 502, 503, 504],
     logFile: "logs/router.log",
   },
+  model: {
+    id: "model-id",
+    name: "Model Name",
+    ownedBy: "local-router",
+    maxInputTokens: 200000,
+    maxOutputTokens: 64000,
+  },
   vendors: [],
 };
 
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
 
-// ============================================================
-// Schema
-// ============================================================
 const httpUrlSchema = z.string().trim().refine((value) => {
   try {
     const url = new URL(value);
@@ -56,7 +125,7 @@ export const vendorModelSchema = z.object({
   enabled: z.boolean().optional().default(true),
   pricing: modelPricingSchema.optional(),
   enableThinking: z.boolean().optional().default(false),
-}).loose();
+}).passthrough();
 
 export const vendorSchema = z.object({
   name: z.string().trim().optional().default(""),
@@ -70,7 +139,7 @@ export const vendorSchema = z.object({
   requestFormat: z.enum(["chat-completions", "responses"]).optional().default("chat-completions"),
   chatCompletionsPath: z.string().trim().optional(),
   responsesPath: z.string().trim().optional(),
-}).loose().superRefine((vendor, context) => {
+}).passthrough().superRefine((vendor, context) => {
   if (vendor.enabled === false) {
     return;
   }
@@ -99,7 +168,16 @@ export const vendorSchema = z.object({
     });
   }
 
-  vendor.models.forEach((model, index) => {
+  const enabledModels = vendor.models.filter((model) => model.enabled !== false);
+  if (!enabledModels.length) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["models"],
+      message: `Vendor ${vendor.name || "(unnamed)"} needs at least one enabled model.`,
+    });
+  }
+
+  enabledModels.forEach((model, index) => {
     if (!model.id) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
@@ -124,14 +202,17 @@ export const configSchema = z.object({
     fallbackStatusCodes: z.array(statusCodeSchema).min(1),
     logFile: z.string().trim().min(1),
   }),
+  model: z.object({
+    id: z.string().trim().min(1),
+    name: z.string().trim().min(1),
+    ownedBy: z.string().trim().min(1),
+    maxInputTokens: z.number().int().min(1),
+    maxOutputTokens: z.number().int().min(1),
+  }),
   vendors: z.array(vendorSchema),
 });
 
-
-// ============================================================
-// 归一化与校验
-// ============================================================
-export function deepMerge(base, override) {
+export function deepMerge(base: any, override: any): any {
   if (Array.isArray(base) || Array.isArray(override)) {
     return override ?? base;
   }
@@ -147,14 +228,22 @@ export function deepMerge(base, override) {
   return override ?? base;
 }
 
-export function isPlainObject(value) {
-  return value !== null && typeof value === "object" && value.constructor === Object;
+export function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && (value as object).constructor === Object;
 }
 
-export function normalizeConfig(config) {
+export function normalizeConfig(config: unknown): NormalizedConfig {
   const merged = deepMerge(DEFAULT_CONFIG, isPlainObject(config) ? config : {});
-  const app = merged.app || {};
-  const router = merged.router || {};
+  const app = (merged.app || {}) as NormalizedAppConfig;
+  const router = (merged.router || {}) as NormalizedRouterConfig;
+  const model = (merged.model || {}) as NormalizedModelConfig;
+  const normalizedModel = {
+    id: String(model.id || DEFAULT_CONFIG.model.id).trim() || DEFAULT_CONFIG.model.id,
+    name: String(model.name || DEFAULT_CONFIG.model.name).trim() || DEFAULT_CONFIG.model.name,
+    ownedBy: String(model.ownedBy || DEFAULT_CONFIG.model.ownedBy).trim() || DEFAULT_CONFIG.model.ownedBy,
+    maxInputTokens: Number(model.maxInputTokens || DEFAULT_CONFIG.model.maxInputTokens),
+    maxOutputTokens: Number(model.maxOutputTokens || DEFAULT_CONFIG.model.maxOutputTokens),
+  };
 
   return {
     app: {
@@ -170,28 +259,30 @@ export function normalizeConfig(config) {
       fallbackStatusCodes: normalizeStatusCodes(router.fallbackStatusCodes),
       logFile: String(router.logFile || DEFAULT_CONFIG.router.logFile).trim() || DEFAULT_CONFIG.router.logFile,
     },
-    vendors: Array.isArray(merged.vendors) ? merged.vendors.map((vendor) => normalizeVendor(vendor)) : [],
+    model: normalizedModel,
+    vendors: Array.isArray(merged.vendors) ? merged.vendors.map((vendor: any) => normalizeVendor(vendor, normalizedModel.id)) : [],
   };
 }
 
-function normalizeCloseBehavior(value) {
-  return closeBehaviorSchema.safeParse(value).success ? value : DEFAULT_CONFIG.app.closeBehavior;
+function normalizeCloseBehavior(value: unknown): CloseBehavior {
+  return closeBehaviorSchema.safeParse(value).success ? (value as CloseBehavior) : DEFAULT_CONFIG.app.closeBehavior;
 }
 
-function normalizeStatusCodes(value) {
+function normalizeStatusCodes(value: unknown): number[] {
   const codes = Array.isArray(value) ? value : DEFAULT_CONFIG.router.fallbackStatusCodes;
   return [...new Set(codes.map(Number).filter((code) => Number.isInteger(code) && code >= 100 && code <= 599))];
 }
 
-export function normalizeVendor(vendor) {
-  const authentication = vendor?.authentication === "api-key" || (!vendor?.authentication && vendor?.apiKey)
+export function normalizeVendor(vendor: Record<string, any> | null | undefined, defaultModelId = DEFAULT_CONFIG.model.id): NormalizedVendor {
+  const authentication: VendorAuthentication = vendor?.authentication === "api-key" || (!vendor?.authentication && vendor?.apiKey)
     ? "api-key"
     : "none";
-  const item = {
+  const item: Record<string, any> = {
     ...vendor,
     name: String(vendor?.name || "").trim(),
     baseUrl: String(vendor?.baseUrl || "").trim(),
     models: normalizeVendorModels(vendor?.models, {
+      defaultModelId,
       hasExplicitModels: Array.isArray(vendor?.models),
       legacyModelId: vendor?.model,
     }),
@@ -219,19 +310,23 @@ export function normalizeVendor(vendor) {
     delete item.apiKey;
   }
 
-  return item;
+  return item as NormalizedVendor;
 }
 
-function normalizeApiKeyHeader(value) {
+function normalizeApiKeyHeader(value: unknown): ApiKeyHeader {
   const header = String(value || "authorization").trim().toLowerCase();
-  return apiKeyHeaderSchema.safeParse(header).success ? header : "authorization";
+  return apiKeyHeaderSchema.safeParse(header).success ? (header as ApiKeyHeader) : "authorization";
 }
 
-export function normalizeVendorModels(value, { hasExplicitModels = Array.isArray(value), legacyModelId = "" } = {}) {
+export function normalizeVendorModels(
+  value: unknown,
+  { defaultModelId = DEFAULT_CONFIG.model.id, hasExplicitModels = Array.isArray(value), legacyModelId = "" }: { defaultModelId?: string; hasExplicitModels?: boolean; legacyModelId?: string } = {},
+): NormalizedVendorModel[] {
   const legacyId = String(legacyModelId || "").trim();
+  const fallbackId = legacyId || String(defaultModelId || DEFAULT_CONFIG.model.id).trim() || DEFAULT_CONFIG.model.id;
 
   if (!hasExplicitModels) {
-    return legacyId ? [{ id: legacyId, enabled: true }] : [];
+    return [{ id: fallbackId, enabled: true }];
   }
 
   if (!Array.isArray(value)) {
@@ -239,18 +334,18 @@ export function normalizeVendorModels(value, { hasExplicitModels = Array.isArray
   }
 
   return value
-    .map((model) => normalizeVendorModel(model))
+    .map((model) => normalizeVendorModel(model, fallbackId))
     .filter((model) => model.id);
 }
 
-function normalizeVendorModel(model) {
+function normalizeVendorModel(model: any, fallbackId: string): NormalizedVendorModel {
   if (typeof model === "string") {
     const id = model.trim();
     return { id, enabled: true };
   }
 
-  const id = String(model?.id || model?.model || "").trim();
-  const normalized = {
+  const id = String(model?.id || model?.model || fallbackId).trim();
+  const normalized: NormalizedVendorModel = {
     ...model,
     id,
     enabled: model?.enabled !== false,
@@ -269,7 +364,7 @@ function normalizeVendorModel(model) {
   return normalized;
 }
 
-function normalizeModelPricing(value) {
+function normalizeModelPricing(value: any): ModelPricing | undefined {
   if (!value) {
     return undefined;
   }
@@ -290,7 +385,10 @@ function normalizeModelPricing(value) {
   };
 }
 
-export function validateConfig(config, { requireVendors = true, configPath = "config.json" } = {}) {
+export function validateConfig(
+  config: NormalizedConfig,
+  { requireVendors = true, configPath = "config.json" }: { requireVendors?: boolean; configPath?: string } = {},
+): void {
   const parsed = configSchema.safeParse(config);
   const errors = parsed.success ? [] : parsed.error.issues.map((issue) => issue.message);
 
@@ -305,7 +403,7 @@ export function validateConfig(config, { requireVendors = true, configPath = "co
   }
 }
 
-export function requiresRouterApiKey(host) {
+export function requiresRouterApiKey(host: string): boolean {
   const normalized = String(host || "").trim().toLowerCase();
   return normalized === "0.0.0.0" || normalized === "::" || !LOOPBACK_HOSTS.has(normalized);
 }

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { configSchema } from "../../src/config.js";
+import { configSchema } from "../../src/config.ts";
 
 const emptyRequest = z.tuple([]);
 const okResponse = z.object({ ok: z.boolean() }).loose();

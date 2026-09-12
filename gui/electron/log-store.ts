@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
 import type { FileHandle } from "node:fs/promises";
 import { dirname, isAbsolute, join } from "node:path";
-import { DEFAULT_CONFIG } from "../../src/config.js";
+import { DEFAULT_CONFIG } from "../../src/config.ts";
 
 type LogConfig = { router?: { logFile?: string } };
 

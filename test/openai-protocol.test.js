@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { convertRequestBody, convertResponseBody } from "../src/openai-protocol.js";
+import { convertRequestBody, convertResponseBody } from "../src/openai-protocol.ts";
 
 const responsesRequest = convertRequestBody({
   model: "client-model",

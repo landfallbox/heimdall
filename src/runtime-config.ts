@@ -1,53 +1,66 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { normalizeConfig, validateConfig } from "./config.js";
+import { normalizeConfig, validateConfig, type NormalizedConfig, type NormalizedVendor, type NormalizedVendorModel } from "./config.ts";
 
 const moduleDirectory = dirname(fileURLToPath(import.meta.url));
 export const projectRoot = resolve(moduleDirectory, "..");
 export const runtimeRoot = process.env.HEIMDALL_DATA_DIR || projectRoot;
 
-function readJsonFile(path) {
+export type RuntimeVendorModel = NormalizedVendorModel & {
+  id: string;
+  enabled: boolean;
+  enableThinking?: boolean;
+};
+
+export type RuntimeVendor = NormalizedVendor & {
+  priority: number;
+  timeoutMs: number;
+  models: RuntimeVendorModel[];
+};
+
+export type RuntimeConfig = Omit<NormalizedConfig, "vendors"> & {
+  vendors: RuntimeVendor[];
+};
+
+function readJsonFile(path: string): unknown {
   return JSON.parse(readFileSync(path, "utf8"));
 }
 
 /** Loads file configuration, applies environment overrides, then validates the runtime shape. */
-export function loadRuntimeConfig() {
+export function loadRuntimeConfig(): { config: RuntimeConfig; configPath: string } {
   const configPath = process.env.ROUTER_CONFIG || resolve(projectRoot, "config.json");
   const fileConfig = existsSync(configPath) ? readJsonFile(configPath) : {};
-  const config = normalizeConfig(fileConfig);
+  const config = normalizeConfig(fileConfig) as RuntimeConfig;
 
   config.router.host = process.env.HOST || process.env.ROUTER_HOST || config.router.host;
   config.router.port = Number(process.env.PORT || process.env.ROUTER_PORT || config.router.port);
   config.router.apiKey = process.env.ROUTER_API_KEY ?? config.router.apiKey;
 
   if (!config.vendors.length) {
-    config.vendors = vendorsFromEnvironment();
+    config.vendors = vendorsFromEnvironment() as RuntimeVendor[];
   }
 
-  config.vendors = config.vendors
+  config.vendors = (config.vendors as NormalizedVendor[])
     .map((vendor, priority) => ({ ...vendor, priority }))
     .filter((vendor) => vendor.enabled !== false)
     .map((vendor) => ({
       ...vendor,
-      models: normalizeRuntimeVendorModels(vendor),
+      models: normalizeRuntimeVendorModels(vendor, config.model.id),
       timeoutMs: Number(config.router.requestTimeoutMs),
     }))
-    .filter((vendor) => vendor.models.some((model) => model.enabled !== false));
+    .filter((vendor) => vendor.models.some((model) => model.enabled !== false)) as RuntimeVendor[];
 
   validateConfig(config, { configPath });
   return { config, configPath };
 }
 
-function normalizeRuntimeVendorModels(vendor) {
+function normalizeRuntimeVendorModels(vendor: NormalizedVendor, defaultModelId: string): RuntimeVendorModel[] {
   const models = Array.isArray(vendor.models) ? vendor.models : [];
   if (!models.length) {
-    const id = String(vendor.model || "").trim();
-    if (!id) {
-      return [];
-    }
-    const model = { id, enabled: true };
-    if (vendor.enableThinking === true) {
+    const id = String((vendor as any).model || defaultModelId || "model-id").trim();
+    const model: RuntimeVendorModel = { id, enabled: true };
+    if ((vendor as any).enableThinking === true) {
       model.enableThinking = true;
     }
     return [model];
@@ -56,35 +69,31 @@ function normalizeRuntimeVendorModels(vendor) {
   return models
     .map((model) => ({
       ...model,
-      id: String(model.id || "").trim(),
+      id: String(model.id || defaultModelId || "model-id").trim(),
       enabled: model.enabled !== false,
     }))
     .filter((model) => model.id);
 }
 
-function vendorsFromEnvironment() {
-  return [vendorFromEnvironment("VENDOR_A", "vendor-a"), vendorFromEnvironment("VENDOR_B", "vendor-b")].filter(Boolean);
+function vendorsFromEnvironment(): NormalizedVendor[] {
+  return [vendorFromEnvironment("VENDOR_A", "vendor-a"), vendorFromEnvironment("VENDOR_B", "vendor-b")].filter(Boolean) as NormalizedVendor[];
 }
 
-function vendorFromEnvironment(prefix, fallbackName) {
+function vendorFromEnvironment(prefix: string, fallbackName: string): NormalizedVendor | null {
   const baseUrl = process.env[`${prefix}_BASE_URL`];
   const apiKey = process.env[`${prefix}_API_KEY`];
   if (!baseUrl && !apiKey) {
     return null;
   }
 
-  const item = {
+  return {
     name: process.env[`${prefix}_NAME`] || fallbackName,
     baseUrl,
     apiKey,
+    model: process.env[`${prefix}_MODEL`] || "model-id",
     requestFormat: process.env[`${prefix}_REQUEST_FORMAT`] === "responses" ? "responses" : "chat-completions",
     authentication: apiKey ? "api-key" : "none",
     enabled: true,
     enableThinking: process.env[`${prefix}_ENABLE_THINKING`] === "1",
-  };
-  const model = String(process.env[`${prefix}_MODEL`] || "").trim();
-  if (model) {
-    item.model = model;
-  }
-  return item;
+  } as unknown as NormalizedVendor;
 }

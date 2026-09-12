@@ -1,3 +1,36 @@
+export type CircuitBreakerOptions = {
+  failureThreshold?: number;
+  baseEjectionMs?: number;
+  maxEjectionMs?: number;
+  now?: () => number;
+};
+
+export type CircuitState = {
+  consecutiveFailures: number;
+  ejectionCount: number;
+  openUntil: number;
+  probeInFlight: boolean;
+};
+
+export type CircuitPermission = {
+  key: string;
+  probe: boolean;
+  forced: boolean;
+};
+
+export type CircuitCandidate<T> = {
+  vendor: T;
+  forced: boolean;
+};
+
+export type CircuitSnapshot = {
+  state: "closed" | "open" | "half-open";
+  consecutiveFailures: number;
+  ejectionCount: number;
+  retryAt: string;
+  probeInFlight: boolean;
+};
+
 export const DEFAULT_CIRCUIT_BREAKER_OPTIONS = Object.freeze({
   failureThreshold: 2,
   baseEjectionMs: 10_000,
@@ -5,7 +38,11 @@ export const DEFAULT_CIRCUIT_BREAKER_OPTIONS = Object.freeze({
 });
 
 export class VendorCircuitBreaker {
-  constructor(options = {}) {
+  options: { failureThreshold: number; baseEjectionMs: number; maxEjectionMs: number };
+  now: () => number;
+  states: Map<string, CircuitState>;
+
+  constructor(options: CircuitBreakerOptions = {}) {
     this.options = {
       ...DEFAULT_CIRCUIT_BREAKER_OPTIONS,
       ...options,
@@ -14,7 +51,7 @@ export class VendorCircuitBreaker {
     this.states = new Map();
   }
 
-  candidates(vendors, modelId) {
+  candidates<T extends { name?: string; baseUrl?: string; priority?: number }>(vendors: T[], modelId: string): CircuitCandidate<T>[] {
     const now = this.now();
     const available = vendors
       .filter((vendor) => this.#isAvailable(vendor, modelId, now))
@@ -32,7 +69,7 @@ export class VendorCircuitBreaker {
     return forced && !forced.state.probeInFlight ? [{ vendor: forced.vendor, forced: true }] : [];
   }
 
-  acquire(vendor, modelId, { forced = false } = {}) {
+  acquire(vendor: { name?: string; baseUrl?: string; priority?: number }, modelId: string, { forced = false }: { forced?: boolean } = {}): CircuitPermission | null {
     const state = this.#getState(vendor, modelId);
     const now = this.now();
 
@@ -47,7 +84,7 @@ export class VendorCircuitBreaker {
     return { key: this.#key(vendor, modelId), probe: true, forced };
   }
 
-  recordFailure(permission) {
+  recordFailure(permission: CircuitPermission): { opened: boolean; consecutiveFailures?: number; durationMs?: number; ejectionCount?: number; retryAt?: string } {
     const state = this.states.get(permission.key);
     if (!state) {
       return { opened: false };
@@ -75,7 +112,7 @@ export class VendorCircuitBreaker {
     };
   }
 
-  recordSuccess(permission) {
+  recordSuccess(permission: CircuitPermission): { closed: boolean; ejectionCount?: number } {
     const state = this.states.get(permission.key);
     if (!state) {
       return { closed: false };
@@ -89,14 +126,14 @@ export class VendorCircuitBreaker {
     return { closed: wasOpen, ejectionCount: state.ejectionCount };
   }
 
-  release(permission) {
+  release(permission: CircuitPermission) {
     const state = this.states.get(permission.key);
     if (state && permission.probe) {
       state.probeInFlight = false;
     }
   }
 
-  snapshot(vendor, modelId) {
+  snapshot(vendor: { name?: string; baseUrl?: string; priority?: number }, modelId: string): CircuitSnapshot {
     const state = this.#getState(vendor, modelId);
     const now = this.now();
     const status = state.openUntil === 0
@@ -114,12 +151,12 @@ export class VendorCircuitBreaker {
     };
   }
 
-  #isAvailable(vendor, modelId, now) {
+  #isAvailable(vendor: { name?: string; baseUrl?: string; priority?: number }, modelId: string, now: number): boolean {
     const state = this.#getState(vendor, modelId);
     return state.openUntil === 0 || (state.openUntil <= now && !state.probeInFlight);
   }
 
-  #getState(vendor, modelId) {
+  #getState(vendor: { name?: string; baseUrl?: string; priority?: number }, modelId: string): CircuitState {
     const key = this.#key(vendor, modelId);
     let state = this.states.get(key);
     if (!state) {
@@ -134,7 +171,7 @@ export class VendorCircuitBreaker {
     return state;
   }
 
-  #key(vendor, modelId) {
+  #key(vendor: { name?: string; baseUrl?: string; priority?: number }, modelId: string): string {
     return JSON.stringify([
       Number.isInteger(vendor?.priority) ? vendor.priority : null,
       String(vendor?.name || ""),

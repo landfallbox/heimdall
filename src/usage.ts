@@ -1,11 +1,50 @@
-export const OPENAI_PRICING_UPDATED_AT = "2026-09-05";
+export interface Pricing {
+  currency: string;
+  inputPerMillion: number;
+  cachedInputPerMillion: number | null;
+  outputPerMillion: number;
+}
+
+export interface RateCard {
+  peak: Pricing;
+  offPeak: Pricing;
+}
+
+export interface PricingCatalog {
+  sourceUrl: string;
+  updatedAt: string;
+  peakHours: [number, number][] | null;
+  models: Record<string, Pricing | RateCard>;
+}
+
+export interface Usage {
+  inputTokens: number;
+  cachedInputTokens: number;
+  outputTokens: number;
+  reasoningTokens: number;
+  totalTokens: number;
+}
+
+export interface Cost {
+  amount: number;
+  currency: string;
+  pricing: unknown;
+}
+
+export interface ResolvedPricing extends Pricing {
+  source: string;
+  sourceModel: string;
+  updatedAt: string | null;
+  card?: string;
+}
+
+export const OPENAI_PRICING_UPDATED_AT = "2026-08-15";
 export const OPENAI_PRICING_SOURCE = "https://developers.openai.com/api/docs/pricing";
 export const DEEPSEEK_PRICING_UPDATED_AT = "2026-08-16";
 export const DEEPSEEK_PRICING_SOURCE = "https://api-docs.deepseek.com/quick_start/pricing";
-export const DEEPSEEK_PEAK_HOURS = [[1, 4], [6, 10]];
+export const DEEPSEEK_PEAK_HOURS: [number, number][] = [[1, 4], [6, 10]];
 
-const OPENAI_STANDARD_PRICING = Object.freeze({
-  "gpt-6-astra": price(10, 1, 50),
+const OPENAI_STANDARD_PRICING: Record<string, Pricing> = Object.freeze({
   "gpt-5.6-sol": price(5, 0.5, 30),
   "gpt-5.6-terra": price(2, 0.2, 12),
   "gpt-5.6-luna": price(0.2, 0.02, 1.2),
@@ -47,12 +86,12 @@ const OPENAI_STANDARD_PRICING = Object.freeze({
   "chat-latest": price(5, 0.5, 30),
 });
 
-const DEEPSEEK_STANDARD_PRICING = Object.freeze({
+const DEEPSEEK_STANDARD_PRICING: Record<string, RateCard> = Object.freeze({
   "deepseek-v4-flash": rateCards(price(0.44, 0.014, 1.32, "CNY"), price(0.22, 0.007, 0.66, "CNY")),
   "deepseek-v4-pro": rateCards(price(1.32, 0.044, 3.96, "CNY"), price(0.66, 0.022, 1.98, "CNY")),
 });
 
-export const PRICING_CATALOGS = Object.freeze({
+export const PRICING_CATALOGS: Record<string, PricingCatalog> = Object.freeze({
   openai: {
     sourceUrl: OPENAI_PRICING_SOURCE,
     updatedAt: OPENAI_PRICING_UPDATED_AT,
@@ -67,7 +106,7 @@ export const PRICING_CATALOGS = Object.freeze({
   },
 });
 
-export function normalizeUsage(body, format) {
+export function normalizeUsage(body: any, format: unknown): Usage | null {
   const usage = body?.usage;
   if (!usage || typeof usage !== "object") {
     return null;
@@ -97,7 +136,7 @@ export function normalizeUsage(body, format) {
   };
 }
 
-export function resolveModelPricing(model, pricingConfig, now = new Date()) {
+export function resolveModelPricing(model: string, pricingConfig: any, now = new Date()): ResolvedPricing | null {
   const custom = normalizeCustomPricing(pricingConfig);
   if (custom) {
     return {
@@ -125,7 +164,7 @@ export function resolveModelPricing(model, pricingConfig, now = new Date()) {
   };
 }
 
-export function getCatalogPriceView(catalogKey, modelId) {
+export function getCatalogPriceView(catalogKey: string, modelId: string) {
   const catalog = PRICING_CATALOGS[catalogKey];
   if (!catalog) {
     return null;
@@ -135,19 +174,19 @@ export function getCatalogPriceView(catalogKey, modelId) {
     return null;
   }
   const entry = catalog.models[sourceModel];
-  const hasRateCards = Boolean(catalog.peakHours && entry.peak && entry.offPeak);
+  const hasRateCards = Boolean(catalog.peakHours && (entry as RateCard).peak && (entry as RateCard).offPeak);
   return {
     source: catalogKey,
     sourceModel,
     sourceUrl: catalog.sourceUrl,
     updatedAt: catalog.updatedAt,
     peakHours: hasRateCards ? catalog.peakHours : null,
-    pricing: hasRateCards ? entry.peak : entry,
-    offPeakPricing: hasRateCards ? entry.offPeak : null,
+    pricing: hasRateCards ? (entry as RateCard).peak : (entry as Pricing),
+    offPeakPricing: hasRateCards ? (entry as RateCard).offPeak : null,
   };
 }
 
-export function estimateUsageCost(usage, pricing) {
+export function estimateUsageCost(usage: Usage | null, pricing: ResolvedPricing | null): Cost | null {
   if (!usage || !pricing) {
     return null;
   }
@@ -179,7 +218,7 @@ export function getOpenAIPricingCatalog() {
   return Object.entries(OPENAI_STANDARD_PRICING).map(([model, pricing]) => ({ model, ...pricing }));
 }
 
-function findCatalogPriceModel(catalogModels, value) {
+function findCatalogPriceModel(catalogModels: Record<string, Pricing | RateCard>, value: unknown): string | null {
   const model = String(value || "").trim().toLowerCase();
   if (catalogModels[model]) {
     return model;
@@ -189,22 +228,22 @@ function findCatalogPriceModel(catalogModels, value) {
   return catalogModels[baseModel] ? baseModel : null;
 }
 
-function resolveCatalogPricing(catalog, sourceModel, now) {
+function resolveCatalogPricing(catalog: PricingCatalog, sourceModel: string, now: Date) {
   const entry = catalog.models[sourceModel];
-  if (catalog.peakHours && entry.peak && entry.offPeak) {
+  if (catalog.peakHours && (entry as RateCard).peak && (entry as RateCard).offPeak) {
     return isPeakHour(now, catalog.peakHours)
-      ? { card: "peak", pricing: entry.peak }
-      : { card: "off-peak", pricing: entry.offPeak };
+      ? { card: "peak", pricing: (entry as RateCard).peak }
+      : { card: "off-peak", pricing: (entry as RateCard).offPeak };
   }
-  return { card: null, pricing: entry };
+  return { card: null, pricing: entry as Pricing };
 }
 
-function isPeakHour(value, peakHours) {
+function isPeakHour(value: Date, peakHours: [number, number][]): boolean {
   const hour = new Date(value).getUTCHours();
   return peakHours.some(([start, end]) => hour >= start && hour < end);
 }
 
-function normalizeCustomPricing(value) {
+function normalizeCustomPricing(value: any): Pricing | null {
   if (!value || value.mode !== "custom") {
     return null;
   }
@@ -227,20 +266,20 @@ function normalizeCustomPricing(value) {
   };
 }
 
-function price(inputPerMillion, cachedInputPerMillion, outputPerMillion, currency = "USD") {
+function price(inputPerMillion: number, cachedInputPerMillion: number | null, outputPerMillion: number, currency = "USD"): Pricing {
   return { currency, inputPerMillion, cachedInputPerMillion, outputPerMillion };
 }
 
-function rateCards(peak, offPeak) {
+function rateCards(peak: Pricing, offPeak: Pricing): RateCard {
   return { peak, offPeak };
 }
 
-function tokenCount(value) {
+function tokenCount(value: unknown): number | null {
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 ? Math.trunc(number) : null;
 }
 
-function nonnegativeNumber(value) {
+function nonnegativeNumber(value: unknown): number | null {
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 ? number : null;
 }

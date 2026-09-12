@@ -3,8 +3,8 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readConfigStore, writeConfigStore } from "../gui/electron/config-store.ts";
-import { getChatCompletionsUrl, getResponsesUrl, getRouterBaseUrl } from "../src/router-urls.js";
-import { normalizeConfig, validateConfig, vendorModelSchema } from "../src/config.js";
+import { getChatCompletionsUrl, getResponsesUrl, getRouterBaseUrl } from "../src/router-urls.ts";
+import { normalizeConfig, validateConfig, vendorModelSchema } from "../src/config.ts";
 
 const tempDirectory = mkdtempSync(join(tmpdir(), "local-router-config-test-"));
 const configPath = join(tempDirectory, "config.json");

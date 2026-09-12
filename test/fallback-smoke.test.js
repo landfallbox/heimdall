@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { readUsageSummary } from "../src/usage-store.js";
+import { readUsageSummary } from "../src/usage-store.ts";
 
 const tempDir = mkdtempSync(join(tmpdir(), "local-router-test-"));
 const projectRoot = new URL("..", import.meta.url);
@@ -60,7 +60,7 @@ function writeConfig(name, config) {
 }
 
 async function startRouter(configPath) {
-  const router = spawn(process.execPath, ["src/server.js"], {
+  const router = spawn(process.execPath, ["src/server.ts"], {
     cwd: projectRoot,
     env: {
       ...process.env,

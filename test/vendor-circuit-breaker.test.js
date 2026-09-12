@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { VendorCircuitBreaker } from "../src/vendor-circuit-breaker.js";
+import { VendorCircuitBreaker } from "../src/vendor-circuit-breaker.ts";
 
 let now = Date.parse("2026-01-01T00:00:00.000Z");
 const breaker = new VendorCircuitBreaker({

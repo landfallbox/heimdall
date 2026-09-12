@@ -4,11 +4,40 @@ import { join } from "node:path";
 const USAGE_DIRECTORY = "usage";
 const FILE_VERSION = 1;
 
-export function createUsageStore(runtimeRoot, { onError = () => {} } = {}) {
-  const directory = join(runtimeRoot, USAGE_DIRECTORY);
-  let writeQueue = Promise.resolve();
+export type UsageCost = {
+  amount: number;
+  currency: string;
+  pricing: unknown;
+} | null;
 
-  function record(event) {
+export type UsageEvent = {
+  version: number;
+  time: string;
+  requestId: string;
+  vendor: string;
+  model: string;
+  format: "chat-completions" | "responses";
+  stream: boolean;
+  usageKnown: boolean;
+  inputTokens: number;
+  cachedInputTokens: number;
+  outputTokens: number;
+  reasoningTokens: number;
+  totalTokens: number;
+  cost: UsageCost;
+};
+
+export type UsageStore = {
+  directory: string;
+  record: (event: any) => Promise<void>;
+  close: () => Promise<void>;
+};
+
+export function createUsageStore(runtimeRoot: string, { onError = () => {} }: { onError?: (error: Error, entry: UsageEvent) => void } = {}): UsageStore {
+  const directory = join(runtimeRoot, USAGE_DIRECTORY);
+  let writeQueue: Promise<void> = Promise.resolve();
+
+  function record(event: any): Promise<void> {
     const entry = normalizeEvent(event);
     const operation = writeQueue.then(async () => {
       await fs.mkdir(directory, { recursive: true });
@@ -25,7 +54,7 @@ export function createUsageStore(runtimeRoot, { onError = () => {} } = {}) {
   };
 }
 
-export async function readUsageSummary(runtimeRoot, { now = new Date(), vendor = "", model = "" } = {}) {
+export async function readUsageSummary(runtimeRoot: string, { now = new Date(), vendor = "", model = "" }: { now?: Date; vendor?: string; model?: string } = {}) {
   const currentTime = validDate(now);
   const vendorFilter = String(vendor || "").trim();
   const modelFilter = String(model || "").trim();
@@ -44,8 +73,8 @@ export async function readUsageSummary(runtimeRoot, { now = new Date(), vendor =
     week: createAggregate(weekStart),
     month: createAggregate(monthStart),
   };
-  const dailyMap = new Map();
-  const dailyModels = new Map();
+  const dailyMap = new Map<string, Aggregate>();
+  const dailyModels = new Map<string, Map<string, Aggregate>>();
 
   for (let offset = 0; offset < 30; offset += 1) {
     const date = addDays(trendStart, offset);
@@ -54,8 +83,8 @@ export async function readUsageSummary(runtimeRoot, { now = new Date(), vendor =
     dailyModels.set(dateKey, new Map());
   }
 
-  const vendors = new Map();
-  const models = new Map();
+  const vendors = new Map<string, Aggregate>();
+  const models = new Map<string, Aggregate>();
   for (const event of events) {
     const eventTime = new Date(event.time);
     for (const [name, period] of Object.entries(periods)) {
@@ -96,7 +125,7 @@ export async function readUsageSummary(runtimeRoot, { now = new Date(), vendor =
   };
 }
 
-function normalizeEvent(event) {
+function normalizeEvent(event: any): UsageEvent {
   const time = validDate(event?.time || new Date()).toISOString();
   const usage = event?.usage;
   const cost = event?.cost;
@@ -118,7 +147,7 @@ function normalizeEvent(event) {
   };
 }
 
-function normalizeCost(value) {
+function normalizeCost(value: any): UsageCost {
   const amount = Number(value?.amount);
   const currency = String(value?.currency || "").trim().toUpperCase();
   if (!Number.isFinite(amount) || amount < 0 || !currency) {
@@ -131,15 +160,15 @@ function normalizeCost(value) {
   };
 }
 
-async function readEvents(directory, start, end) {
-  const events = [];
+async function readEvents(directory: string, start: Date, end: Date): Promise<{ events: any[]; ignoredLines: number }> {
+  const events: any[] = [];
   let ignoredLines = 0;
   const monthKeys = utcMonthKeys(start, end);
   const contents = await Promise.all(monthKeys.map(async (monthKey) => {
     try {
       return await fs.readFile(join(directory, `${monthKey}.jsonl`), "utf8");
     } catch (error) {
-      if (error.code === "ENOENT") {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
         return "";
       }
       throw error;
@@ -162,7 +191,20 @@ async function readEvents(directory, start, end) {
   return { events, ignoredLines };
 }
 
-function createAggregate(startDate) {
+interface Aggregate {
+  startDate: Date;
+  requestCount: number;
+  usageKnownCount: number;
+  pricedRequestCount: number;
+  inputTokens: number;
+  cachedInputTokens: number;
+  outputTokens: number;
+  reasoningTokens: number;
+  totalTokens: number;
+  costByCurrency: Map<string, number>;
+}
+
+function createAggregate(startDate: Date): Aggregate {
   return {
     startDate,
     requestCount: 0,
@@ -177,7 +219,7 @@ function createAggregate(startDate) {
   };
 }
 
-function addEvent(aggregate, event) {
+function addEvent(aggregate: Aggregate, event: any) {
   aggregate.requestCount += 1;
   if (event.usageKnown === true) {
     aggregate.usageKnownCount += 1;
@@ -194,14 +236,19 @@ function addEvent(aggregate, event) {
   }
 }
 
-function addGroupedEvent(groups, key, event) {
-  if (!groups.has(key)) {
-    groups.set(key, createAggregate(startOfMonth(new Date(event.time))));
+function addGroupedEvent(groups: Map<string, Aggregate> | undefined, key: string, event: any) {
+  if (!groups) {
+    return;
   }
-  addEvent(groups.get(key), event);
+  let aggregate = groups.get(key);
+  if (!aggregate) {
+    aggregate = createAggregate(startOfMonth(new Date(event.time)));
+    groups.set(key, aggregate);
+  }
+  addEvent(aggregate, event);
 }
 
-function finalizeAggregate(aggregate) {
+function finalizeAggregate(aggregate: Aggregate) {
   return {
     startsAt: aggregate.startDate.toISOString(),
     requestCount: aggregate.requestCount,
@@ -220,18 +267,21 @@ function finalizeAggregate(aggregate) {
   };
 }
 
-function finalizeGroups(groups) {
+function finalizeGroups(groups: Map<string, Aggregate> | undefined) {
+  if (!groups) {
+    return [];
+  }
   return [...groups.entries()]
     .map(([name, aggregate]) => ({ name, ...finalizeAggregate(aggregate) }))
     .sort((left, right) => right.totalTokens - left.totalTokens || left.name.localeCompare(right.name));
 }
 
-function coverage(numerator, denominator) {
+function coverage(numerator: number, denominator: number): number {
   return denominator > 0 ? Number((numerator / denominator).toFixed(6)) : 1;
 }
 
-function utcMonthKeys(start, end) {
-  const keys = [];
+function utcMonthKeys(start: Date, end: Date): string[] {
+  const keys: string[] = [];
   const cursor = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1));
   const last = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), 1));
   while (cursor <= last) {
@@ -241,44 +291,44 @@ function utcMonthKeys(start, end) {
   return keys;
 }
 
-function startOfDay(date) {
+function startOfDay(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
-function startOfWeek(date) {
+function startOfWeek(date: Date): Date {
   const start = startOfDay(date);
   const daysSinceMonday = (start.getDay() + 6) % 7;
   start.setDate(start.getDate() - daysSinceMonday);
   return start;
 }
 
-function startOfMonth(date) {
+function startOfMonth(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), 1);
 }
 
-function addDays(date, amount) {
+function addDays(date: Date, amount: number): Date {
   const result = new Date(date);
   result.setDate(result.getDate() + amount);
   return result;
 }
 
-function localDateKey(date) {
+function localDateKey(date: Date): string {
   return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"), String(date.getDate()).padStart(2, "0")].join("-");
 }
 
-function tokenCount(value) {
+function tokenCount(value: unknown): number {
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 ? Math.trunc(number) : 0;
 }
 
-function validDate(value) {
-  const date = value instanceof Date ? new Date(value) : new Date(value);
+function validDate(value: unknown): Date {
+  const date = value instanceof Date ? new Date(value) : new Date(value as string);
   if (Number.isNaN(date.getTime())) {
     throw new Error("Usage event time must be a valid date.");
   }
   return date;
 }
 
-function uniqueDimensionValues(events, field, fallback) {
+function uniqueDimensionValues(events: any[], field: string, fallback: string): string[] {
   return [...new Set(events.map((event) => String(event?.[field] || fallback)))].sort((left, right) => left.localeCompare(right));
 }

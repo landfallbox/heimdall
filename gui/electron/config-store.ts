@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { normalizeConfig, validateConfig } from "../../src/config.js";
+import { normalizeConfig, validateConfig } from "../../src/config.ts";
 
 type NormalizedConfig = ReturnType<typeof normalizeConfig>;
 

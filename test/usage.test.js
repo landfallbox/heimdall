@@ -3,8 +3,8 @@ import fs from "node:fs/promises";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createUsageStore, readUsageSummary } from "../src/usage-store.js";
-import { estimateUsageCost, getCatalogPriceView, normalizeUsage, resolveModelPricing } from "../src/usage.js";
+import { createUsageStore, readUsageSummary } from "../src/usage-store.ts";
+import { estimateUsageCost, getCatalogPriceView, normalizeUsage, resolveModelPricing } from "../src/usage.ts";
 
 const chatUsage = normalizeUsage({
   usage: {

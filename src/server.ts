@@ -1,16 +1,45 @@
 import http from "node:http";
 import { createHash, randomUUID } from "node:crypto";
-import { realpathSync, watch } from "node:fs";
+import { realpathSync, watch, type FSWatcher } from "node:fs";
 import { basename, dirname } from "node:path";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { StringDecoder } from "node:string_decoder";
-import { createLogger } from "./logger.js";
-import { convertRequestBody, convertResponseBody, normalizeRequestFormat } from "./openai-protocol.js";
-import { loadRuntimeConfig, runtimeRoot } from "./runtime-config.js";
-import { createUsageStore } from "./usage-store.js";
-import { estimateUsageCost, normalizeUsage, resolveModelPricing } from "./usage.js";
-import { VendorCircuitBreaker } from "./vendor-circuit-breaker.js";
+import { createLogger, type Logger } from "./logger.ts";
+import { convertRequestBody, convertResponseBody, normalizeRequestFormat } from "./openai-protocol.ts";
+import { loadRuntimeConfig, runtimeRoot, type RuntimeConfig, type RuntimeVendor } from "./runtime-config.ts";
+import { createUsageStore, type UsageStore } from "./usage-store.ts";
+import { estimateUsageCost, normalizeUsage, resolveModelPricing, type Usage } from "./usage.ts";
+import { VendorCircuitBreaker, type CircuitPermission } from "./vendor-circuit-breaker.ts";
+import type { NormalizedVendorModel, RequestFormat } from "./config.ts";
+
+type VendorWithModel = RuntimeVendor & { selectedModel: NormalizedVendorModel };
+
+type Runtime = {
+  config: RuntimeConfig;
+  circuitBreaker: VendorCircuitBreaker;
+  configRevision: string;
+  restartFields: string[];
+};
+
+type VendorFailure = {
+  vendor: string;
+  elapsedMs: number;
+  errorName?: string;
+  errorMessage?: string;
+  errorType?: string;
+  statusCode?: number;
+  bodyBytes?: number;
+  protocolFailure?: boolean;
+};
+
+type ReloadResult = {
+  ok: boolean;
+  applied: boolean;
+  configRevision: string;
+  restartRequired: boolean;
+  restartFields: string[];
+};
 
 const HOP_BY_HOP_HEADERS = new Set([
   "connection",
@@ -27,7 +56,7 @@ const HOP_BY_HOP_HEADERS = new Set([
 const RESTART_REQUIRED_FIELDS = ["router.host", "router.port", "router.logFile"];
 const CONFIG_WATCH_DEBOUNCE_MS = 200;
 
-function sendParentMessage(message) {
+function sendParentMessage(message: unknown): Promise<void> {
   return new Promise((resolve, reject) => {
     if (typeof process.send !== "function" || !process.connected) {
       reject(new Error("Parent IPC channel is disconnected."));
@@ -48,7 +77,7 @@ function sendParentMessage(message) {
   });
 }
 
-function sendJson(res, statusCode, body, extraHeaders = {}) {
+function sendJson(res: http.ServerResponse, statusCode: number, body: unknown, extraHeaders: Record<string, string> = {}) {
   res.writeHead(statusCode, {
     "content-type": "application/json; charset=utf-8",
     ...extraHeaders,
@@ -56,19 +85,20 @@ function sendJson(res, statusCode, body, extraHeaders = {}) {
   res.end(JSON.stringify(body));
 }
 
-function runtimeConfigRevision(config) {
+function runtimeConfigRevision(config: RuntimeConfig): string {
   const runtimeConfig = {
     router: config.router,
+    model: config.model,
     vendors: config.vendors,
   };
   return createHash("sha256").update(JSON.stringify(runtimeConfig)).digest("hex");
 }
 
-function getConfigValue(config, path) {
-  return path.split(".").reduce((value, key) => value?.[key], config);
+function getConfigValue(config: unknown, path: string): unknown {
+  return path.split(".").reduce((value, key) => (value as any)?.[key], config);
 }
 
-function prepareReloadedConfig(currentConfig, nextConfig) {
+function prepareReloadedConfig(currentConfig: RuntimeConfig, nextConfig: RuntimeConfig) {
   const restartFields = RESTART_REQUIRED_FIELDS.filter(
     (field) => getConfigValue(currentConfig, field) !== getConfigValue(nextConfig, field),
   );
@@ -76,18 +106,18 @@ function prepareReloadedConfig(currentConfig, nextConfig) {
 
   for (const field of restartFields) {
     const [, key] = field.split(".");
-    effectiveConfig.router[key] = currentConfig.router[key];
+    (effectiveConfig.router as any)[key] = currentConfig.router[key as keyof RuntimeConfig["router"]];
   }
 
   return { effectiveConfig, restartFields };
 }
 
-function getRequestPath(req) {
-  const url = new URL(req.url, "http://127.0.0.1");
+function getRequestPath(req: http.IncomingMessage): string {
+  const url = new URL(req.url ?? "", "http://127.0.0.1");
   return url.pathname.replace(/\/+$/, "") || "/";
 }
 
-function isAuthorized(req, config, path) {
+function isAuthorized(req: http.IncomingMessage, config: RuntimeConfig, path: string): boolean {
   const managementToken = process.env.HEIMDALL_MANAGEMENT_TOKEN;
   if (path === "/health" && managementToken && req.headers["x-router-management-token"] === managementToken) {
     return true;
@@ -102,14 +132,14 @@ function isAuthorized(req, config, path) {
   return authorization === `Bearer ${expectedKey}`;
 }
 
-async function readJsonBody(req, maxBodyBytes) {
-  const chunks = [];
+async function readJsonBody(req: http.IncomingMessage, maxBodyBytes: number): Promise<any> {
+  const chunks: Buffer[] = [];
   let total = 0;
 
   for await (const chunk of req) {
     total += chunk.length;
     if (total > maxBodyBytes) {
-      const error = new Error(`Request body exceeds maxBodyBytes (${maxBodyBytes}).`);
+      const error = new Error(`Request body exceeds maxBodyBytes (${maxBodyBytes}).`) as Error & { statusCode?: number };
       error.statusCode = 413;
       throw error;
     }
@@ -123,12 +153,12 @@ async function readJsonBody(req, maxBodyBytes) {
   try {
     return JSON.parse(Buffer.concat(chunks).toString("utf8"));
   } catch (error) {
-    error.statusCode = 400;
+    (error as Error & { statusCode?: number }).statusCode = 400;
     throw error;
   }
 }
 
-function buildUpstreamUrl(vendor, requestFormat) {
+function buildUpstreamUrl(vendor: RuntimeVendor, requestFormat: RequestFormat): string {
   const baseUrl = vendor.baseUrl.replace(/\/+$/, "");
   const path = requestFormat === "responses"
     ? vendor.responsesPath || "/responses"
@@ -136,7 +166,7 @@ function buildUpstreamUrl(vendor, requestFormat) {
   return `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
-function buildUpstreamHeaders(vendor) {
+function buildUpstreamHeaders(vendor: RuntimeVendor): Record<string, string> {
   const apiKeyHeader = vendor.apiKeyHeader || "authorization";
   const authenticationHeader = apiKeyHeader === "authorization"
     ? `Bearer ${vendor.apiKey}`
@@ -148,7 +178,7 @@ function buildUpstreamHeaders(vendor) {
   };
 }
 
-function createTimeoutSignal(timeoutMs) {
+function createTimeoutSignal(timeoutMs: number) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   return {
@@ -158,7 +188,7 @@ function createTimeoutSignal(timeoutMs) {
   };
 }
 
-function linkClientAbort(req, res, abort) {
+function linkClientAbort(req: http.IncomingMessage, res: http.ServerResponse, abort: () => void): () => void {
   const abortClosedResponse = () => {
     if (!res.writableEnded) {
       abort();
@@ -172,7 +202,7 @@ function linkClientAbort(req, res, abort) {
   };
 }
 
-async function callVendor(vendor, requestBody, inboundFormat, signal, logger) {
+async function callVendor(vendor: VendorWithModel, requestBody: any, inboundFormat: RequestFormat, signal: AbortSignal, logger: Logger) {
   const upstreamFormat = normalizeRequestFormat(vendor.requestFormat);
   const body = convertRequestBody(requestBody, inboundFormat, upstreamFormat, vendor.selectedModel.id);
 
@@ -195,17 +225,17 @@ async function callVendor(vendor, requestBody, inboundFormat, signal, logger) {
   return { response, upstreamFormat };
 }
 
-function shouldFallback(statusCode, config) {
+function shouldFallback(statusCode: number, config: RuntimeConfig): boolean {
   return config.router.fallbackStatusCodes.includes(statusCode) || statusCode >= 500;
 }
 
-async function readBoundedText(response, maxBytes = 64 * 1024) {
+async function readBoundedText(response: Response, maxBytes = 64 * 1024): Promise<string> {
   const reader = response.body?.getReader();
   if (!reader) {
     return "";
   }
 
-  const chunks = [];
+  const chunks: Buffer[] = [];
   let total = 0;
 
   while (true) {
@@ -228,7 +258,7 @@ async function readBoundedText(response, maxBytes = 64 * 1024) {
   return Buffer.concat(chunks).toString("utf8");
 }
 
-function summarizeUpstreamError(statusCode, body) {
+function summarizeUpstreamError(statusCode: number, body: string) {
   const text = String(body || "").trim();
   let errorType = "upstream_error";
 
@@ -250,7 +280,7 @@ function summarizeUpstreamError(statusCode, body) {
   };
 }
 
-function copyUpstreamHeaders(upstream, res, vendorName) {
+function copyUpstreamHeaders(upstream: Response, res: http.ServerResponse, vendorName: string) {
   for (const [key, value] of upstream.headers.entries()) {
     if (!HOP_BY_HOP_HEADERS.has(key.toLowerCase())) {
       res.setHeader(key, value);
@@ -259,26 +289,26 @@ function copyUpstreamHeaders(upstream, res, vendorName) {
   res.setHeader("x-router-vendor", vendorName);
 }
 
-async function pipeUpstreamWithUsage(upstream, res, format, logger) {
+async function pipeUpstreamWithUsage(upstream: Response, res: http.ServerResponse, format: RequestFormat, logger: Logger): Promise<Usage | null> {
   if (!upstream.body) {
     res.end();
     return null;
   }
 
-  let usage = null;
+  let usage: Usage | null = null;
   const tracker = createSseUsageTracker(format, (nextUsage) => {
     usage = nextUsage;
   }, logger);
-  await pipeline(Readable.fromWeb(upstream.body), tracker, res);
+  await pipeline(Readable.fromWeb(upstream.body as any), tracker, res);
   return usage;
 }
 
-function createSseUsageTracker(format, onUsage, logger) {
+function createSseUsageTracker(format: RequestFormat, onUsage: (usage: Usage) => void, logger: Logger) {
   const decoder = new StringDecoder("utf8");
   let pending = "";
   let sseChunkCount = 0;
 
-  function inspectText(text, flush = false) {
+  function inspectText(text: string, flush = false) {
     pending += text;
     const lines = pending.split(/\r?\n/);
     pending = flush ? "" : lines.pop() || "";
@@ -315,7 +345,7 @@ function createSseUsageTracker(format, onUsage, logger) {
   });
 }
 
-function recordUsage(usageStore, logger, context, usage, customPricing) {
+function recordUsage(usageStore: UsageStore, logger: Logger, context: { requestId: string; vendor: string; model: string; format: RequestFormat; stream: boolean }, usage: Usage | null, customPricing: unknown) {
   const pricing = resolveModelPricing(context.model, customPricing);
   const cost = estimateUsageCost(usage, pricing);
   void usageStore.record({ ...context, usage, cost }).catch(() => null);
@@ -332,28 +362,23 @@ function recordUsage(usageStore, logger, context, usage, customPricing) {
   });
 }
 
-async function handleGeneration(req, res, config, logger, circuitBreaker, usageStore, inboundFormat) {
-  // 生成请求 ID 并读取请求体（受 maxBodyBytes 限制，超限返回 413，JSON 非法返回 400）
+async function handleGeneration(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  config: RuntimeConfig,
+  logger: Logger,
+  circuitBreaker: VendorCircuitBreaker,
+  usageStore: UsageStore,
+  inboundFormat: RequestFormat,
+) {
   const requestId = randomUUID();
   const startedAt = Date.now();
   const requestBody = await readJsonBody(req, config.router.maxBodyBytes);
   logger.debug("inbound_request", { requestId, body: requestBody });
-
-  // 确定目标模型（请求必须显式指定 model，缺失直接报错）
-  const requestedModel = String(requestBody.model ?? "").trim();
-  if (!requestedModel) {
-    sendJson(res, 400, {
-      error: {
-        message: "Missing required parameter: model.",
-        type: "invalid_request_error",
-        param: "model",
-      },
-    });
-    return;
-  }
-
-  // 找出所有启用了该模型的供应商（同一模型可由多个供应商提供），没有任何供应商支持该模型，直接返回 404
+  const requestedModel = String(requestBody.model || config.model.id).trim() || config.model.id;
   const vendors = getVendorsForModel(config.vendors, requestedModel);
+  const failures: VendorFailure[] = [];
+
   if (!vendors.length) {
     sendJson(res, 404, {
       error: {
@@ -365,24 +390,16 @@ async function handleGeneration(req, res, config, logger, circuitBreaker, usageS
     return;
   }
 
-  // 累积各供应商的失败明细（用于全部失败时的日志与 400/502 响应）
-  const failures = [];
-
-  // 熔断器按优先级排序候选供应商（熔断打开的供应商可能被标记为"强制探测"），按顺序逐个尝试
   const candidates = circuitBreaker.candidates(vendors, requestedModel);
   for (const { vendor, forced } of candidates) {
-    // 熔断打开且非探测请求时，跳过该供应商
     const circuitPermission = circuitBreaker.acquire(vendor, requestedModel, { forced });
     if (!circuitPermission) {
       continue;
     }
 
     const vendorStartedAt = Date.now();
-    // 为该供应商创建超时控制句柄（仅限制连接与响应头的等待时间）
-    const timeoutSignal = createTimeoutSignal(vendor.timeoutMs);
-    
-    // 客户端断开时联动中止上游请求，避免无谓消耗与计费
-    const unlinkClientAbort = linkClientAbort(req, res, timeoutSignal.abort);
+    const timeout = createTimeoutSignal(vendor.timeoutMs);
+    const unlinkClientAbort = linkClientAbort(req, res, timeout.abort);
 
     try {
       logger.info("vendor_request_started", {
@@ -396,17 +413,16 @@ async function handleGeneration(req, res, config, logger, circuitBreaker, usageS
         circuitForcedProbe: circuitPermission.forced,
       });
 
-      // 向上游供应商发出请求，阻塞到供应商返回响应头
-      const { response: upstream, upstreamFormat } = await callVendor(vendor, requestBody, inboundFormat, timeoutSignal.signal, logger);
-
-      // 上游已响应，取消超时；后续流式传输不再受此限制
-      timeoutSignal.cancel();
+      const { response: upstream, upstreamFormat } = await callVendor(vendor, requestBody, inboundFormat, timeout.signal, logger);
+      // requestTimeoutMs limits connection and response-header wait time. Once a
+      // vendor responds, long-running streams may continue until completion or
+      // until the client disconnects.
+      timeout.cancel();
       const elapsedMs = Date.now() - vendorStartedAt;
 
-      // 上游返回错误状态码
       if (!upstream.ok) {
         const errorText = await readBoundedText(upstream);
-        const failure = {
+        const failure: VendorFailure = {
           vendor: vendor.name,
           elapsedMs,
           ...summarizeUpstreamError(upstream.status, errorText),
@@ -418,7 +434,6 @@ async function handleGeneration(req, res, config, logger, circuitBreaker, usageS
           ...failure,
         });
 
-        // 属于可切换状态码（在 fallbackStatusCodes 中或 5xx）：记录熔断失败，切换下一个供应商
         if (shouldFallback(upstream.status, config)) {
           recordCircuitFailure(circuitBreaker, circuitPermission, logger, {
             requestId,
@@ -429,7 +444,6 @@ async function handleGeneration(req, res, config, logger, circuitBreaker, usageS
           continue;
         }
 
-        // 否则（如 4xx 客户端错误）：供应商本身无故障，记录熔断成功并把错误原样透传给客户端
         recordCircuitSuccess(circuitBreaker, circuitPermission, logger, {
           requestId,
           vendor: vendor.name,
@@ -442,7 +456,6 @@ async function handleGeneration(req, res, config, logger, circuitBreaker, usageS
         return;
       }
 
-      // 上游成功，记录熔断成功
       logger.info("vendor_request_selected", {
         requestId,
         vendor: vendor.name,
@@ -457,13 +470,10 @@ async function handleGeneration(req, res, config, logger, circuitBreaker, usageS
         vendor: vendor.name,
         model: requestedModel,
       });
-
-      // 判断是否流式响应（仅当上下游格式一致时才直接透传，否则需缓冲后转换）
       res.statusCode = upstream.status;
-      const responseIsStream = upstreamFormat === inboundFormat && (
+      const responseIsStream = Boolean(upstreamFormat === inboundFormat && (
         requestBody.stream === true || upstream.headers.get("content-type")?.includes("text/event-stream")
-      );
-
+      ));
       const usageContext = {
         requestId,
         vendor: vendor.name,
@@ -471,16 +481,13 @@ async function handleGeneration(req, res, config, logger, circuitBreaker, usageS
         format: upstreamFormat,
         stream: responseIsStream,
       };
-
       if (responseIsStream) {
-        // 流式：SSE 流直接透传给客户端，同时旁路解析提取 token 用量
         copyUpstreamHeaders(upstream, res, vendor.name);
         const usage = await pipeUpstreamWithUsage(upstream, res, upstreamFormat, logger);
         recordUsage(usageStore, logger, usageContext, usage, vendor.selectedModel.pricing);
       } else {
-        // 非流式：读取完整响应体
         const upstreamText = await upstream.text();
-        let upstreamBody = null;
+        let upstreamBody: any = null;
         try {
           upstreamBody = JSON.parse(upstreamText);
         } catch (error) {
@@ -489,7 +496,6 @@ async function handleGeneration(req, res, config, logger, circuitBreaker, usageS
           }
         }
         const usage = normalizeUsage(upstreamBody, upstreamFormat);
-        // 格式与请求一致则原样透传，否则转换回请求格式后返回
         if (upstreamFormat === inboundFormat) {
           copyUpstreamHeaders(upstream, res, vendor.name);
           res.end(upstreamText);
@@ -501,17 +507,15 @@ async function handleGeneration(req, res, config, logger, circuitBreaker, usageS
         }
         recordUsage(usageStore, logger, usageContext, usage, vendor.selectedModel.pricing);
       }
-
       return;
     } catch (error) {
-      // 异常处理。协议转换失败（400 + errorType）不算供应商故障
-      const isProtocolFailure = error.statusCode === 400 && Boolean(error.errorType);
-      const failure = {
+      const isProtocolFailure = (error as any).statusCode === 400 && Boolean((error as any).errorType);
+      const failure: VendorFailure = {
         vendor: vendor.name,
         elapsedMs: Date.now() - vendorStartedAt,
-        errorName: error.name,
-        errorMessage: error.message,
-        errorType: error.errorType,
+        errorName: (error as Error).name,
+        errorMessage: (error as Error).message,
+        errorType: (error as any).errorType,
         ...(isProtocolFailure ? { protocolFailure: true } : {}),
       };
       failures.push(failure);
@@ -521,47 +525,42 @@ async function handleGeneration(req, res, config, logger, circuitBreaker, usageS
         ...failure,
       });
 
-      // 客户端已断开：释放熔断许可并直接结束（无需再尝试其他供应商）
       if (req.aborted || res.destroyed) {
         circuitBreaker.release(circuitPermission);
         return;
       }
 
-      // 响应已开始发送则不能再切换供应商（会破坏流并可能重复计费），只能断开连接
+      // Once response bytes are committed, another vendor would corrupt the stream
+      // and may duplicate a billable upstream request.
       if (res.headersSent) {
         circuitBreaker.release(circuitPermission);
-        res.destroy(error);
+        res.destroy(error as Error);
         return;
       }
 
-      // 协议失败：请求本身与该供应商格式不兼容，跳过并尝试下一个
       if (isProtocolFailure) {
         circuitBreaker.release(circuitPermission);
         continue;
       }
 
-      // 超时 / 网络错误：记录熔断失败，尝试下一个供应商
       recordCircuitFailure(circuitBreaker, circuitPermission, logger, {
         requestId,
         vendor: vendor.name,
         model: requestedModel,
-        reason: error.name === "AbortError" ? "timeout" : "network_error",
+        reason: (error as Error).name === "AbortError" ? "timeout" : "network_error",
       });
     } finally {
-      // 清理客户端断开监听与超时定时器
       unlinkClientAbort();
-      timeoutSignal.cancel();
+      timeout.cancel();
     }
   }
 
-  // 所有供应商均失败
   logger.error("all_vendors_failed", {
     requestId,
     totalElapsedMs: Date.now() - startedAt,
     failures,
   });
 
-  // 若全部是协议失败，返回 400 并带上具体协议错误
   const protocolFailures = failures.filter((failure) => failure.protocolFailure);
   if (protocolFailures.length === failures.length && protocolFailures.length) {
     sendJson(res, 400, {
@@ -573,7 +572,6 @@ async function handleGeneration(req, res, config, logger, circuitBreaker, usageS
     return;
   }
 
-  // 否则返回 502，附带各供应商的失败明细
   sendJson(res, 502, {
     error: {
       message: "All configured vendors failed before a response could be returned.",
@@ -584,7 +582,7 @@ async function handleGeneration(req, res, config, logger, circuitBreaker, usageS
   });
 }
 
-function recordCircuitFailure(circuitBreaker, permission, logger, context) {
+function recordCircuitFailure(circuitBreaker: VendorCircuitBreaker, permission: CircuitPermission, logger: Logger, context: Record<string, unknown>) {
   const transition = circuitBreaker.recordFailure(permission);
   if (transition.opened) {
     logger.warn("vendor_circuit_opened", {
@@ -596,7 +594,7 @@ function recordCircuitFailure(circuitBreaker, permission, logger, context) {
   }
 }
 
-function recordCircuitSuccess(circuitBreaker, permission, logger, context) {
+function recordCircuitSuccess(circuitBreaker: VendorCircuitBreaker, permission: CircuitPermission, logger: Logger, context: Record<string, unknown>) {
   const transition = circuitBreaker.recordSuccess(permission);
   if (transition.closed) {
     logger.info("vendor_circuit_closed", {
@@ -606,14 +604,14 @@ function recordCircuitSuccess(circuitBreaker, permission, logger, context) {
   }
 }
 
-function getVendorsForModel(vendors, requestedModel) {
+function getVendorsForModel(vendors: RuntimeVendor[], requestedModel: string): VendorWithModel[] {
   return vendors.flatMap((vendor) => {
     const selectedModel = vendor.models.find((model) => model.enabled !== false && model.id === requestedModel);
     return selectedModel ? [{ ...vendor, selectedModel }] : [];
   });
 }
 
-function handleModels(_req, res, config) {
+function handleModels(_req: http.IncomingMessage, res: http.ServerResponse, config: RuntimeConfig) {
   const modelIds = [...new Set(config.vendors.flatMap((vendor) => vendor.models
     .filter((model) => model.enabled !== false)
     .map((model) => model.id)))];
@@ -623,12 +621,12 @@ function handleModels(_req, res, config) {
     data: modelIds.map((id) => ({
       id,
       object: "model",
-      owned_by: "heimdall",
+      owned_by: config.model.ownedBy,
     })),
   });
 }
 
-function handleHealth(_req, res, runtime) {
+function handleHealth(_req: http.IncomingMessage, res: http.ServerResponse, runtime: Runtime) {
   const { config, circuitBreaker } = runtime;
   sendJson(res, 200, {
     ok: true,
@@ -636,6 +634,7 @@ function handleHealth(_req, res, runtime) {
     configRevision: runtime.configRevision,
     restartRequired: runtime.restartFields.length > 0,
     restartFields: runtime.restartFields,
+    model: config.model.id,
     vendorCount: config.vendors.length,
     vendors: config.vendors.map((vendor) => ({
       name: vendor.name,
@@ -650,7 +649,13 @@ function handleHealth(_req, res, runtime) {
   });
 }
 
-async function handleRequest(req, res, runtime, logger, usageStore) {
+async function handleRequest(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  runtime: Runtime,
+  logger: Logger,
+  usageStore: UsageStore,
+) {
   const { config, circuitBreaker } = runtime;
   const path = getRequestPath(req);
 
@@ -695,20 +700,20 @@ async function handleRequest(req, res, runtime, logger, usageStore) {
     logger.error("request_failed", {
       path,
       method: req.method,
-      errorName: error.name,
-      errorMessage: error.message,
+      errorName: (error as Error).name,
+      errorMessage: (error as Error).message,
     });
 
     if (!res.headersSent) {
-      sendJson(res, error.statusCode || 500, {
+      sendJson(res, (error as any).statusCode || 500, {
         error: {
-          message: error.message,
-          type: error.errorType || "router_error",
-          ...(error.parameter ? { param: error.parameter } : {}),
+          message: (error as Error).message,
+          type: (error as any).errorType || "router_error",
+          ...((error as any).parameter ? { param: (error as any).parameter } : {}),
         },
       });
     } else {
-      res.destroy(error);
+      res.destroy(error as Error);
     }
   }
 }
@@ -723,15 +728,15 @@ function main() {
       errorMessage: error.message,
     }),
   });
-  let runtime = {
+  let runtime: Runtime = {
     config,
     circuitBreaker: new VendorCircuitBreaker(),
     configRevision: runtimeConfigRevision(config),
     restartFields: [],
   };
-  let reloadQueue = Promise.resolve();
-  let configWatcher = null;
-  let configWatchTimer = null;
+  let reloadQueue: Promise<void> = Promise.resolve();
+  let configWatcher: FSWatcher | null = null;
+  let configWatchTimer: NodeJS.Timeout | null = null;
   let stopping = false;
 
   const server = http.createServer((req, res) => {
@@ -739,8 +744,8 @@ function main() {
     void handleRequest(req, res, snapshot, logger, usageStore);
   });
 
-  const reloadRuntimeConfig = (source) => {
-    const operation = reloadQueue.then(() => {
+  const reloadRuntimeConfig = (source: string): Promise<ReloadResult> => {
+    const operation = reloadQueue.then((): ReloadResult => {
       const loaded = loadRuntimeConfig();
       const nextRevision = runtimeConfigRevision(loaded.config);
       if (nextRevision === runtime.configRevision) {
@@ -775,18 +780,23 @@ function main() {
       };
     });
 
-    reloadQueue = operation.catch((error) => {
-      logger.error("config_reload_failed", {
-        source,
-        errorName: error.name,
-        errorMessage: error.message,
-      });
-    });
+    reloadQueue = operation.then(
+      () => undefined,
+      (error) => {
+        logger.error("config_reload_failed", {
+          source,
+          errorName: (error as Error).name,
+          errorMessage: (error as Error).message,
+        });
+      },
+    );
     return operation;
   };
 
   const scheduleWatchedReload = () => {
-    clearTimeout(configWatchTimer);
+    if (configWatchTimer) {
+      clearTimeout(configWatchTimer);
+    }
     configWatchTimer = setTimeout(() => {
       configWatchTimer = null;
       void reloadRuntimeConfig("file-watch").catch(() => null);
@@ -804,7 +814,7 @@ function main() {
       logger.error("config_watch_failed", { errorName: error.name, errorMessage: error.message });
     });
   } catch (error) {
-    logger.error("config_watch_failed", { errorName: error.name, errorMessage: error.message });
+    logger.error("config_watch_failed", { errorName: (error as Error).name, errorMessage: (error as Error).message });
   }
 
   server.listen(config.router.port, config.router.host, () => {
@@ -812,17 +822,20 @@ function main() {
       host: config.router.host,
       port: config.router.port,
       configPath,
+      model: config.model.id,
       vendors: config.vendors.map((vendor) => vendor.name),
     });
   });
 
-  const stopRouter = (reason) => {
+  const stopRouter = (reason: string) => {
     if (stopping) {
       return;
     }
 
     stopping = true;
-    clearTimeout(configWatchTimer);
+    if (configWatchTimer) {
+      clearTimeout(configWatchTimer);
+    }
     configWatcher?.close();
     logger.info("router_stopping", { reason });
     server.close(() => {
@@ -834,19 +847,19 @@ function main() {
     }
   };
 
-  for (const signal of ["SIGINT", "SIGTERM"]) {
+  for (const signal of ["SIGINT", "SIGTERM"] as const) {
     process.on(signal, () => stopRouter(signal));
   }
 
   if (typeof process.send === "function") {
-    process.on("message", (message) => {
+    process.on("message", (message: any) => {
       if (message?.type === "shutdown") {
         stopRouter("parent_request");
         return;
       }
       if (message?.type === "reload-config" && message.requestId) {
         void (async () => {
-          let response;
+          let response: any;
           try {
             const result = await reloadRuntimeConfig("parent-request");
             response = {
@@ -859,7 +872,7 @@ function main() {
               type: "config-reload-failed",
               requestId: message.requestId,
               ok: false,
-              error: error.message || String(error),
+              error: (error as Error).message || String(error),
             };
           }
 
@@ -869,8 +882,8 @@ function main() {
             logger.error("config_reload_response_failed", {
               requestId: message.requestId,
               responseType: response.type,
-              errorName: error.name,
-              errorMessage: error.message,
+              errorName: (error as Error).name,
+              errorMessage: (error as Error).message,
             });
           }
         })();

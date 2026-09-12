@@ -1,10 +1,18 @@
-export const REQUEST_FORMATS = ["chat-completions", "responses"];
+import type { RequestFormat } from "./config.ts";
 
-export function normalizeRequestFormat(value) {
+export const REQUEST_FORMATS: RequestFormat[] = ["chat-completions", "responses"];
+
+export function normalizeRequestFormat(value: unknown): RequestFormat {
   return value === "responses" ? "responses" : "chat-completions";
 }
 
-export function convertRequestBody(body, inboundFormat, upstreamFormat, model) {
+export type ProtocolError = Error & {
+  statusCode: number;
+  errorType: string;
+  parameter?: string;
+};
+
+export function convertRequestBody(body: any, inboundFormat: unknown, upstreamFormat: unknown, model: string): any {
   const source = normalizeRequestFormat(inboundFormat);
   const target = normalizeRequestFormat(upstreamFormat);
   if (source === target) {
@@ -21,7 +29,7 @@ export function convertRequestBody(body, inboundFormat, upstreamFormat, model) {
     : responsesRequestToChat(body, model);
 }
 
-export function convertResponseBody(body, upstreamFormat, outboundFormat) {
+export function convertResponseBody(body: any, upstreamFormat: unknown, outboundFormat: unknown): any {
   const source = normalizeRequestFormat(upstreamFormat);
   const target = normalizeRequestFormat(outboundFormat);
   if (source === target) {
@@ -30,7 +38,7 @@ export function convertResponseBody(body, upstreamFormat, outboundFormat) {
   return source === "chat-completions" ? chatResponseToResponses(body) : responsesResponseToChat(body);
 }
 
-function chatRequestToResponses(body, model) {
+function chatRequestToResponses(body: any, model: string) {
   assertUnsupportedFields(body, ["n", "logprobs", "top_logprobs"], "Chat Completions");
   const { messages = [], max_tokens, max_completion_tokens, tools, ...rest } = body;
   const converted = {
@@ -48,7 +56,7 @@ function chatRequestToResponses(body, model) {
   return converted;
 }
 
-function responsesRequestToChat(body, model) {
+function responsesRequestToChat(body: any, model: string) {
   assertUnsupportedFields(body, ["previous_response_id", "conversation", "include", "store", "truncation"], "Responses");
   const { input, instructions, max_output_tokens, tools, ...rest } = body;
   const messages = normalizeResponseInput(input);
@@ -65,7 +73,7 @@ function responsesRequestToChat(body, model) {
   return converted;
 }
 
-function chatMessageToResponseInput(message) {
+function chatMessageToResponseInput(message: any) {
   if (message?.role === "tool") {
     return {
       type: "function_call_output",
@@ -79,7 +87,7 @@ function chatMessageToResponseInput(message) {
   };
 }
 
-function normalizeResponseInput(input) {
+function normalizeResponseInput(input: any) {
   if (typeof input === "string") {
     return [{ role: "user", content: input }];
   }
@@ -94,7 +102,7 @@ function normalizeResponseInput(input) {
   });
 }
 
-function convertChatContentToResponses(content) {
+function convertChatContentToResponses(content: any) {
   if (!Array.isArray(content)) {
     return content ?? "";
   }
@@ -110,7 +118,7 @@ function convertChatContentToResponses(content) {
   });
 }
 
-function convertResponsesContentToChat(content) {
+function convertResponsesContentToChat(content: any) {
   if (!Array.isArray(content)) {
     return content ?? "";
   }
@@ -125,14 +133,14 @@ function convertResponsesContentToChat(content) {
   });
 }
 
-function chatToolToResponseTool(tool) {
+function chatToolToResponseTool(tool: any) {
   if (tool?.type !== "function" || !tool.function?.name) {
     throw protocolError("Only function tools can be converted to Responses format.", "unsupported_tool");
   }
   return { type: "function", ...tool.function };
 }
 
-function responseToolToChatTool(tool) {
+function responseToolToChatTool(tool: any) {
   if (tool?.type !== "function" || !tool.name) {
     throw protocolError("Only function tools can be converted to Chat Completions format.", "unsupported_tool");
   }
@@ -140,7 +148,7 @@ function responseToolToChatTool(tool) {
   return { type: "function", function: definition };
 }
 
-function chatResponseToResponses(body) {
+function chatResponseToResponses(body: any) {
   const choice = body?.choices?.[0] || {};
   const message = choice.message || {};
   const output = [];
@@ -178,8 +186,8 @@ function chatResponseToResponses(body) {
   };
 }
 
-function responsesResponseToChat(body) {
-  const output = Array.isArray(body?.output) ? body.output : [];
+function responsesResponseToChat(body: any) {
+  const output: any[] = Array.isArray(body?.output) ? body.output : [];
   const text = output
     .filter((item) => item?.type === "message")
     .flatMap((item) => Array.isArray(item.content) ? item.content : [])
@@ -215,15 +223,15 @@ function responsesResponseToChat(body) {
   };
 }
 
-function assertUnsupportedFields(body, fields, format) {
+function assertUnsupportedFields(body: any, fields: string[], format: string) {
   const field = fields.find((name) => body[name] !== undefined);
   if (field) {
     throw protocolError(`${format} field cannot be converted safely: ${field}`, "unsupported_parameter", field);
   }
 }
 
-function protocolError(message, type, parameter) {
-  const error = new Error(message);
+function protocolError(message: string, type: string, parameter?: string): ProtocolError {
+  const error = new Error(message) as ProtocolError;
   error.statusCode = 400;
   error.errorType = type;
   error.parameter = parameter;
