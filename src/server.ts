@@ -299,7 +299,7 @@ async function pipeUpstreamWithUsage(upstream: Response, res: http.ServerRespons
   const tracker = createSseUsageTracker(format, (nextUsage) => {
     usage = nextUsage;
   }, logger);
-  await pipeline(Readable.fromWeb(upstream.body as any), tracker, res);
+  await pipeline(Readable.fromWeb(upstream.body as unknown as import("node:stream/web").ReadableStream), tracker, res);
   return usage;
 }
 
