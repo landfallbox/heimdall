@@ -25,16 +25,16 @@ try {
   assert.equal(JSON.parse(readFileSync(configPath, "utf8")).router.port, 4100);
   await assert.rejects(
     () => writeConfigStore(configPath, initial.config, initial.revision),
-    (error) => error.code === "CONFIG_CONFLICT",
+    (error: any) => error.code === "CONFIG_CONFLICT",
   );
 
-  assert.equal(getRouterBaseUrl({ router: { host: "::1", port: 4000 } }), "http://[::1]:4000");
+  assert.equal(getRouterBaseUrl({ router: { host: "::1", port: 4000 } } as any), "http://[::1]:4000");
   assert.equal(
-    getChatCompletionsUrl({ router: { host: "127.0.0.1", port: 4000 } }),
+    getChatCompletionsUrl({ router: { host: "127.0.0.1", port: 4000 } } as any),
     "http://127.0.0.1:4000/v1/chat/completions",
   );
   assert.equal(
-    getResponsesUrl({ router: { host: "::1", port: 4000 } }),
+    getResponsesUrl({ router: { host: "::1", port: 4000 } } as any),
     "http://[::1]:4000/v1/responses",
   );
 

@@ -101,7 +101,7 @@ const deepseekRoundTrip = toConfig(toDraft(normalizeConfig({
     }],
   }],
 })));
-assert.deepEqual(deepseekRoundTrip.vendors[0].models[0].pricing, { mode: "deepseek" });
+assert.deepEqual(deepseekRoundTrip.vendors[0]!.models![0]!.pricing, { mode: "deepseek" });
 const deepseekDraftModel = toDraft(normalizeConfig({
   router: { apiKey: "test-token" },
   vendors: [{
@@ -109,7 +109,7 @@ const deepseekDraftModel = toDraft(normalizeConfig({
     baseUrl: "https://api.deepseek.com",
     models: [{ id: "deepseek-v4-flash", pricing: { mode: "deepseek" } }],
   }],
-})).vendors[0].models[0];
+})).vendors[0]!.models![0]!;
 assert.equal(deepseekDraftModel.pricingMode, "deepseek");
 assert.equal(deepseekDraftModel.inputPerMillion, "");
 const deepseekDraft = toDraft(normalizeConfig({
@@ -120,8 +120,8 @@ const deepseekDraft = toDraft(normalizeConfig({
     models: [{ id: "deepseek-v4-pro", enabled: true }],
   }],
 }));
-deepseekDraft.vendors[0].models[0].pricingMode = "deepseek";
-assert.deepEqual(toConfig(deepseekDraft).vendors[0].models[0].pricing, { mode: "deepseek" });
+deepseekDraft.vendors[0]!.models![0]!.pricingMode = "deepseek";
+assert.deepEqual(toConfig(deepseekDraft).vendors[0]!.models![0]!.pricing, { mode: "deepseek" });
 assert.deepEqual(getVendorCircuitSummary({ models: [
   { id: "model-a", circuit: { state: "closed" } },
   { id: "model-b", circuit: { state: "open" } },

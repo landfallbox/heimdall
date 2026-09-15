@@ -11,10 +11,10 @@ const routerDataDir = join(testRoot, "router-data");
 const userDataDir = join(testRoot, "electron-user-data");
 const configPath = join(testRoot, "config.json");
 const pidPath = join(routerDataDir, "router.pid");
-let electronApp;
-let routerPid;
+let electronApp: any = null;
+let routerPid: number | null = null;
 
-function createConfig(port) {
+function createConfig(port: number) {
   return {
     app: {
       closeBehavior: "tray",
@@ -40,18 +40,18 @@ function createConfig(port) {
   };
 }
 
-async function findFreePort() {
+async function findFreePort(): Promise<number> {
   const server = http.createServer();
-  await new Promise((resolvePromise, rejectPromise) => {
+  await new Promise<void>((resolvePromise, rejectPromise) => {
     server.once("error", rejectPromise);
-    server.listen(0, "127.0.0.1", resolvePromise);
+    server.listen(0, "127.0.0.1", () => resolvePromise());
   });
-  const address = server.address();
-  await new Promise((resolvePromise) => server.close(resolvePromise));
-  return address.port;
+  const address = server.address()!;
+  await new Promise<void>((resolvePromise) => server.close(() => resolvePromise()));
+  return (address as import("net").AddressInfo).port;
 }
 
-async function waitFor(predicate, message, timeoutMs = 10000) {
+async function waitFor(predicate: () => Promise<boolean> | boolean, message: string, timeoutMs = 10000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (await predicate()) {
@@ -62,8 +62,8 @@ async function waitFor(predicate, message, timeoutMs = 10000) {
   throw new Error(message);
 }
 
-function isProcessRunning(pid) {
-  if (!Number.isInteger(pid) || pid <= 0) {
+function isProcessRunning(pid: number | null | undefined): boolean {
+  if (typeof pid !== "number" || !Number.isInteger(pid) || pid <= 0) {
     return false;
   }
   try {
@@ -100,9 +100,9 @@ async function runTest() {
   });
 
   const window = await electronApp.firstWindow();
-  await window.waitForFunction(() => Boolean(window.heimdall));
+  await window.waitForFunction(() => Boolean((window as any).heimdall));
 
-  const startResult = await window.evaluate(() => window.heimdall.startRouter());
+  const startResult = await window.evaluate(() => (window as any).heimdall.startRouter());
   assert.equal(startResult.started, true, JSON.stringify(startResult));
   assert.equal(startResult.health?.ok, true, JSON.stringify(startResult));
 
@@ -111,9 +111,9 @@ async function runTest() {
     return isProcessRunning(routerPid);
   }, "Electron did not start a managed Router process.");
 
-  const loaded = await window.evaluate(() => window.heimdall.loadConfig());
+  const loaded = await window.evaluate(() => (window as any).heimdall.loadConfig());
   const reloadedToken = "electron-reloaded-token";
-  const saveResult = await window.evaluate(({ config, revision, token }) => window.heimdall.saveConfig({
+  const saveResult = await window.evaluate(({ config, revision, token }: any) => (window as any).heimdall.saveConfig({
     config: {
       ...config,
       router: { ...config.router, apiKey: token },
@@ -132,15 +132,15 @@ async function runTest() {
   });
   assert.equal(newTokenHealth.status, 200);
 
-  await electronApp.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].close());
+  await electronApp.evaluate(({ BrowserWindow }: any) => BrowserWindow.getAllWindows()[0].close());
   await waitFor(
-    () => electronApp.evaluate(({ BrowserWindow }) => !BrowserWindow.getAllWindows()[0].isVisible()),
+    () => electronApp.evaluate(({ BrowserWindow }: any) => !BrowserWindow.getAllWindows()[0].isVisible()),
     "Closing the window did not hide it to the tray.",
   );
   assert.equal(isProcessRunning(routerPid), true, "Router stopped when the window was only hidden to the tray.");
 
   const appClosed = electronApp.waitForEvent("close");
-  await window.evaluate(() => window.heimdall.quitAndStop()).catch(() => null);
+  await window.evaluate(() => (window as any).heimdall.quitAndStop()).catch(() => null);
   await appClosed;
   electronApp = null;
 
@@ -158,7 +158,7 @@ try {
     await electronApp.close().catch(() => null);
   }
   if (isProcessRunning(routerPid)) {
-    process.kill(routerPid, "SIGKILL");
+    process.kill(routerPid!, "SIGKILL");
   }
   rmSync(testRoot, { recursive: true, force: true });
 }

@@ -57,11 +57,11 @@ assert.equal(chatBody.choices[0].message.content, "answer");
 
 assert.throws(
   () => convertRequestBody({ stream: true, messages: [] }, "chat-completions", "responses", "vendor-model"),
-  (error) => error.statusCode === 400 && error.errorType === "unsupported_stream_conversion",
+  (error: any) => error.statusCode === 400 && error.errorType === "unsupported_stream_conversion",
 );
 assert.throws(
   () => convertRequestBody({ input: [{ content: [{ type: "input_file" }] }] }, "responses", "chat-completions", "vendor-model"),
-  (error) => error.statusCode === 400 && error.errorType === "unsupported_content",
+  (error: any) => error.statusCode === 400 && error.errorType === "unsupported_content",
 );
 
 console.log("OpenAI protocol tests passed");

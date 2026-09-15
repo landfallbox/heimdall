@@ -12,37 +12,37 @@ const projectRoot = new URL("..", import.meta.url);
 const routerOutput = new WeakMap();
 const MAX_ROUTER_OUTPUT_LENGTH = 64 * 1024;
 
-async function createMockVendor(handler) {
+async function createMockVendor(handler: (req: http.IncomingMessage, res: http.ServerResponse) => void | Promise<void>) {
   const server = http.createServer(handler);
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
-  const address = server.address();
+  const address = server.address() as import("net").AddressInfo;
   return {
     server,
     baseUrl: `http://127.0.0.1:${address.port}/v1`,
   };
 }
 
-function readBody(req) {
+function readBody(req: http.IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
-    const chunks = [];
-    req.on("data", (chunk) => chunks.push(chunk));
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk) => chunks.push(chunk as Buffer));
     req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
     req.on("error", reject);
   });
 }
 
-async function findFreePort() {
+async function findFreePort(): Promise<number> {
   const server = http.createServer();
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
-  const port = server.address().port;
+  const port = (server.address() as import("net").AddressInfo).port;
   server.close();
   await once(server, "close");
   return port;
 }
 
-async function waitFor(predicate, message, timeoutMs = 3000) {
+async function waitFor(predicate: () => Promise<boolean> | boolean, message: string, timeoutMs = 3000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (await predicate()) {
@@ -53,13 +53,13 @@ async function waitFor(predicate, message, timeoutMs = 3000) {
   throw new Error(message);
 }
 
-function writeConfig(name, config) {
+function writeConfig(name: string, config: unknown) {
   const configPath = join(tempDir, `${name}.json`);
   writeFileSync(configPath, JSON.stringify(config, null, 2));
   return configPath;
 }
 
-async function startRouter(configPath) {
+async function startRouter(configPath: string) {
   const router = spawn(process.execPath, ["src/server.ts"], {
     cwd: projectRoot,
     env: {
@@ -70,23 +70,23 @@ async function startRouter(configPath) {
     stdio: ["ignore", "pipe", "pipe", "ipc"],
   });
 
-  router.stdout.setEncoding("utf8");
-  router.stderr.setEncoding("utf8");
+  router.stdout!.setEncoding("utf8");
+  router.stderr!.setEncoding("utf8");
   const output = { text: "" };
-  const captureOutput = (chunk) => {
+  const captureOutput = (chunk: string | Buffer) => {
     output.text = `${output.text}${chunk}`.slice(-MAX_ROUTER_OUTPUT_LENGTH);
   };
-  router.stdout.on("data", captureOutput);
-  router.stderr.on("data", captureOutput);
+  router.stdout!.on("data", captureOutput);
+  router.stderr!.on("data", captureOutput);
   routerOutput.set(router, output);
   return router;
 }
 
-function getRouterOutput(router) {
+function getRouterOutput(router: import("node:child_process").ChildProcess) {
   return routerOutput.get(router)?.text || "";
 }
 
-async function stopRouter(router) {
+async function stopRouter(router: import("node:child_process").ChildProcess) {
   if (router.exitCode !== null) {
     return;
   }
@@ -95,11 +95,11 @@ async function stopRouter(router) {
   await once(router, "exit");
 }
 
-async function reloadRouter(router, timeoutMs = 3000) {
+async function reloadRouter(router: import("node:child_process").ChildProcess, timeoutMs = 3000) {
   const requestId = `reload-${Date.now()}-${Math.random()}`;
 
-  return new Promise((resolve, reject) => {
-    let timeout;
+  return new Promise<any>((resolve, reject) => {
+    let timeout: NodeJS.Timeout | undefined;
     const cleanup = () => {
       clearTimeout(timeout);
       router.off("message", onMessage);
@@ -107,21 +107,21 @@ async function reloadRouter(router, timeoutMs = 3000) {
       router.off("error", onError);
       router.off("disconnect", onDisconnect);
     };
-    const fail = (error) => {
+    const fail = (error: Error) => {
       cleanup();
       reject(error);
     };
-    const onMessage = (message) => {
+    const onMessage = (message: any) => {
       if (message?.requestId !== requestId) {
         return;
       }
       cleanup();
       resolve(message);
     };
-    const onExit = (code, signal) => fail(new Error(
+    const onExit = (code: number | null, signal: string | null) => fail(new Error(
       `Router exited during config reload (code=${code}, signal=${signal}).\n${getRouterOutput(router)}`,
     ));
-    const onError = (error) => fail(error);
+    const onError = (error: Error) => fail(error);
     const onDisconnect = () => fail(new Error(
       `Router IPC disconnected during config reload.\n${getRouterOutput(router)}`,
     ));
@@ -146,13 +146,13 @@ async function reloadRouter(router, timeoutMs = 3000) {
   });
 }
 
-async function waitForProcessClose(router, timeoutMs = 5000, context = "Router") {
-  let timeout;
+async function waitForProcessClose(router: import("node:child_process").ChildProcess, timeoutMs = 5000, context = "Router") {
+  let timeout: NodeJS.Timeout | undefined;
 
   try {
     return await Promise.race([
       once(router, "close"),
-      new Promise((_, reject) => {
+      new Promise<never>((_, reject) => {
         timeout = setTimeout(() => {
           reject(new Error(`${context} did not exit in time (exitCode=${router.exitCode}, signalCode=${router.signalCode}).`));
         }, timeoutMs);
@@ -163,16 +163,16 @@ async function waitForProcessClose(router, timeoutMs = 5000, context = "Router")
   }
 }
 
-async function waitForProcessExit(router, timeoutMs = 5000, context = "Router") {
+async function waitForProcessExit(router: import("node:child_process").ChildProcess, timeoutMs = 5000, context = "Router") {
   if (router.exitCode !== null || router.signalCode !== null) {
     return [router.exitCode, router.signalCode];
   }
 
-  let timeout;
+  let timeout: NodeJS.Timeout | undefined;
   try {
     return await Promise.race([
       once(router, "exit"),
-      new Promise((_, reject) => {
+      new Promise<never>((_, reject) => {
         timeout = setTimeout(() => reject(new Error(`${context} did not exit in time.`)), timeoutMs);
       }),
     ]);
@@ -181,10 +181,10 @@ async function waitForProcessExit(router, timeoutMs = 5000, context = "Router") 
   }
 }
 
-async function waitForHealth(port, token = "test-token") {
+async function waitForHealth(port: number, token = "test-token") {
   const deadline = Date.now() + 5000;
-  let lastError;
-  const headers = token ? { authorization: `Bearer ${token}` } : {};
+  let lastError: unknown;
+  const headers: Record<string, string> = token ? { authorization: `Bearer ${token}` } : {};
 
   while (Date.now() < deadline) {
     try {
@@ -202,7 +202,7 @@ async function waitForHealth(port, token = "test-token") {
   throw lastError || new Error("Router did not become healthy.");
 }
 
-async function waitForAuthorizedHealth(port, token, timeoutMs = 3000) {
+async function waitForAuthorizedHealth(port: number, token: string, timeoutMs = 3000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
@@ -219,7 +219,7 @@ async function waitForAuthorizedHealth(port, token, timeoutMs = 3000) {
   throw new Error(`Router did not accept the reloaded token in time: ${token}`);
 }
 
-async function assertEndpointUnavailable(url) {
+async function assertEndpointUnavailable(url: string) {
   try {
     const response = await fetch(url);
     await response.arrayBuffer();
@@ -229,8 +229,8 @@ async function assertEndpointUnavailable(url) {
   assert.fail(`Expected endpoint to be unavailable: ${url}`);
 }
 
-async function requestChat(port, token = "test-token", model = "model-id") {
-  const headers = { "content-type": "application/json" };
+async function requestChat(port: number, token = "test-token", model = "model-id") {
+  const headers: Record<string, string> = { "content-type": "application/json" };
   if (token) {
     headers.authorization = `Bearer ${token}`;
   }
@@ -245,8 +245,8 @@ async function requestChat(port, token = "test-token", model = "model-id") {
   });
 }
 
-async function requestResponses(port, token = "test-token", model = "model-id") {
-  const headers = { "content-type": "application/json" };
+async function requestResponses(port: number, token = "test-token", model = "model-id") {
+  const headers: Record<string, string> = { "content-type": "application/json" };
   if (token) {
     headers.authorization = `Bearer ${token}`;
   }
@@ -258,7 +258,7 @@ async function requestResponses(port, token = "test-token", model = "model-id") 
   });
 }
 
-async function withRouter(name, config, test) {
+async function withRouter(name: string, config: any, test: (ctx: { port: number; configPath: string; router: import("node:child_process").ChildProcess }) => Promise<void>) {
   const configPath = writeConfig(name, config);
   const router = await startRouter(configPath);
   const port = config.router.port;
@@ -271,7 +271,7 @@ async function withRouter(name, config, test) {
   }
 }
 
-function baseConfig(port, vendors, overrides = {}) {
+function baseConfig(port: number, vendors: any[], overrides: any = {}) {
   return {
     router: {
       host: "127.0.0.1",
@@ -324,7 +324,7 @@ async function testStatusFallback() {
 }
 
 async function testResponsesRoutingAndConversion() {
-  const received = [];
+  const received: any[] = [];
   const vendor = await createMockVendor(async (req, res) => {
     const body = JSON.parse(await readBody(req));
     received.push({ path: req.url, body });
@@ -356,14 +356,14 @@ async function testResponsesRoutingAndConversion() {
       assert.equal(nativeResponse.headers.get("x-router-vendor"), "responses-vendor");
       const nativeBody = await nativeResponse.json();
       assert.equal(nativeBody.object, "response");
-      assert.equal(received[0].path, "/v1/responses");
-      assert.equal(received[0].body.input, "hello");
+      assert.equal(received[0]!.path, "/v1/responses");
+      assert.equal(received[0]!.body.input, "hello");
 
       const convertedResponse = await requestChat(routerPort);
       assert.equal(convertedResponse.status, 200);
       const convertedBody = await convertedResponse.json();
-      assert.equal(received[1].path, "/v1/responses");
-      assert.deepEqual(received[1].body.input, [{ role: "user", content: "hello" }]);
+      assert.equal(received[1]!.path, "/v1/responses");
+      assert.deepEqual(received[1]!.body.input, [{ role: "user", content: "hello" }]);
       assert.equal(convertedBody.object, "chat.completion");
       assert.equal(convertedBody.choices[0].message.content, "response answer");
     });
@@ -614,9 +614,9 @@ async function testNoFallbackAfterPartialStream() {
       { name: "fallback", baseUrl: fallback.baseUrl, model: "model-id" },
     ]), async ({ port: routerPort }) => {
       const response = await requestChat(routerPort);
-      const reader = response.body.getReader();
+      const reader = response.body!.getReader();
       const first = await reader.read();
-      assert.equal(Buffer.from(first.value).toString("utf8"), "data: first\n\n");
+      assert.equal(Buffer.from(first.value!).toString("utf8"), "data: first\n\n");
       await assert.rejects(() => reader.read());
       await new Promise((resolve) => setTimeout(resolve, 100));
       assert.equal(calls.partial, 1);
@@ -665,7 +665,7 @@ async function testClientAbortStopsFallback() {
       });
       await waitFor(() => calls.slow === 1, "Request did not reach the slow vendor.");
       controller.abort();
-      await assert.rejects(request, (error) => error.name === "AbortError");
+      await assert.rejects(request, (error: any) => error.name === "AbortError");
       await new Promise((resolve) => setTimeout(resolve, 150));
       assert.equal(calls.slow, 1);
       assert.equal(calls.fallback, 0);
@@ -735,7 +735,7 @@ async function testRouterAuth() {
 }
 
 async function testVendorModelMapping() {
-  const receivedModels = [];
+  const receivedModels: string[] = [];
   const vendor = await createMockVendor(async (req, res) => {
     const body = JSON.parse(await readBody(req));
     receivedModels.push(body.model);
@@ -772,7 +772,7 @@ async function testVendorModelMapping() {
 }
 
 async function testLegacyVendorModelMigration() {
-  const receivedModels = [];
+  const receivedModels: string[] = [];
   const vendor = await createMockVendor(async (req, res) => {
     const body = JSON.parse(await readBody(req));
     receivedModels.push(body.model);
@@ -816,7 +816,7 @@ async function testModelsEndpointListsVendorModels() {
       });
       const body = await response.json();
       assert.equal(response.status, 200);
-      assert.deepEqual(body.data.map((model) => model.id), ["model-id", "coder-model"]);
+      assert.deepEqual(body.data.map((model: any) => model.id), ["model-id", "coder-model"]);
     });
   } finally {
     vendor.server.close();
@@ -974,7 +974,7 @@ async function testUsageCaptureForJsonAndSse() {
         return summary.models.find((item) => item.name === model.id)?.requestCount === 2;
       }, "Router did not persist JSON and SSE usage events.");
       const summary = await readUsageSummary(tempDir);
-      const modelUsage = summary.models.find((item) => item.name === model.id);
+      const modelUsage = summary.models.find((item) => item.name === model.id)!;
       assert.equal(modelUsage.usageKnownCount, 2);
       assert.equal(modelUsage.totalTokens, 300);
       assert.deepEqual(modelUsage.costs, [{ currency: "USD", amount: 0.00042 }]);

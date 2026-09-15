@@ -23,8 +23,8 @@
   "main": "gui/electron/main.ts",
   "scripts": {
     "check": "tsc --noEmit && node --check gui/electron/preload.cjs && node --check scripts/start-electron-dev.mjs && node --check scripts/generate-release-notes.mjs",
-    "test": "node test/config-and-urls.test.js && node test/config-draft.test.js && node test/ipc-contracts.test.js && node test/log-store.test.js && node test/openai-protocol.test.js && node test/usage.test.js && node test/vendor-circuit-breaker.test.js && node test/fallback-smoke.test.js",
-    "test:electron": "node test/electron-lifecycle.test.js",
+    "test": "node test/config-and-urls.test.ts && node test/config-draft.test.ts && node test/ipc-contracts.test.ts && node test/log-store.test.ts && node test/openai-protocol.test.ts && node test/usage.test.ts && node test/vendor-circuit-breaker.test.ts && node test/fallback-smoke.test.ts",
+    "test:electron": "node test/electron-lifecycle.test.ts",
     "test:ci": "npm test && npm run test:electron",
     "gui": "node scripts/start-electron-dev.mjs",
     "gui:dev": "node scripts/start-electron-dev.mjs",

@@ -20,7 +20,7 @@ assert.deepEqual(
   parseIpcRequest("usage:summary", [{ vendor: "vendor-a", model: "gpt-5-mini" }]),
   [{ vendor: "vendor-a", model: "gpt-5-mini" }],
 );
-assert.equal(parseIpcResponse("router:start", { started: true, via: "process", pid: 1234, health }).health.ok, true);
+assert.equal((parseIpcResponse("router:start", { started: true, via: "process", pid: 1234, health }) as any).health.ok, true);
 
 assert.throws(
   () => parseIpcRequest("logs:read", [{ limit: "80" }]),

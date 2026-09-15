@@ -11,7 +11,7 @@ const breaker = new VendorCircuitBreaker({
 const primary = { name: "primary", baseUrl: "https://primary.example/v1" };
 const fallback = { name: "fallback", baseUrl: "https://fallback.example/v1" };
 
-function fail(vendor, modelId = "model-id", options = {}) {
+function fail(vendor: any, modelId = "model-id", options: any = {}) {
   const permission = breaker.acquire(vendor, modelId, options);
   assert.ok(permission);
   return breaker.recordFailure(permission);
