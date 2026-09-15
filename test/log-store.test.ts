@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { readLogPage } from "../gui/electron/log-store.ts";
+import { readLogPage, resolveLogPath } from "../gui/electron/log-store.ts";
+
+assert.equal(resolveLogPath({}, "/data"), join("/data", "logs/router.log"));
+assert.equal(resolveLogPath({ router: { logFile: "custom/log.txt" } }, "/data"), join("/data", "custom/log.txt"));
+assert.equal(resolveLogPath({ router: { logFile: "/abs/path/log.txt" } }, "/data"), "/abs/path/log.txt");
 
 const tempDirectory = mkdtempSync(join(tmpdir(), "local-router-log-test-"));
 const logPath = join(tempDirectory, "router.log");
