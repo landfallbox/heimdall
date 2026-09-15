@@ -6,7 +6,7 @@ import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { StringDecoder } from "node:string_decoder";
 import { createLogger, type Logger } from "./logger.ts";
-import { convertRequestBody, convertResponseBody, normalizeRequestFormat } from "./openai-protocol.ts";
+import { convertRequestBody, convertResponseBody, isProtocolError, normalizeRequestFormat } from "./openai-protocol.ts";
 import { loadRuntimeConfig, runtimeRoot, type RuntimeConfig, type RuntimeVendor } from "./runtime-config.ts";
 import { createUsageStore, type UsageStore } from "./usage-store.ts";
 import { estimateUsageCost, normalizeUsage, resolveModelPricing, type Usage } from "./usage.ts";
@@ -509,13 +509,14 @@ async function handleGeneration(
       }
       return;
     } catch (error) {
-      const isProtocolFailure = (error as any).statusCode === 400 && Boolean((error as any).errorType);
+      const protocolError = isProtocolError(error) ? error : null;
+      const isProtocolFailure = protocolError !== null && protocolError.statusCode === 400 && Boolean(protocolError.errorType);
       const failure: VendorFailure = {
         vendor: vendor.name,
         elapsedMs: Date.now() - vendorStartedAt,
         errorName: (error as Error).name,
         errorMessage: (error as Error).message,
-        errorType: (error as any).errorType,
+        errorType: protocolError?.errorType,
         ...(isProtocolFailure ? { protocolFailure: true } : {}),
       };
       failures.push(failure);
@@ -705,11 +706,12 @@ async function handleRequest(
     });
 
     if (!res.headersSent) {
-      sendJson(res, (error as any).statusCode || 500, {
+      const protocolError = isProtocolError(error) ? error : null;
+      sendJson(res, protocolError?.statusCode || 500, {
         error: {
           message: (error as Error).message,
-          type: (error as any).errorType || "router_error",
-          ...((error as any).parameter ? { param: (error as any).parameter } : {}),
+          type: protocolError?.errorType || "router_error",
+          ...(protocolError?.parameter ? { param: protocolError.parameter } : {}),
         },
       });
     } else {

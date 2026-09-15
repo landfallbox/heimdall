@@ -12,6 +12,10 @@ export type ProtocolError = Error & {
   parameter?: string;
 };
 
+export function isProtocolError(error: unknown): error is ProtocolError {
+  return error instanceof Error && "statusCode" in error && "errorType" in error;
+}
+
 export function convertRequestBody(body: any, inboundFormat: unknown, upstreamFormat: unknown, model: string): any {
   const source = normalizeRequestFormat(inboundFormat);
   const target = normalizeRequestFormat(upstreamFormat);
