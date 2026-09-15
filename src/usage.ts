@@ -38,13 +38,14 @@ export interface ResolvedPricing extends Pricing {
   card?: string;
 }
 
-export const OPENAI_PRICING_UPDATED_AT = "2026-08-15";
+export const OPENAI_PRICING_UPDATED_AT = "2026-09-05";
 export const OPENAI_PRICING_SOURCE = "https://developers.openai.com/api/docs/pricing";
 export const DEEPSEEK_PRICING_UPDATED_AT = "2026-08-16";
 export const DEEPSEEK_PRICING_SOURCE = "https://api-docs.deepseek.com/quick_start/pricing";
 export const DEEPSEEK_PEAK_HOURS: [number, number][] = [[1, 4], [6, 10]];
 
 const OPENAI_STANDARD_PRICING: Record<string, Pricing> = Object.freeze({
+  "gpt-6-astra": price(10, 1, 50),
   "gpt-5.6-sol": price(5, 0.5, 30),
   "gpt-5.6-terra": price(2, 0.2, 12),
   "gpt-5.6-luna": price(0.2, 0.02, 1.2),

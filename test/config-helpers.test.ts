@@ -34,14 +34,14 @@ const noAuth = normalizeVendor({ name: "V", baseUrl: "http://x/v1" });
 assert.equal(noAuth.authentication, "none");
 assert.equal("apiKey" in noAuth, false);
 
-assert.deepEqual(normalizeVendorModels(["a", "b"], { defaultModelId: "d" }), [
+assert.deepEqual(normalizeVendorModels(["a", "b"]), [
   { id: "a", enabled: true },
   { id: "b", enabled: true },
 ]);
-assert.deepEqual(normalizeVendorModels(undefined, { defaultModelId: "d" }), [{ id: "d", enabled: true }]);
+assert.deepEqual(normalizeVendorModels(undefined), []);
 assert.deepEqual(normalizeVendorModels("legacy", { legacyModelId: "legacy" }), [{ id: "legacy", enabled: true }]);
 assert.deepEqual(
-  normalizeVendorModels([{ id: "m", pricing: { mode: "deepseek" } }, { id: "m2", enabled: false }], { defaultModelId: "d" }),
+  normalizeVendorModels([{ id: "m", pricing: { mode: "deepseek" } }, { id: "m2", enabled: false }]),
   [
     { id: "m", enabled: true, pricing: { mode: "deepseek" } },
     { id: "m2", enabled: false },

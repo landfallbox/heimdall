@@ -43,7 +43,7 @@ export function loadRuntimeConfig(): { config: RuntimeConfig; configPath: string
     .filter((vendor) => vendor.enabled !== false)
     .map((vendor) => ({
       ...vendor,
-      models: normalizeRuntimeVendorModels(vendor, config.model.id),
+      models: normalizeRuntimeVendorModels(vendor),
       timeoutMs: Number(config.router.requestTimeoutMs),
     }))
     .filter((vendor) => vendor.models.some((model) => model.enabled !== false));
@@ -53,10 +53,13 @@ export function loadRuntimeConfig(): { config: RuntimeConfig; configPath: string
   return { config: runtimeConfig, configPath };
 }
 
-function normalizeRuntimeVendorModels(vendor: NormalizedVendor, defaultModelId: string): RuntimeVendorModel[] {
+function normalizeRuntimeVendorModels(vendor: NormalizedVendor): RuntimeVendorModel[] {
   const models = Array.isArray(vendor.models) ? vendor.models : [];
   if (!models.length) {
-    const id = String(vendor.model || defaultModelId || "model-id").trim();
+    const id = String(vendor.model || "").trim();
+    if (!id) {
+      return [];
+    }
     const model: RuntimeVendorModel = { id, enabled: true };
     if (vendor.enableThinking === true) {
       model.enableThinking = true;
@@ -67,7 +70,7 @@ function normalizeRuntimeVendorModels(vendor: NormalizedVendor, defaultModelId: 
   return models
     .map((model) => ({
       ...model,
-      id: String(model.id || defaultModelId || "model-id").trim(),
+      id: String(model.id || "").trim(),
       enabled: model.enabled !== false,
     }))
     .filter((model) => model.id);
@@ -85,16 +88,20 @@ function vendorFromEnvironment(prefix: string, fallbackName: string): Normalized
     return null;
   }
 
-  return {
+  const item: NormalizedVendor = {
     name: process.env[`${prefix}_NAME`] || fallbackName,
     baseUrl: baseUrl ?? "",
     models: [],
     apiKeyHeader: "authorization",
     apiKey: apiKey ?? undefined,
-    model: process.env[`${prefix}_MODEL`] || "model-id",
     requestFormat: process.env[`${prefix}_REQUEST_FORMAT`] === "responses" ? "responses" : "chat-completions",
     authentication: apiKey ? "api-key" : "none",
     enabled: true,
     enableThinking: process.env[`${prefix}_ENABLE_THINKING`] === "1",
   };
+  const model = String(process.env[`${prefix}_MODEL`] || "").trim();
+  if (model) {
+    item.model = model;
+  }
+  return item;
 }

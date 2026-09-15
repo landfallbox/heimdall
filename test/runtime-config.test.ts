@@ -17,6 +17,7 @@ const vendorEnvKeys = [
   "VENDOR_A_ENABLE_THINKING",
   "VENDOR_B_BASE_URL",
   "VENDOR_B_API_KEY",
+  "VENDOR_B_MODEL",
 ];
 
 function clearVendorEnv() {
@@ -54,19 +55,27 @@ try {
 
   clearVendorEnv();
   process.env.VENDOR_A_BASE_URL = "http://127.0.0.1:9001/v1";
+  process.env.VENDOR_A_MODEL = "model-a";
   const noKey = loadRuntimeConfig().config;
   assert.equal(noKey.vendors.length, 1);
   assert.equal(noKey.vendors[0].authentication, "none");
   assert.equal(noKey.vendors[0].name, "vendor-a");
+  assert.equal(noKey.vendors[0].models[0].id, "model-a");
 
   clearVendorEnv();
   process.env.VENDOR_A_BASE_URL = "http://127.0.0.1:9002/v1";
+  process.env.VENDOR_A_MODEL = "model-a";
   process.env.VENDOR_B_BASE_URL = "http://127.0.0.1:9003/v1";
+  process.env.VENDOR_B_MODEL = "model-b";
   const two = loadRuntimeConfig().config;
   assert.equal(two.vendors.length, 2);
   assert.equal(two.vendors[0].priority, 0);
   assert.equal(two.vendors[1].priority, 1);
   assert.equal(two.vendors[1].name, "vendor-b");
+
+  clearVendorEnv();
+  process.env.VENDOR_A_BASE_URL = "http://127.0.0.1:9004/v1";
+  assert.throws(() => loadRuntimeConfig(), /No vendors configured/);
 
   clearVendorEnv();
   assert.throws(() => loadRuntimeConfig(), /No vendors configured/);

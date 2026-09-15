@@ -125,7 +125,7 @@ export default function App() {
   const [configRevision, setConfigRevision] = useState("");
   const vendorModelsRequestRef = useRef(0);
   const vendorModelsSourceKeyRef = useRef("");
-  const vendorScrollTargetRef = useRef(null);
+  const vendorScrollTargetRef = useRef<number | null>(null);
 
   const run = useCallback(async (name: string, action: () => Promise<void>) => {
     setBusy(name);

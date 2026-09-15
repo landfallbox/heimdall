@@ -88,7 +88,6 @@ function sendJson(res: http.ServerResponse, statusCode: number, body: unknown, e
 function runtimeConfigRevision(config: RuntimeConfig): string {
   const runtimeConfig = {
     router: config.router,
-    model: config.model,
     vendors: config.vendors,
   };
   return createHash("sha256").update(JSON.stringify(runtimeConfig)).digest("hex");
@@ -375,10 +374,19 @@ async function handleGeneration(
   const startedAt = Date.now();
   const requestBody = await readJsonBody(req, config.router.maxBodyBytes);
   logger.debug("inbound_request", { requestId, body: requestBody });
-  const requestedModel = String(requestBody.model || config.model.id).trim() || config.model.id;
-  const vendors = getVendorsForModel(config.vendors, requestedModel);
-  const failures: VendorFailure[] = [];
+  const requestedModel = String(requestBody.model ?? "").trim();
+  if (!requestedModel) {
+    sendJson(res, 400, {
+      error: {
+        message: "Missing required parameter: model.",
+        type: "invalid_request_error",
+        param: "model",
+      },
+    });
+    return;
+  }
 
+  const vendors = getVendorsForModel(config.vendors, requestedModel);
   if (!vendors.length) {
     sendJson(res, 404, {
       error: {
@@ -390,6 +398,7 @@ async function handleGeneration(
     return;
   }
 
+  const failures: VendorFailure[] = [];
   const candidates = circuitBreaker.candidates(vendors, requestedModel);
   for (const { vendor, forced } of candidates) {
     const circuitPermission = circuitBreaker.acquire(vendor, requestedModel, { forced });
@@ -622,7 +631,7 @@ function handleModels(_req: http.IncomingMessage, res: http.ServerResponse, conf
     data: modelIds.map((id) => ({
       id,
       object: "model",
-      owned_by: config.model.ownedBy,
+      owned_by: "heimdall",
     })),
   });
 }
@@ -635,7 +644,6 @@ function handleHealth(_req: http.IncomingMessage, res: http.ServerResponse, runt
     configRevision: runtime.configRevision,
     restartRequired: runtime.restartFields.length > 0,
     restartFields: runtime.restartFields,
-    model: config.model.id,
     vendorCount: config.vendors.length,
     vendors: config.vendors.map((vendor) => ({
       name: vendor.name,
@@ -824,7 +832,6 @@ function main() {
       host: config.router.host,
       port: config.router.port,
       configPath,
-      model: config.model.id,
       vendors: config.vendors.map((vendor) => vendor.name),
     });
   });
