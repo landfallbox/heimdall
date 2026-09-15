@@ -1,6 +1,8 @@
-import { Menu, nativeImage, Notification, Tray, type MenuItemConstructorOptions } from "electron";
+import electron from "electron";
+import type { MenuItemConstructorOptions, Tray as TrayType } from "electron";
 import type { HealthState, RouterActionResult, UpdateState } from "../src/types.ts";
 
+const { Menu, nativeImage, Notification, Tray } = electron;
 const REFRESH_INTERVAL_MS = 15000;
 
 interface TrayStatus {
@@ -38,7 +40,7 @@ export function createTrayController({
   startRouter,
   stopRouter,
 }: TrayControllerOptions) {
-  let tray: Tray | null = null;
+  let tray: TrayType | null = null;
   let refreshTimer: NodeJS.Timeout | null = null;
   let busyAction = "";
   let status: TrayStatus = { label: "Checking", detail: "", isRouterActive: false };
@@ -95,7 +97,7 @@ export function createTrayController({
     tray.setContextMenu(Menu.buildFromTemplate(items));
   }
 
-  function create(): Tray {
+  function create(): TrayType {
     if (tray) {
       return tray;
     }
