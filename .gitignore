@@ -8,3 +8,5 @@ build/bin/
 build/*.ico
 build/*.png
 *.local.json
+.playwright-profile/
+.playwright-mcp/
