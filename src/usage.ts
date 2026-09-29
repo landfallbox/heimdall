@@ -89,6 +89,7 @@ const OPENAI_STANDARD_PRICING: Record<string, Pricing> = Object.freeze({
 
 const DEEPSEEK_STANDARD_PRICING: Record<string, RateCard> = Object.freeze({
   "deepseek-v4-flash": rateCards(price(0.44, 0.014, 1.32, "CNY"), price(0.22, 0.007, 0.66, "CNY")),
+  "deepseek-v4.1-flash": rateCards(price(2, 0.04, 8, "CNY"), price(1, 0.02, 4, "CNY")),
   "deepseek-v4-pro": rateCards(price(1.32, 0.044, 3.96, "CNY"), price(0.66, 0.022, 1.98, "CNY")),
 });
 
