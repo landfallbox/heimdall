@@ -258,6 +258,19 @@ async function requestResponses(port: number, token = "test-token", model = "mod
   });
 }
 
+async function requestEmbeddings(port: number, token = "test-token", model = "model-id") {
+  const headers: Record<string, string> = { "content-type": "application/json" };
+  if (token) {
+    headers.authorization = `Bearer ${token}`;
+  }
+
+  return fetch(`http://127.0.0.1:${port}/v1/embeddings`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ model, input: "hello" }),
+  });
+}
+
 async function withRouter(name: string, config: any, test: (ctx: { port: number; configPath: string; router: import("node:child_process").ChildProcess }) => Promise<void>) {
   const configPath = writeConfig(name, config);
   const router = await startRouter(configPath);
@@ -366,6 +379,74 @@ async function testResponsesRoutingAndConversion() {
       assert.deepEqual(received[1]!.body.input, [{ role: "user", content: "hello" }]);
       assert.equal(convertedBody.object, "chat.completion");
       assert.equal(convertedBody.choices[0].message.content, "response answer");
+    });
+  } finally {
+    vendor.server.close();
+  }
+}
+
+async function testEmbeddingsRouting() {
+  const received: any[] = [];
+  const vendor = await createMockVendor(async (req, res) => {
+    const body = JSON.parse(await readBody(req));
+    received.push({ path: req.url, body });
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({
+      object: "list",
+      data: [{ object: "embedding", index: 0, embedding: [0.1, 0.2] }],
+      model: body.model,
+      usage: { prompt_tokens: 3, total_tokens: 3 },
+    }));
+  });
+
+  try {
+    const port = await findFreePort();
+    const vendors = [{
+      name: "embeddings-vendor",
+      baseUrl: vendor.baseUrl,
+      models: [{ id: "model-id", enabled: true }],
+      requestFormat: "embeddings",
+    }];
+    await withRouter("embeddings-routing", baseConfig(port, vendors), async ({ port: routerPort }) => {
+      const response = await requestEmbeddings(routerPort);
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get("x-router-vendor"), "embeddings-vendor");
+      const body = await response.json();
+      assert.equal(body.object, "list");
+      assert.equal(body.data[0].embedding[1], 0.2);
+      assert.equal(received[0]!.path, "/v1/embeddings");
+      assert.equal(received[0]!.body.input, "hello");
+    });
+  } finally {
+    vendor.server.close();
+  }
+}
+
+async function testCustomFormatRouting() {
+  const received: any[] = [];
+  const vendor = await createMockVendor(async (req, res) => {
+    const body = JSON.parse(await readBody(req));
+    received.push({ path: req.url, body });
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ result: "custom-answer", model: body.model }));
+  });
+
+  try {
+    const port = await findFreePort();
+    const vendors = [{
+      name: "custom-vendor",
+      // Custom format: the Base URL is the complete request path.
+      baseUrl: `${vendor.baseUrl}/custom-endpoint`,
+      models: [{ id: "model-id", enabled: true }],
+      requestFormat: "custom",
+    }];
+    await withRouter("custom-routing", baseConfig(port, vendors), async ({ port: routerPort }) => {
+      const response = await requestChat(routerPort);
+      assert.equal(response.status, 200);
+      const body = await response.json();
+      assert.equal(body.result, "custom-answer");
+      assert.equal(received[0]!.path, "/v1/custom-endpoint");
+      assert.equal(received[0]!.body.model, "model-id");
     });
   } finally {
     vendor.server.close();
@@ -1038,6 +1119,8 @@ async function testParentDisconnectStopsRouter() {
 
 await testStatusFallback();
 await testResponsesRoutingAndConversion();
+await testEmbeddingsRouting();
+await testCustomFormatRouting();
 await testTimeoutFallback();
 await testCircuitBreakerSkipsFailedVendorPerModel();
 await testRuntimeConfigReload();

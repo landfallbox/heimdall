@@ -1,9 +1,16 @@
 import type { RequestFormat } from "./config.ts";
 
-export const REQUEST_FORMATS: RequestFormat[] = ["chat-completions", "responses"];
+export const REQUEST_FORMATS: RequestFormat[] = ["chat-completions", "responses", "embeddings", "custom"];
+
+const REQUEST_FORMAT_VALUES = new Set<RequestFormat>(["chat-completions", "responses", "embeddings", "custom"]);
 
 export function normalizeRequestFormat(value: unknown): RequestFormat {
-  return value === "responses" ? "responses" : "chat-completions";
+  return REQUEST_FORMAT_VALUES.has(value as RequestFormat) ? (value as RequestFormat) : "chat-completions";
+}
+
+/** Formats whose request/response bodies can be translated between each other. */
+export function isConvertibleFormat(value: unknown): boolean {
+  return value === "chat-completions" || value === "responses";
 }
 
 export type ProtocolError = Error & {
@@ -22,6 +29,16 @@ export function convertRequestBody(body: any, inboundFormat: unknown, upstreamFo
   if (source === target) {
     return { ...body, model };
   }
+  // Custom is a raw passthrough: forward the inbound body unchanged to the target path.
+  if (source === "custom" || target === "custom") {
+    return { ...body, model };
+  }
+  if (!isConvertibleFormat(source) || !isConvertibleFormat(target)) {
+    throw protocolError(
+      `Cannot convert a ${formatLabel(source)} request to the ${formatLabel(target)} format.`,
+      "unsupported_format_conversion",
+    );
+  }
   if (body.stream === true) {
     throw protocolError(
       "Streaming requests cannot be converted between Chat Completions and Responses formats.",
@@ -39,7 +56,29 @@ export function convertResponseBody(body: any, upstreamFormat: unknown, outbound
   if (source === target) {
     return body;
   }
+  if (source === "custom" || target === "custom") {
+    return body;
+  }
+  if (!isConvertibleFormat(source) || !isConvertibleFormat(target)) {
+    throw protocolError(
+      `Cannot convert a ${formatLabel(source)} response to the ${formatLabel(target)} format.`,
+      "unsupported_format_conversion",
+    );
+  }
   return source === "chat-completions" ? chatResponseToResponses(body) : responsesResponseToChat(body);
+}
+
+function formatLabel(format: RequestFormat): string {
+  switch (format) {
+    case "chat-completions":
+      return "Chat Completions";
+    case "responses":
+      return "Responses";
+    case "embeddings":
+      return "Embeddings";
+    case "custom":
+      return "Custom";
+  }
 }
 
 function chatRequestToResponses(body: any, model: string) {

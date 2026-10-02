@@ -759,6 +759,21 @@ h2 {
   line-height: 1.35;
 }
 
+.field-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+.field-hint code {
+  font-family: var(--mono, monospace);
+  background: var(--field-bg, rgba(127, 127, 127, 0.12));
+  padding: 0 3px;
+  border-radius: 3px;
+}
+
 .field-message.warning {
   color: var(--warning);
 }
@@ -810,48 +825,6 @@ h2 {
 .segmented-control button.active {
   background: var(--primary-soft);
   color: var(--primary);
-}
-
-.advanced-section {
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface-alt);
-}
-
-.advanced-section summary {
-  display: flex;
-  min-height: 40px;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 12px;
-  color: var(--muted);
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 750;
-  list-style: none;
-}
-
-.advanced-section summary::-webkit-details-marker {
-  display: none;
-}
-
-.advanced-section summary svg {
-  transition: transform 140ms ease;
-}
-
-.advanced-section[open] summary svg {
-  transform: rotate(180deg);
-}
-
-.advanced-fields {
-  padding: 4px 12px 12px;
-}
-
-.router-advanced-fields {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
 }
 
 .secret-row {

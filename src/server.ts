@@ -159,9 +159,15 @@ async function readJsonBody(req: http.IncomingMessage, maxBodyBytes: number): Pr
 
 function buildUpstreamUrl(vendor: RuntimeVendor, requestFormat: RequestFormat): string {
   const baseUrl = vendor.baseUrl.replace(/\/+$/, "");
+  // Custom format: the Base URL is the complete request path, forwarded as-is.
+  if (requestFormat === "custom") {
+    return baseUrl;
+  }
   const path = requestFormat === "responses"
     ? vendor.responsesPath || "/responses"
-    : vendor.chatCompletionsPath || "/chat/completions";
+    : requestFormat === "embeddings"
+      ? vendor.embeddingsPath || "/embeddings"
+      : vendor.chatCompletionsPath || "/chat/completions";
   return `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
@@ -205,7 +211,7 @@ async function callVendor(vendor: VendorWithModel, requestBody: any, inboundForm
   const upstreamFormat = normalizeRequestFormat(vendor.requestFormat);
   const body = convertRequestBody(requestBody, inboundFormat, upstreamFormat, vendor.selectedModel.id);
 
-  if (vendor.selectedModel?.enableThinking === true) {
+  if (vendor.selectedModel?.enableThinking === true && upstreamFormat === "chat-completions") {
     body.chat_template_kwargs = { ...(body.chat_template_kwargs || {}), enable_thinking: true };
   }
 
@@ -696,6 +702,11 @@ async function handleRequest(
 
     if (req.method === "POST" && path === "/v1/responses") {
       await handleGeneration(req, res, config, logger, circuitBreaker, usageStore, "responses");
+      return;
+    }
+
+    if (req.method === "POST" && path === "/v1/embeddings") {
+      await handleGeneration(req, res, config, logger, circuitBreaker, usageStore, "embeddings");
       return;
     }
 

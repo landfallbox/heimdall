@@ -202,7 +202,7 @@ export function validateVendor(vendor: VendorLike): ValidationResult {
     errors.push("Missing key");
   }
 
-  if (!["chat-completions", "responses"].includes(requestFormat)) {
+  if (!["chat-completions", "responses", "embeddings", "custom"].includes(requestFormat)) {
     fields.requestFormat = { tone: "error", message: "Select a supported request format." };
     errors.push("Invalid request format");
   }

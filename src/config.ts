@@ -2,7 +2,7 @@ import { z } from "zod";
 import { normalizeRequestFormat } from "./openai-protocol.ts";
 
 export type CloseBehavior = "tray" | "exit" | "ask";
-export type RequestFormat = "chat-completions" | "responses";
+export type RequestFormat = "chat-completions" | "responses" | "embeddings" | "custom";
 export type ApiKeyHeader = "authorization" | "api-key" | "x-api-key";
 export type VendorAuthentication = "none" | "api-key";
 
@@ -36,6 +36,7 @@ export type NormalizedVendor = {
   apiKey?: string;
   chatCompletionsPath?: string;
   responsesPath?: string;
+  embeddingsPath?: string;
   [key: string]: unknown;
 };
 
@@ -120,9 +121,10 @@ export const vendorSchema = z.object({
   apiKeyHeader: apiKeyHeaderSchema.optional().default("authorization"),
   enabled: z.boolean().optional().default(true),
   apiKey: z.string().trim().optional(),
-  requestFormat: z.enum(["chat-completions", "responses"]).optional().default("chat-completions"),
+  requestFormat: z.enum(["chat-completions", "responses", "embeddings", "custom"]).optional().default("chat-completions"),
   chatCompletionsPath: z.string().trim().optional(),
   responsesPath: z.string().trim().optional(),
+  embeddingsPath: z.string().trim().optional(),
 }).loose().superRefine((vendor, context) => {
   if (vendor.enabled === false) {
     return;
@@ -250,7 +252,7 @@ export function normalizeVendor(vendor: Record<string, any> | null | undefined):
     enabled: vendor?.enabled !== false,
   };
 
-  for (const key of ["apiKey", "chatCompletionsPath", "responsesPath"]) {
+  for (const key of ["apiKey", "chatCompletionsPath", "responsesPath", "embeddingsPath"]) {
     if (item[key] !== undefined) {
       item[key] = String(item[key] || "").trim();
       if (!item[key]) {

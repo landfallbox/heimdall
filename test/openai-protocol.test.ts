@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { convertRequestBody, convertResponseBody } from "../src/openai-protocol.ts";
+import { convertRequestBody, convertResponseBody, normalizeRequestFormat } from "../src/openai-protocol.ts";
 
 const responsesRequest = convertRequestBody({
   model: "client-model",
@@ -62,6 +62,54 @@ assert.throws(
 assert.throws(
   () => convertRequestBody({ input: [{ content: [{ type: "input_file" }] }] }, "responses", "chat-completions", "vendor-model"),
   (error: any) => error.statusCode === 400 && error.errorType === "unsupported_content",
+);
+
+assert.equal(normalizeRequestFormat("embeddings"), "embeddings");
+assert.equal(normalizeRequestFormat("custom"), "custom");
+assert.equal(normalizeRequestFormat("responses"), "responses");
+assert.equal(normalizeRequestFormat("unknown"), "chat-completions");
+
+const embeddingsBody = convertRequestBody(
+  { model: "client-model", input: "hello", encoding_format: "base64" },
+  "embeddings",
+  "embeddings",
+  "vendor-model",
+);
+assert.equal(embeddingsBody.model, "vendor-model");
+assert.equal(embeddingsBody.input, "hello");
+assert.equal(embeddingsBody.encoding_format, "base64");
+
+const embeddingsResponse = convertResponseBody(
+  { object: "list", data: [{ object: "embedding", index: 0, embedding: [0.1, 0.2] }], usage: { prompt_tokens: 3, total_tokens: 3 } },
+  "embeddings",
+  "embeddings",
+);
+assert.equal(embeddingsResponse.object, "list");
+assert.equal(embeddingsResponse.data[0].embedding[1], 0.2);
+
+const customBody = convertRequestBody(
+  { model: "client-model", prompt: "hello" },
+  "chat-completions",
+  "custom",
+  "vendor-model",
+);
+assert.equal(customBody.model, "vendor-model");
+assert.equal(customBody.prompt, "hello");
+
+const customResponse = convertResponseBody(
+  { result: "ok" },
+  "custom",
+  "chat-completions",
+);
+assert.deepEqual(customResponse, { result: "ok" });
+
+assert.throws(
+  () => convertRequestBody({ model: "m", input: "x" }, "embeddings", "chat-completions", "vendor-model"),
+  (error: any) => error.statusCode === 400 && error.errorType === "unsupported_format_conversion",
+);
+assert.throws(
+  () => convertResponseBody({ object: "list", data: [] }, "embeddings", "responses"),
+  (error: any) => error.statusCode === 400 && error.errorType === "unsupported_format_conversion",
 );
 
 console.log("OpenAI protocol tests passed");

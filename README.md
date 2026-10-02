@@ -14,6 +14,7 @@ The router tries enabled vendors in priority order. If the current vendor times 
 
 - OpenAI-compatible `/v1/chat/completions` proxy.
 - Local vendor priority and fallback configuration.
+- Per-vendor request format: Chat Completions, Responses, Embeddings, or a Custom path.
 - Local API key required for access.
 - Electron GUI for configuration, status, token usage, estimated cost, logs, and tray control.
 - Optional login startup on Windows and macOS, disabled by default.
@@ -62,7 +63,14 @@ Keep `config.json` private. It is ignored by git and may contain API keys. The d
 
 Point any OpenAI-compatible client at the local endpoint and use the same token as `router.apiKey`.
 
-The Router accepts both `POST /v1/chat/completions` and `POST /v1/responses`. Each vendor can independently use Chat Completions or Responses upstream format; the desktop app exposes this choice in Vendor Settings.
+The Router accepts `POST /v1/chat/completions`, `POST /v1/responses`, and `POST /v1/embeddings`. Each vendor can independently use an upstream request format; the desktop app exposes this choice in Vendor Settings:
+
+- **Chat Completions** — forwards to the vendor's `/chat/completions` path (configurable via `chatCompletionsPath`).
+- **Responses** — forwards to the vendor's `/responses` path (configurable via `responsesPath`).
+- **Embeddings** — forwards to the vendor's `/embeddings` path (configurable via `embeddingsPath`).
+- **Custom** — forwards directly to the vendor Base URL, which is the complete request path (not a base to append a path to). Use this when the upstream endpoint does not match any of the built-in formats, for example `http://127.0.0.1:8002/v1/embeddings`.
+
+Chat Completions and Responses bodies are translated automatically when the inbound and upstream formats differ. Embeddings and Custom bodies are passed through unchanged.
 
 Example client entry:
 

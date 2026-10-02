@@ -50,6 +50,31 @@ const responsesRoundTrip = toConfig(toDraft(normalizeConfig({
 assert.equal(responsesRoundTrip.vendors[0].requestFormat, "responses");
 assert.equal(responsesRoundTrip.vendors[0].responsesPath, "/custom/responses");
 
+const embeddingsRoundTrip = toConfig(toDraft(normalizeConfig({
+  router: { apiKey: "test-token" },
+  vendors: [{
+    name: "embeddings",
+    baseUrl: "http://127.0.0.1:8002/v1",
+    models: [{ id: "model-id", enabled: true }],
+    requestFormat: "embeddings",
+    embeddingsPath: "/embeddings",
+  }],
+})));
+assert.equal(embeddingsRoundTrip.vendors[0].requestFormat, "embeddings");
+assert.equal(embeddingsRoundTrip.vendors[0].embeddingsPath, "/embeddings");
+
+const customRoundTrip = toConfig(toDraft(normalizeConfig({
+  router: { apiKey: "test-token" },
+  vendors: [{
+    name: "custom",
+    baseUrl: "http://127.0.0.1:8002/v1/embeddings",
+    models: [{ id: "model-id", enabled: true }],
+    requestFormat: "custom",
+  }],
+})));
+assert.equal(customRoundTrip.vendors[0].requestFormat, "custom");
+assert.equal(customRoundTrip.vendors[0].baseUrl, "http://127.0.0.1:8002/v1/embeddings");
+
 const pricingRoundTrip = toConfig(toDraft(normalizeConfig({
   router: { apiKey: "test-token" },
   vendors: [{

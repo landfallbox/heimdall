@@ -1567,7 +1567,7 @@ function VendorEditorPage({
             <div className="segmented-control">
               <button
                 type="button"
-                className={vendor.requestFormat !== "responses" ? "active" : ""}
+                className={vendor.requestFormat === "chat-completions" ? "active" : ""}
                 onClick={() => updateVendor("requestFormat", "chat-completions")}
               >
                 Chat Completions
@@ -1579,6 +1579,20 @@ function VendorEditorPage({
               >
                 Responses
               </button>
+              <button
+                type="button"
+                className={vendor.requestFormat === "embeddings" ? "active" : ""}
+                onClick={() => updateVendor("requestFormat", "embeddings")}
+              >
+                Embeddings
+              </button>
+              <button
+                type="button"
+                className={vendor.requestFormat === "custom" ? "active" : ""}
+                onClick={() => updateVendor("requestFormat", "custom")}
+              >
+                Custom
+              </button>
             </div>
             {vendorValidation.fields.requestFormat?.message && (
               <small className={"field-message " + vendorValidation.fields.requestFormat.tone}>{vendorValidation.fields.requestFormat.message}</small>
@@ -1586,6 +1600,11 @@ function VendorEditorPage({
           </div>
           <Field label="Base URL" wide message={vendorValidation.fields.baseUrl?.message} tone={vendorValidation.fields.baseUrl?.tone}>
             <input value={vendor.baseUrl || ""} onChange={(event) => updateVendor("baseUrl", event.target.value)} />
+            {vendor.requestFormat === "custom" && (
+              <small className="field-hint">
+                Custom 格式下，Base URL 是完整的请求路径（不再是路径的前半截），请求将直接转发到该地址，例如 <code>http://127.0.0.1:8002/v1/embeddings</code>。
+              </small>
+            )}
           </Field>
           {vendor.authentication === "api-key" && (
             <Field label="Vendor API key" wide message={vendorValidation.fields.apiKey?.message} tone={vendorValidation.fields.apiKey?.tone}>
@@ -1642,24 +1661,6 @@ function VendorEditorPage({
               && !/Enter valid non-negative prices/.test(vendorValidation.fields.models.message)
               && <small className="field-message error">{vendorValidation.fields.models.message}</small>}
           </div>
-          <details className="advanced-section wide">
-            <summary>
-              <span>Advanced</span>
-              <ChevronDown size={16} />
-            </summary>
-            <div className="advanced-fields">
-              <Field label={vendor.requestFormat === "responses" ? "Responses path" : "Chat Completions path"} wide>
-                <input
-                  value={vendor.requestFormat === "responses" ? vendor.responsesPath || "" : vendor.chatCompletionsPath || ""}
-                  placeholder={vendor.requestFormat === "responses" ? "/responses" : "/chat/completions"}
-                  onChange={(event) => updateVendor(
-                    vendor.requestFormat === "responses" ? "responsesPath" : "chatCompletionsPath",
-                    event.target.value,
-                  )}
-                />
-              </Field>
-            </div>
-          </details>
         </div>
       </div>
     </div>

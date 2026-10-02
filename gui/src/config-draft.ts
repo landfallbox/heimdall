@@ -1,5 +1,5 @@
 export type CloseBehavior = "tray" | "exit" | "ask";
-export type RequestFormat = "chat-completions" | "responses";
+export type RequestFormat = "chat-completions" | "responses" | "embeddings" | "custom";
 export type PricingMode = "openai" | "deepseek" | "custom";
 export type Authentication = "none" | "api-key";
 
@@ -32,8 +32,6 @@ export interface VendorDraft {
   apiKeyHeader?: string;
   enabled?: boolean;
   requestFormat?: RequestFormat;
-  chatCompletionsPath?: string;
-  responsesPath?: string;
   [key: string]: unknown;
 }
 
@@ -82,8 +80,6 @@ export interface VendorConfig {
   requestFormat: RequestFormat;
   enabled: boolean;
   apiKey?: string;
-  chatCompletionsPath?: string;
-  responsesPath?: string;
   [key: string]: unknown;
 }
 
@@ -103,8 +99,6 @@ export interface ConfigVendorInput {
   apiKeyHeader?: string;
   enabled?: boolean;
   requestFormat?: string;
-  chatCompletionsPath?: string;
-  responsesPath?: string;
   [key: string]: unknown;
 }
 
@@ -138,7 +132,7 @@ export const defaultDraft: Draft = {
 };
 
 const closeBehaviorValues = new Set<CloseBehavior>(["tray", "exit", "ask"]);
-const requestFormatValues = new Set<RequestFormat>(["chat-completions", "responses"]);
+const requestFormatValues = new Set<RequestFormat>(["chat-completions", "responses", "embeddings", "custom"]);
 
 export function normalizeRequestFormat(value: unknown): RequestFormat {
   return requestFormatValues.has(value as RequestFormat) ? (value as RequestFormat) : "chat-completions";

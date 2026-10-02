@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { normalizeConfig, validateConfig, type NormalizedConfig, type NormalizedVendor, type NormalizedVendorModel } from "./config.ts";
+import { normalizeRequestFormat } from "./openai-protocol.ts";
 
 const moduleDirectory = dirname(fileURLToPath(import.meta.url));
 export const projectRoot = resolve(moduleDirectory, "..");
@@ -94,7 +95,7 @@ function vendorFromEnvironment(prefix: string, fallbackName: string): Normalized
     models: [],
     apiKeyHeader: "authorization",
     apiKey: apiKey ?? undefined,
-    requestFormat: process.env[`${prefix}_REQUEST_FORMAT`] === "responses" ? "responses" : "chat-completions",
+    requestFormat: normalizeRequestFormat(process.env[`${prefix}_REQUEST_FORMAT`]),
     authentication: apiKey ? "api-key" : "none",
     enabled: true,
     enableThinking: process.env[`${prefix}_ENABLE_THINKING`] === "1",

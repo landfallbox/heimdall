@@ -73,6 +73,33 @@
       "enabled": false
     },
     {
+      "name": "local-embeddings-vendor",
+      "baseUrl": "http://127.0.0.1:8002/v1",
+      "models": [
+        {
+          "id": "embed-model",
+          "enabled": true
+        }
+      ],
+      "authentication": "none",
+      "requestFormat": "embeddings",
+      "embeddingsPath": "/embeddings",
+      "enabled": false
+    },
+    {
+      "name": "custom-vendor",
+      "baseUrl": "http://127.0.0.1:8003/v1/embeddings",
+      "models": [
+        {
+          "id": "custom-model",
+          "enabled": true
+        }
+      ],
+      "authentication": "none",
+      "requestFormat": "custom",
+      "enabled": false
+    },
+    {
       "name": "deepseek-vendor",
       "baseUrl": "https://api.deepseek.com",
       "models": [

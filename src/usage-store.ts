@@ -16,7 +16,7 @@ export type UsageEvent = {
   requestId: string;
   vendor: string;
   model: string;
-  format: "chat-completions" | "responses";
+  format: "chat-completions" | "responses" | "embeddings" | "custom";
   stream: boolean;
   usageKnown: boolean;
   inputTokens: number;
@@ -135,7 +135,7 @@ function normalizeEvent(event: any): UsageEvent {
     requestId: String(event?.requestId || ""),
     vendor: String(event?.vendor || ""),
     model: String(event?.model || ""),
-    format: event?.format === "responses" ? "responses" : "chat-completions",
+    format: event?.format === "responses" ? "responses" : event?.format === "embeddings" ? "embeddings" : event?.format === "custom" ? "custom" : "chat-completions",
     stream: event?.stream === true,
     usageKnown: Boolean(usage),
     inputTokens: tokenCount(usage?.inputTokens),
