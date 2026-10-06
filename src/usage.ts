@@ -38,12 +38,12 @@ export interface ResolvedPricing extends Pricing {
   card?: string;
 }
 
-export const OPENAI_PRICING_UPDATED_AT = "2026-09-05";
+export const OPENAI_PRICING_UPDATED_AT = "2026-10-07";
 export const OPENAI_PRICING_SOURCE = "https://developers.openai.com/api/docs/pricing";
 export const DEEPSEEK_PRICING_UPDATED_AT = "2026-08-16";
 export const DEEPSEEK_PRICING_SOURCE = "https://api-docs.deepseek.com/quick_start/pricing";
 export const DEEPSEEK_PEAK_HOURS: [number, number][] = [[1, 4], [6, 10]];
-export const ANTHROPIC_PRICING_UPDATED_AT = "2026-09-03";
+export const ANTHROPIC_PRICING_UPDATED_AT = "2026-10-07";
 export const ANTHROPIC_PRICING_SOURCE = "https://platform.claude.com/docs/en/about-claude/pricing";
 export const GOOGLE_PRICING_UPDATED_AT = "2026-10-01";
 export const GOOGLE_PRICING_SOURCE = "https://ai.google.dev/gemini-api/docs/pricing";
@@ -70,7 +70,9 @@ export const PRICING_CATALOG_KEYS = Object.keys(PRICING_CATALOG_LABELS) as Prici
 
 const OPENAI_STANDARD_PRICING: Record<string, Pricing> = Object.freeze({
   "gpt-6-astra": price(10, 1, 50),
-  "gpt-5.6-sol": price(5, 0.5, 30),
+  "gpt-6-sol": price(2, 0.2, 10),
+  "gpt-6-luna": price(0.1, 0.01, 0.5),
+  "gpt-5.6-sol": price(4, 0.4, 20),
   "gpt-5.6-terra": price(2, 0.2, 12),
   "gpt-5.6-luna": price(0.2, 0.02, 1.2),
   "gpt-5.5": price(5, 0.5, 30),
@@ -80,6 +82,10 @@ const OPENAI_STANDARD_PRICING: Record<string, Pricing> = Object.freeze({
   "gpt-5.4-nano": price(0.2, 0.02, 1.25),
   "gpt-5.4-pro": price(30, null, 180),
   "gpt-5.3-codex": price(1.75, 0.175, 14),
+  "gpt-5.2-codex": price(1.75, null, 14),
+  "gpt-5.1-codex": price(1.25, 0.125, 10),
+  "gpt-5.3-instant": price(1.75, null, 14),
+  "gpt-5.2-instant": price(1.5, null, 6),
   "gpt-5.2": price(1.75, 0.175, 14),
   "gpt-5.2-pro": price(21, null, 168),
   "gpt-5.1": price(1.25, 0.125, 10),
@@ -117,14 +123,29 @@ const DEEPSEEK_STANDARD_PRICING: Record<string, RateCard> = Object.freeze({
   "deepseek-v4-pro": rateCards(price(1.32, 0.044, 3.96, "CNY"), price(0.66, 0.022, 1.98, "CNY")),
 });
 
+// Anthropic 官方模型 ID 为连字符风格（如 claude-opus-5-5）；点号风格别名保留以兼容旧配置。
 const ANTHROPIC_STANDARD_PRICING: Record<string, Pricing> = Object.freeze({
+  "claude-opus-5-5": price(4, 0.2, 20),
+  "claude-opus-5": price(5, 0.5, 25),
+  "claude-opus-4-8": price(5, 0.5, 25),
+  "claude-opus-4-7": price(5, 0.5, 25),
+  "claude-opus-4-6": price(5, 0.5, 25),
   "claude-opus-4.6": price(5, 0.5, 25),
+  "claude-opus-4-5": price(5, 0.5, 25),
   "claude-opus-4.5": price(5, 0.5, 25),
+  "claude-opus-4-1": price(15, 1.5, 75),
   "claude-opus-4.1": price(15, 1.5, 75),
+  "claude-sonnet-5-5": price(2, 0.2, 10),
+  "claude-sonnet-5": price(2, 0.2, 10),
+  "claude-sonnet-4-6": price(3, 0.3, 15),
   "claude-sonnet-4.6": price(3, 0.3, 15),
+  "claude-sonnet-4-5": price(3, 0.3, 15),
   "claude-sonnet-4.5": price(3, 0.3, 15),
   "claude-sonnet-4": price(3, 0.3, 15),
+  "claude-haiku-4-5": price(1, 0.1, 5),
   "claude-haiku-4.5": price(1, 0.1, 5),
+  "claude-fable-5-1": price(10, 0.25, 50),
+  "claude-mythos-5-1": price(10, 0.25, 50),
   "claude-3-5-sonnet": price(3, 0.3, 15),
   "claude-3-5-haiku": price(0.8, 0.08, 4),
   "claude-3-opus": price(15, 1.5, 75),
