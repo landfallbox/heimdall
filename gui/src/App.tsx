@@ -41,7 +41,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import type { CloseBehavior } from "./config-draft.ts";
+import type { CloseBehavior, RequestFormat } from "./config-draft.ts";
 import {
   defaultDraft,
   getVendorModels,
@@ -88,6 +88,13 @@ const closeBehaviorOptions: Array<{ value: CloseBehavior; label: string }> = [
   { value: "tray", label: "Keep in tray" },
   { value: "exit", label: "Exit and stop" },
   { value: "ask", label: "Ask every time" },
+];
+
+const requestFormatOptions: Array<{ value: RequestFormat; label: string }> = [
+  { value: "chat-completions", label: "Chat Completions" },
+  { value: "responses", label: "Responses" },
+  { value: "embeddings", label: "Embeddings" },
+  { value: "custom", label: "Custom" },
 ];
 
 const currencyOptions = ["USD", "CNY"];
@@ -1562,37 +1569,19 @@ function VendorEditorPage({
               <small className={"field-message " + vendorValidation.fields.authentication.tone}>{vendorValidation.fields.authentication.message}</small>
             )}
           </div>
-          <div className={["field", vendorValidation.fields.requestFormat?.tone && "has-" + vendorValidation.fields.requestFormat.tone].filter(Boolean).join(" ")}>
+          <div className={["field", "wide", vendorValidation.fields.requestFormat?.tone && "has-" + vendorValidation.fields.requestFormat.tone].filter(Boolean).join(" ")}>
             <span>Request format</span>
-            <div className="segmented-control">
-              <button
-                type="button"
-                className={vendor.requestFormat === "chat-completions" ? "active" : ""}
-                onClick={() => updateVendor("requestFormat", "chat-completions")}
-              >
-                Chat Completions
-              </button>
-              <button
-                type="button"
-                className={vendor.requestFormat === "responses" ? "active" : ""}
-                onClick={() => updateVendor("requestFormat", "responses")}
-              >
-                Responses
-              </button>
-              <button
-                type="button"
-                className={vendor.requestFormat === "embeddings" ? "active" : ""}
-                onClick={() => updateVendor("requestFormat", "embeddings")}
-              >
-                Embeddings
-              </button>
-              <button
-                type="button"
-                className={vendor.requestFormat === "custom" ? "active" : ""}
-                onClick={() => updateVendor("requestFormat", "custom")}
-              >
-                Custom
-              </button>
+            <div className="segmented-control segmented-control--four">
+              {requestFormatOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={vendor.requestFormat === option.value ? "active" : ""}
+                  onClick={() => updateVendor("requestFormat", option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
             </div>
             {vendorValidation.fields.requestFormat?.message && (
               <small className={"field-message " + vendorValidation.fields.requestFormat.tone}>{vendorValidation.fields.requestFormat.message}</small>

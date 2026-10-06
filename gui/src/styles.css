@@ -827,6 +827,12 @@ h2 {
   color: var(--primary);
 }
 
+/* Four-column variant of the segmented control (Request format). Reuses the
+   Authentication styling: the selected segment highlights in place, no sliding. */
+.segmented-control--four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .secret-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 38px;
