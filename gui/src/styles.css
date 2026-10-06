@@ -1295,6 +1295,17 @@ h2 {
   align-items: end;
 }
 
+.pricing-catalog-select {
+  min-height: 36px;
+}
+
+.pricing-catalog-select select {
+  appearance: none;
+  padding-right: 40px;
+  width: 100%;
+  height: 36px;
+}
+
 .pricing-mode {
   height: 36px;
   min-height: 36px;

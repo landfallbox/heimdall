@@ -40,7 +40,12 @@ try {
 
   assert.equal(vendorModelSchema.safeParse({ id: "m", pricing: { mode: "deepseek" } }).success, true);
   assert.equal(vendorModelSchema.safeParse({ id: "m", pricing: { mode: "openai" } }).success, true);
-  assert.equal(vendorModelSchema.safeParse({ id: "m", pricing: { mode: "anthropic" } }).success, false);
+  assert.equal(vendorModelSchema.safeParse({ id: "m", pricing: { mode: "anthropic" } }).success, true);
+  assert.equal(vendorModelSchema.safeParse({ id: "m", pricing: { mode: "google" } }).success, true);
+  assert.equal(vendorModelSchema.safeParse({ id: "m", pricing: { mode: "kimi" } }).success, true);
+  assert.equal(vendorModelSchema.safeParse({ id: "m", pricing: { mode: "glm" } }).success, true);
+  assert.equal(vendorModelSchema.safeParse({ id: "m", pricing: { mode: "mimo" } }).success, true);
+  assert.equal(vendorModelSchema.safeParse({ id: "m", pricing: { mode: "unknown-vendor" } }).success, false);
   assert.equal(vendorModelSchema.safeParse({
     id: "m",
     pricing: { mode: "custom", inputPerMillion: 1, outputPerMillion: 2 },

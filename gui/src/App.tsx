@@ -72,7 +72,7 @@ import {
 } from "./app-model.ts";
 import { useLogsController, useUpdateController, useUsageController } from "./app-controllers.ts";
 import { getDesktopApi, type SaveConfigResult } from "./desktop-api.ts";
-import { getCatalogPriceView } from "../../src/usage.ts";
+import { getCatalogPriceView, isPricingCatalogKey, PRICING_CATALOG_KEYS, PRICING_CATALOG_LABELS } from "../../src/usage.ts";
 import type { ChartSegment, HealthState, LogEntry, LogPage, UpdateState, UsageDaily, UsagePeriod, UsageSummary, VendorHealth } from "./types.ts";
 
 const defaultAppName = "Heimdall";
@@ -1683,14 +1683,13 @@ function ModelPricingRow({
   loadVendorModelsOnSelect: () => Promise<void>;
 }) {
   const customPricing = model.pricingMode === "custom";
-  const catalogKey = model.pricingMode === "deepseek" ? "deepseek" : "openai";
+  const catalogKey = isPricingCatalogKey(model.pricingMode) ? model.pricingMode : "openai";
   const pricingView = getCatalogPriceView(catalogKey, model.id);
-  const otherCatalogKey = catalogKey === "deepseek" ? "openai" : "deepseek";
-  const otherPricingView = !customPricing && !pricingView && model.id
-    ? getCatalogPriceView(otherCatalogKey, model.id)
+  const otherCatalogKey = !customPricing && !pricingView && model.id
+    ? PRICING_CATALOG_KEYS.find((key) => key !== catalogKey && getCatalogPriceView(key, model.id))
     : null;
-  const catalogLabel = catalogKey === "deepseek" ? "DeepSeek" : "OpenAI";
-  const otherCatalogLabel = otherCatalogKey === "deepseek" ? "DeepSeek" : "OpenAI";
+  const catalogLabel = PRICING_CATALOG_LABELS[catalogKey];
+  const otherCatalogLabel = otherCatalogKey ? PRICING_CATALOG_LABELS[otherCatalogKey] : "";
 
   return (
     <div className="model-pricing-row">
@@ -1746,28 +1745,19 @@ function ModelPricingRow({
       </div>
 
       <div className="pricing-editor">
-        <div className="segmented-control pricing-mode three">
-          <button
-            type="button"
-            className={!customPricing && model.pricingMode !== "deepseek" ? "active" : ""}
-            onClick={() => updateVendorModel(index, "pricingMode", "openai")}
-          >
-            OpenAI
-          </button>
-          <button
-            type="button"
-            className={model.pricingMode === "deepseek" ? "active" : ""}
-            onClick={() => updateVendorModel(index, "pricingMode", "deepseek")}
-          >
-            DeepSeek
-          </button>
-          <button
-            type="button"
-            className={customPricing ? "active" : ""}
-            onClick={() => updateVendorModel(index, "pricingMode", "custom")}
-          >
-            Custom
-          </button>
+        <div className="pricing-catalog-select model-select">
+          <select
+            value={model.pricingMode || "openai"}
+            onChange={(event) => updateVendorModel(index, "pricingMode", event.target.value)}
+            title="Pricing catalog for this model"
+          >            {PRICING_CATALOG_KEYS.map((key) => (
+              <option value={key} key={key}>
+                {PRICING_CATALOG_LABELS[key]} catalog
+              </option>
+            ))}
+            <option value="custom">Custom</option>
+          </select>
+          <ChevronDown aria-hidden="true" size={16} />
         </div>
         <PricingFields
           currency={customPricing ? model.pricingCurrency : pricingView?.pricing?.currency}
@@ -1791,7 +1781,7 @@ function ModelPricingRow({
         </small>
       ) : !pricingView && model.id ? (
         <small className="model-row-message">
-          {otherPricingView ? (
+          {otherCatalogKey ? (
             <>
               Not in {catalogLabel} —{" "}
               <button

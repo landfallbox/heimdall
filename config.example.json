@@ -120,6 +120,50 @@
       "apiKey": "replace-with-deepseek-vendor-key",
       "requestFormat": "chat-completions",
       "enabled": false
+    },
+    {
+      "name": "anthropic-vendor",
+      "baseUrl": "https://api.anthropic.com/v1",
+      "models": [
+        {
+          "id": "claude-sonnet-4.5",
+          "enabled": true,
+          "pricing": {
+            "mode": "anthropic"
+          }
+        },
+        {
+          "id": "claude-haiku-4.5",
+          "enabled": true
+        }
+      ],
+      "authentication": "api-key",
+      "apiKeyHeader": "x-api-key",
+      "apiKey": "replace-with-anthropic-vendor-key",
+      "requestFormat": "chat-completions",
+      "enabled": false
+    },
+    {
+      "name": "glm-vendor",
+      "baseUrl": "https://open.bigmodel.cn/api/paas/v4",
+      "models": [
+        {
+          "id": "glm-5.3",
+          "enabled": true,
+          "pricing": {
+            "mode": "glm"
+          }
+        },
+        {
+          "id": "glm-5.3-flash",
+          "enabled": true
+        }
+      ],
+      "authentication": "api-key",
+      "apiKeyHeader": "authorization",
+      "apiKey": "replace-with-glm-vendor-key",
+      "requestFormat": "chat-completions",
+      "enabled": false
     }
   ]
 }

@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createUsageStore, readUsageSummary } from "../src/usage-store.ts";
-import { estimateUsageCost, getCatalogPriceView, normalizeUsage, resolveModelPricing } from "../src/usage.ts";
+import { estimateUsageCost, getCatalogPriceView, getPricingCatalogSummary, isPricingCatalogKey, normalizeUsage, resolveModelPricing } from "../src/usage.ts";
 
 const chatUsage = normalizeUsage({
   usage: {
@@ -119,6 +119,52 @@ assert.equal(openAIPricingView.sourceModel, "gpt-5-mini");
 assert.equal(openAIPricingView.pricing.inputPerMillion, 0.25);
 assert.equal(openAIPricingView.offPeakPricing, null);
 assert.equal(openAIPricingView.peakHours, null);
+
+const anthropicPricing = resolveModelPricing("claude-haiku-4.5", { mode: "anthropic" })!;
+assert.equal(anthropicPricing.source, "anthropic");
+assert.equal(anthropicPricing.sourceModel, "claude-haiku-4.5");
+assert.equal(anthropicPricing.currency, "USD");
+assert.equal(anthropicPricing.inputPerMillion, 1);
+assert.equal(anthropicPricing.cachedInputPerMillion, 0.1);
+assert.equal(anthropicPricing.outputPerMillion, 5);
+assert.equal(resolveModelPricing("claude-future-model", { mode: "anthropic" }), null);
+
+const geminiPricing = resolveModelPricing("gemini-3.1-pro", { mode: "google" })!;
+assert.equal(geminiPricing.source, "google");
+assert.equal(geminiPricing.inputPerMillion, 2);
+assert.equal(geminiPricing.cachedInputPerMillion, 0.2);
+assert.equal(geminiPricing.outputPerMillion, 12);
+
+const kimiPricing = resolveModelPricing("kimi-k3", { mode: "kimi" })!;
+assert.equal(kimiPricing.source, "kimi");
+assert.equal(kimiPricing.inputPerMillion, 3);
+assert.equal(kimiPricing.cachedInputPerMillion, 0.3);
+assert.equal(kimiPricing.outputPerMillion, 15);
+
+const glmPricing = resolveModelPricing("glm-5.3", { mode: "glm" })!;
+assert.equal(glmPricing.source, "glm");
+assert.equal(glmPricing.currency, "CNY");
+assert.equal(glmPricing.inputPerMillion, 8);
+assert.equal(glmPricing.cachedInputPerMillion, 2);
+assert.equal(glmPricing.outputPerMillion, 28);
+assert.deepEqual(estimateUsageCost(chatUsage, glmPricing), {
+  amount: 0.00205,
+  currency: "CNY",
+  pricing: glmPricing,
+});
+
+const mimoPricing = resolveModelPricing("mimo-v2.6-pro", { mode: "mimo" })!;
+assert.equal(mimoPricing.source, "mimo");
+assert.equal(mimoPricing.currency, "CNY");
+assert.equal(mimoPricing.inputPerMillion, 3);
+assert.equal(mimoPricing.cachedInputPerMillion, 0.025);
+assert.equal(mimoPricing.outputPerMillion, 6);
+assert.equal(resolveModelPricing("mimo-v2.5-pro", { mode: "mimo" })!.inputPerMillion, 3);
+
+assert.equal(resolveModelPricing("gpt-5-mini", { mode: "unknown-catalog" })!.source, "openai");
+assert.equal(isPricingCatalogKey("anthropic"), true);
+assert.equal(isPricingCatalogKey("custom"), false);
+assert.equal(getPricingCatalogSummary().length, 7);
 
 const tempDirectory = mkdtempSync(join(tmpdir(), "local-router-usage-test-"));
 try {

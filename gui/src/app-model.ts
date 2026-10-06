@@ -1,5 +1,5 @@
-import { getVendorModels, type ConfigVendorInput, type Draft, type VendorDraft, type VendorModelDraft } from "./config-draft.ts";
-import { getCatalogPriceView } from "../../src/usage.ts";
+import { getVendorModels, type ConfigVendorInput, type Draft, type PricingMode, type VendorDraft, type VendorModelDraft } from "./config-draft.ts";
+import { getCatalogPriceView, isPricingCatalogKey, PRICING_CATALOG_KEYS } from "../../src/usage.ts";
 import type { LogEntry, Tone, VendorHealth } from "./types.ts";
 
 export interface FieldIssue {
@@ -118,15 +118,19 @@ export function endpointsFromDraft(draft: Draft): { chatCompletions: string; res
   };
 }
 
-export function suggestCatalogSwitch(pricingMode: unknown, modelId: string): "openai" | "deepseek" | null {
+export function suggestCatalogSwitch(pricingMode: unknown, modelId: string): PricingMode | null {
   if (pricingMode === "custom" || !modelId) {
     return null;
   }
-  if (getCatalogPriceView(pricingMode as "openai" | "deepseek", modelId)) {
+  if (isPricingCatalogKey(pricingMode) && getCatalogPriceView(pricingMode, modelId)) {
     return null;
   }
-  const otherKey = pricingMode === "deepseek" ? "openai" : "deepseek";
-  return getCatalogPriceView(otherKey, modelId) ? otherKey : null;
+  for (const key of PRICING_CATALOG_KEYS.filter((value) => value !== pricingMode)) {
+    if (getCatalogPriceView(key, modelId)) {
+      return key;
+    }
+  }
+  return null;
 }
 
 export function getVendorCircuitSummary(vendorHealth: VendorHealth | undefined): { tone: Tone; label: string } | null {

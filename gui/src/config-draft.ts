@@ -1,6 +1,6 @@
 export type CloseBehavior = "tray" | "exit" | "ask";
 export type RequestFormat = "chat-completions" | "responses" | "embeddings" | "custom";
-export type PricingMode = "openai" | "deepseek" | "custom";
+export type PricingMode = "openai" | "deepseek" | "anthropic" | "google" | "kimi" | "glm" | "mimo" | "custom";
 export type Authentication = "none" | "api-key";
 
 export interface VendorModelDraft {
@@ -67,7 +67,7 @@ export interface VendorModelConfig {
   enabled: boolean;
   pricing?:
     | { mode: "custom"; currency: string; inputPerMillion: number; cachedInputPerMillion: number | null; outputPerMillion: number }
-    | { mode: "deepseek" };
+    | { mode: CatalogPricing };
   enableThinking?: boolean;
 }
 
@@ -133,6 +133,15 @@ export const defaultDraft: Draft = {
 
 const closeBehaviorValues = new Set<CloseBehavior>(["tray", "exit", "ask"]);
 const requestFormatValues = new Set<RequestFormat>(["chat-completions", "responses", "embeddings", "custom"]);
+const pricingModeValues = new Set<PricingMode>([
+  "openai", "deepseek", "anthropic", "google", "kimi", "glm", "mimo", "custom",
+]);
+
+export type CatalogPricing = Extract<PricingMode, "openai" | "deepseek" | "anthropic" | "google" | "kimi" | "glm" | "mimo">;
+
+const CATALOG_PRICING_MODES: CatalogPricing[] = [
+  "openai", "deepseek", "anthropic", "google", "kimi", "glm", "mimo",
+];
 
 export function normalizeRequestFormat(value: unknown): RequestFormat {
   return requestFormatValues.has(value as RequestFormat) ? (value as RequestFormat) : "chat-completions";
@@ -163,10 +172,10 @@ function normalizeVendorModelForDraft(model: string | Record<string, unknown>): 
   const pricingRaw = model.pricing as
     | { mode?: string; currency?: string; inputPerMillion?: number | string; cachedInputPerMillion?: number | string; outputPerMillion?: number | string }
     | undefined;
-  const pricing = pricingRaw && ["openai", "deepseek", "custom"].includes(pricingRaw.mode ?? "") ? pricingRaw : null;
-  const pricingMode = ["openai", "deepseek", "custom"].includes(model.pricingMode as string)
+  const pricing = pricingRaw && pricingModeValues.has(pricingRaw.mode as PricingMode) ? pricingRaw : null;
+  const pricingMode = pricingModeValues.has(model.pricingMode as PricingMode)
     ? (model.pricingMode as PricingMode)
-    : pricing ? (pricing.mode as PricingMode) : "openai";
+    : pricing?.mode as PricingMode | undefined;
   const inputPerMillion = model.inputPerMillion as string | undefined;
   const cachedInputPerMillion = model.cachedInputPerMillion as string | undefined;
   const outputPerMillion = model.outputPerMillion as string | undefined;
@@ -252,9 +261,9 @@ export function toConfig(draft: Draft): Config {
               outputPerMillion: requiredNonnegativeNumber(model.outputPerMillion, "Output price"),
             },
           } : {}),
-          ...(model.pricingMode === "deepseek" ? {
-            pricing: { mode: "deepseek" as const },
-          } : {}),
+          ...(CATALOG_PRICING_MODES.includes(model.pricingMode as CatalogPricing)
+            ? { pricing: { mode: model.pricingMode as CatalogPricing } }
+            : {}),
           ...(model.enableThinking === true ? { enableThinking: true } : {}),
         })),
         authentication: vendor.authentication === "api-key" ? "api-key" : "none",

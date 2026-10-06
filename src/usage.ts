@@ -43,6 +43,30 @@ export const OPENAI_PRICING_SOURCE = "https://developers.openai.com/api/docs/pri
 export const DEEPSEEK_PRICING_UPDATED_AT = "2026-08-16";
 export const DEEPSEEK_PRICING_SOURCE = "https://api-docs.deepseek.com/quick_start/pricing";
 export const DEEPSEEK_PEAK_HOURS: [number, number][] = [[1, 4], [6, 10]];
+export const ANTHROPIC_PRICING_UPDATED_AT = "2026-09-03";
+export const ANTHROPIC_PRICING_SOURCE = "https://platform.claude.com/docs/en/about-claude/pricing";
+export const GOOGLE_PRICING_UPDATED_AT = "2026-10-01";
+export const GOOGLE_PRICING_SOURCE = "https://ai.google.dev/gemini-api/docs/pricing";
+export const KIMI_PRICING_UPDATED_AT = "2026-09-20";
+export const KIMI_PRICING_SOURCE = "https://platform.kimi.ai/docs/pricing/chat.md";
+export const GLM_PRICING_UPDATED_AT = "2026-09-28";
+export const GLM_PRICING_SOURCE = "https://docs.bigmodel.cn/cn/guide/start/pricing.md";
+export const MIMO_PRICING_UPDATED_AT = "2026-10-06";
+export const MIMO_PRICING_SOURCE = "https://mimo.mi.com/docs/zh-CN/pricing";
+
+export type PricingCatalogKey = "openai" | "deepseek" | "anthropic" | "google" | "kimi" | "glm" | "mimo";
+
+export const PRICING_CATALOG_LABELS: Record<PricingCatalogKey, string> = Object.freeze({
+  openai: "OpenAI",
+  deepseek: "DeepSeek",
+  anthropic: "Anthropic",
+  google: "Google",
+  kimi: "Kimi",
+  glm: "GLM",
+  mimo: "MiMo",
+});
+
+export const PRICING_CATALOG_KEYS = Object.keys(PRICING_CATALOG_LABELS) as PricingCatalogKey[];
 
 const OPENAI_STANDARD_PRICING: Record<string, Pricing> = Object.freeze({
   "gpt-6-astra": price(10, 1, 50),
@@ -93,6 +117,68 @@ const DEEPSEEK_STANDARD_PRICING: Record<string, RateCard> = Object.freeze({
   "deepseek-v4-pro": rateCards(price(1.32, 0.044, 3.96, "CNY"), price(0.66, 0.022, 1.98, "CNY")),
 });
 
+const ANTHROPIC_STANDARD_PRICING: Record<string, Pricing> = Object.freeze({
+  "claude-opus-4.6": price(5, 0.5, 25),
+  "claude-opus-4.5": price(5, 0.5, 25),
+  "claude-opus-4.1": price(15, 1.5, 75),
+  "claude-sonnet-4.6": price(3, 0.3, 15),
+  "claude-sonnet-4.5": price(3, 0.3, 15),
+  "claude-sonnet-4": price(3, 0.3, 15),
+  "claude-haiku-4.5": price(1, 0.1, 5),
+  "claude-3-5-sonnet": price(3, 0.3, 15),
+  "claude-3-5-haiku": price(0.8, 0.08, 4),
+  "claude-3-opus": price(15, 1.5, 75),
+  "claude-3-haiku": price(0.25, 0.025, 1.25),
+});
+
+const GOOGLE_STANDARD_PRICING: Record<string, Pricing> = Object.freeze({
+  "gemini-3.1-pro": price(2, 0.2, 12),
+  "gemini-3-pro": price(2, 0.2, 12),
+  "gemini-3.5-flash": price(1.5, 0.15, 9),
+  "gemini-3.8-flash": price(0.75, 0.075, 3.75),
+  "gemini-3.7-flash": price(0.75, 0.075, 3.75),
+  "gemini-3.6-flash": price(0.75, 0.075, 3.75),
+  "gemini-3-flash": price(0.5, 0.05, 3),
+  "gemini-3.5-flash-lite": price(0.3, 0.03, 2.5),
+  "gemini-3.1-flash-lite": price(0.25, 0.025, 1.5),
+  "gemini-2.5-pro": price(1.25, 0.125, 10),
+  "gemini-2.5-flash": price(0.3, 0.03, 2.5),
+  "gemini-2.5-flash-lite": price(0.1, 0.01, 0.4),
+});
+
+const KIMI_STANDARD_PRICING: Record<string, Pricing> = Object.freeze({
+  "kimi-k3": price(3, 0.3, 15),
+  "kimi-k2.7-code": price(0.95, 0.19, 4),
+  "kimi-k2.7-code-highspeed": price(1.9, 0.38, 8),
+  "kimi-k2.6": price(0.95, 0.16, 4),
+  "kimi-k2.5": price(0.6, null, 3),
+  "kimi-k2": price(0.6, null, 2.5),
+});
+
+// 智谱按 输入/缓存命中/输出 分别计费，单位为元/百万 tokens。带长度分档的模型取最常用档位（输入 <32K）。
+const GLM_STANDARD_PRICING: Record<string, Pricing> = Object.freeze({
+  "glm-5.3": price(8, 2, 28, "CNY"),
+  "glm-5.3-flash": price(0.8, 0.23, 2.8, "CNY"),
+  "glm-5.3-flashx": price(2, 0.57, 7, "CNY"),
+  "glm-5.2": price(8, 2, 28, "CNY"),
+  "glm-5.1": price(6, 1.3, 24, "CNY"),
+  "glm-5-turbo": price(5, 1.2, 22, "CNY"),
+  "glm-5": price(4, 1, 18, "CNY"),
+  "glm-4.7": price(2, 0.4, 8, "CNY"),
+  "glm-4.5-air": price(0.8, 0.16, 2, "CNY"),
+  "glm-4.6v": price(1, 0.2, 3, "CNY"),
+  "glm-4.7-flashx": price(0.5, 0.1, 3, "CNY"),
+});
+
+// 小米 MiMo 按国内人民币定价（元/百万 tokens）。官方另有海外美元价；mimo-v2.5-pro/mimo-v2.5 将于 2026-10-21 下线。
+const MIMO_STANDARD_PRICING: Record<string, Pricing> = Object.freeze({
+  "mimo-v2.6-pro": price(3, 0.025, 6, "CNY"),
+  "mimo-v2.6-flash": price(1, 0.02, 2, "CNY"),
+  "mimo-v2.6-pro-ultraspeed": price(30, 0.25, 60, "CNY"),
+  "mimo-v2.5-pro": price(3, 0.025, 6, "CNY"),
+  "mimo-v2.5": price(1, 0.02, 2, "CNY"),
+});
+
 export const PRICING_CATALOGS: Record<string, PricingCatalog> = Object.freeze({
   openai: {
     sourceUrl: OPENAI_PRICING_SOURCE,
@@ -105,6 +191,36 @@ export const PRICING_CATALOGS: Record<string, PricingCatalog> = Object.freeze({
     updatedAt: DEEPSEEK_PRICING_UPDATED_AT,
     peakHours: DEEPSEEK_PEAK_HOURS,
     models: DEEPSEEK_STANDARD_PRICING,
+  },
+  anthropic: {
+    sourceUrl: ANTHROPIC_PRICING_SOURCE,
+    updatedAt: ANTHROPIC_PRICING_UPDATED_AT,
+    peakHours: null,
+    models: ANTHROPIC_STANDARD_PRICING,
+  },
+  google: {
+    sourceUrl: GOOGLE_PRICING_SOURCE,
+    updatedAt: GOOGLE_PRICING_UPDATED_AT,
+    peakHours: null,
+    models: GOOGLE_STANDARD_PRICING,
+  },
+  kimi: {
+    sourceUrl: KIMI_PRICING_SOURCE,
+    updatedAt: KIMI_PRICING_UPDATED_AT,
+    peakHours: null,
+    models: KIMI_STANDARD_PRICING,
+  },
+  glm: {
+    sourceUrl: GLM_PRICING_SOURCE,
+    updatedAt: GLM_PRICING_UPDATED_AT,
+    peakHours: null,
+    models: GLM_STANDARD_PRICING,
+  },
+  mimo: {
+    sourceUrl: MIMO_PRICING_SOURCE,
+    updatedAt: MIMO_PRICING_UPDATED_AT,
+    peakHours: null,
+    models: MIMO_STANDARD_PRICING,
   },
 });
 
@@ -149,7 +265,7 @@ export function resolveModelPricing(model: string, pricingConfig: any, now = new
     };
   }
 
-  const catalogKey = pricingConfig?.mode === "deepseek" ? "deepseek" : "openai";
+  const catalogKey = isPricingCatalogKey(pricingConfig?.mode) ? pricingConfig.mode : "openai";
   const catalog = PRICING_CATALOGS[catalogKey];
   const sourceModel = findCatalogPriceModel(catalog.models, model);
   if (!sourceModel) {
@@ -167,7 +283,7 @@ export function resolveModelPricing(model: string, pricingConfig: any, now = new
 }
 
 export function getCatalogPriceView(catalogKey: string, modelId: string) {
-  const catalog = PRICING_CATALOGS[catalogKey];
+  const catalog = isPricingCatalogKey(catalogKey) ? PRICING_CATALOGS[catalogKey] : null;
   if (!catalog) {
     return null;
   }
@@ -218,6 +334,24 @@ export function estimateUsageCost(usage: Usage | null, pricing: ResolvedPricing 
 
 export function getOpenAIPricingCatalog() {
   return Object.entries(OPENAI_STANDARD_PRICING).map(([model, pricing]) => ({ model, ...pricing }));
+}
+
+export function isPricingCatalogKey(value: unknown): value is PricingCatalogKey {
+  return typeof value === "string" && Object.prototype.hasOwnProperty.call(PRICING_CATALOGS, value);
+}
+
+export function getPricingCatalogSummary() {
+  return PRICING_CATALOG_KEYS.map((key) => {
+    const catalog = PRICING_CATALOGS[key];
+    return {
+      key,
+      label: PRICING_CATALOG_LABELS[key],
+      sourceUrl: catalog.sourceUrl,
+      updatedAt: catalog.updatedAt,
+      modelCount: Object.keys(catalog.models).length,
+      peakHours: catalog.peakHours,
+    };
+  });
 }
 
 function findCatalogPriceModel(catalogModels: Record<string, Pricing | RateCard>, value: unknown): string | null {

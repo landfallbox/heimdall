@@ -127,6 +127,30 @@ const deepseekRoundTrip = toConfig(toDraft(normalizeConfig({
   }],
 })));
 assert.deepEqual(deepseekRoundTrip.vendors[0]!.models![0]!.pricing, { mode: "deepseek" });
+const glmRoundTrip = toConfig(toDraft(normalizeConfig({
+  router: { apiKey: "test-token" },
+  vendors: [{
+    name: "zhipu",
+    baseUrl: "https://open.bigmodel.cn/api/paas/v4",
+    models: [{
+      id: "glm-5.3-flash",
+      enabled: true,
+      pricing: { mode: "glm" },
+    }],
+  }],
+})));
+assert.deepEqual(glmRoundTrip.vendors[0]!.models![0]!.pricing, { mode: "glm" });
+assert.equal(
+  toDraft(normalizeConfig({
+    router: { apiKey: "test-token" },
+    vendors: [{
+      name: "zhipu",
+      baseUrl: "https://open.bigmodel.cn/api/paas/v4",
+      models: [{ id: "glm-5.3-flash", pricing: { mode: "glm" } }],
+    }],
+  })).vendors[0]!.models![0]!.pricingMode,
+  "glm",
+);
 const deepseekDraftModel = toDraft(normalizeConfig({
   router: { apiKey: "test-token" },
   vendors: [{
@@ -158,6 +182,11 @@ assert.equal(getVendorCircuitSummary({ models: [] }), null);
 
 assert.equal(suggestCatalogSwitch("openai", "deepseek-v4-flash"), "deepseek");
 assert.equal(suggestCatalogSwitch("openai", "deepseek-chat"), null);
+assert.equal(suggestCatalogSwitch("openai", "claude-haiku-4.5"), "anthropic");
+assert.equal(suggestCatalogSwitch("anthropic", "gpt-5-mini"), "openai");
+assert.equal(suggestCatalogSwitch("unknown-mode" as never, "claude-sonnet-4.6"), "anthropic");
+assert.equal(suggestCatalogSwitch("custom", "claude-sonnet-4.6"), null);
+assert.equal(suggestCatalogSwitch("anthropic", "claude-sonnet-4.6"), null);
 assert.equal(suggestCatalogSwitch("deepseek", "gpt-5-mini"), "openai");
 assert.equal(suggestCatalogSwitch("openai", "gpt-5-mini"), null);
 assert.equal(suggestCatalogSwitch("deepseek", "deepseek-v4-pro"), null);
