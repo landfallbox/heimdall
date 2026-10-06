@@ -28,6 +28,7 @@ type VendorFailure = {
   errorName?: string;
   errorMessage?: string;
   errorType?: string;
+  errorCode?: string;
   statusCode?: number;
   bodyBytes?: number;
   protocolFailure?: boolean;
@@ -526,12 +527,14 @@ async function handleGeneration(
     } catch (error) {
       const protocolError = isProtocolError(error) ? error : null;
       const isProtocolFailure = protocolError !== null && protocolError.statusCode === 400 && Boolean(protocolError.errorType);
+      const cause = (error as Error & { cause?: { code?: string; errno?: string | number } }).cause;
       const failure: VendorFailure = {
         vendor: vendor.name,
         elapsedMs: Date.now() - vendorStartedAt,
         errorName: (error as Error).name,
         errorMessage: (error as Error).message,
         errorType: protocolError?.errorType,
+        ...(cause?.code ? { errorCode: cause.code } : {}),
         ...(isProtocolFailure ? { protocolFailure: true } : {}),
       };
       failures.push(failure);
@@ -845,6 +848,14 @@ function main() {
       configPath,
       vendors: config.vendors.map((vendor) => vendor.name),
     });
+    if (typeof process.send === "function") {
+      // Parent may not be listening; a closed channel must not crash the Router.
+      process.send({ type: "router_ready" }, (error: NodeJS.ErrnoException | null) => {
+        if (error && error.code !== "ERR_IPC_CHANNEL_CLOSED") {
+          console.error(JSON.stringify({ level: "error", event: "router_ready_signal_failed", errorMessage: error.message }));
+        }
+      });
+    }
   });
 
   const stopRouter = (reason: string) => {

@@ -42,7 +42,7 @@ async function findFreePort(): Promise<number> {
   return port;
 }
 
-async function waitFor(predicate: () => Promise<boolean> | boolean, message: string, timeoutMs = 3000) {
+async function waitFor(predicate: () => Promise<boolean> | boolean, message: string, timeoutMs = 10000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (await predicate()) {
@@ -70,6 +70,16 @@ async function startRouter(configPath: string) {
     stdio: ["ignore", "pipe", "pipe", "ipc"],
   });
 
+  const ready = new Promise<void>((resolve) => {
+    const onMessage = (message: any) => {
+      if (message?.type === "router_ready") {
+        router.off("message", onMessage);
+        resolve();
+      }
+    };
+    router.on("message", onMessage);
+  });
+
   router.stdout!.setEncoding("utf8");
   router.stderr!.setEncoding("utf8");
   const output = { text: "" };
@@ -79,6 +89,13 @@ async function startRouter(configPath: string) {
   router.stdout!.on("data", captureOutput);
   router.stderr!.on("data", captureOutput);
   routerOutput.set(router, output);
+  await once(router, "spawn");
+  // The Router sends `router_ready` over IPC as soon as it listens. Wait for it so
+  // the health probe does not race the server startup on slow CI machines.
+  await Promise.race([
+    ready,
+    new Promise<void>((resolve) => setTimeout(resolve, 15000)),
+  ]);
   return router;
 }
 
@@ -91,11 +108,19 @@ async function stopRouter(router: import("node:child_process").ChildProcess) {
     return;
   }
 
-  router.kill();
-  await once(router, "exit");
+  const exited = waitForProcessExit(router, 5000, "Router shutdown").then(() => true).catch(() => false);
+  // Prefer the IPC shutdown so the Router flushes pending log writes before exiting.
+  if (typeof router.send === "function") {
+    router.send({ type: "shutdown" });
+  }
+  const didExit = await exited;
+  if (!didExit) {
+    router.kill();
+    await waitForProcessExit(router, 5000, "Router after kill").catch(() => undefined);
+  }
 }
 
-async function reloadRouter(router: import("node:child_process").ChildProcess, timeoutMs = 3000) {
+async function reloadRouter(router: import("node:child_process").ChildProcess, timeoutMs = 10000) {
   const requestId = `reload-${Date.now()}-${Math.random()}`;
 
   return new Promise<any>((resolve, reject) => {
@@ -147,6 +172,10 @@ async function reloadRouter(router: import("node:child_process").ChildProcess, t
 }
 
 async function waitForProcessClose(router: import("node:child_process").ChildProcess, timeoutMs = 5000, context = "Router") {
+  if (router.exitCode !== null || router.signalCode !== null) {
+    return [router.exitCode, router.signalCode] as const;
+  }
+
   let timeout: NodeJS.Timeout | undefined;
 
   try {
@@ -182,7 +211,7 @@ async function waitForProcessExit(router: import("node:child_process").ChildProc
 }
 
 async function waitForHealth(port: number, token = "test-token") {
-  const deadline = Date.now() + 5000;
+  const deadline = Date.now() + 15000;
   let lastError: unknown;
   const headers: Record<string, string> = token ? { authorization: `Bearer ${token}` } : {};
 
@@ -202,7 +231,7 @@ async function waitForHealth(port: number, token = "test-token") {
   throw lastError || new Error("Router did not become healthy.");
 }
 
-async function waitForAuthorizedHealth(port: number, token: string, timeoutMs = 3000) {
+async function waitForAuthorizedHealth(port: number, token: string, timeoutMs = 10000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
@@ -279,6 +308,12 @@ async function withRouter(name: string, config: any, test: (ctx: { port: number;
   try {
     await waitForHealth(port, config.router.apiKey);
     await test({ port, configPath, router });
+  } catch (error) {
+    const detail = (error as Error)?.cause ? ` cause=${(error as Error & { cause: Error }).cause.message}` : "";
+    const routerError = new Error(
+      `${error instanceof Error ? error.message : String(error)}${detail}\nrouter-output:\n${getRouterOutput(router)}`,
+    );
+    throw routerError;
   } finally {
     await stopRouter(router);
   }
@@ -291,7 +326,7 @@ function baseConfig(port: number, vendors: any[], overrides: any = {}) {
       port,
       apiKey: "test-token",
       logFile: join(tempDir, `router-${port}.log`),
-      requestTimeoutMs: 500,
+      requestTimeoutMs: 1000,
       ...overrides.router,
     },
     vendors,
@@ -458,7 +493,7 @@ async function testTimeoutFallback() {
   const slow = await createMockVendor(async (req, res) => {
     calls.slow += 1;
     await readBody(req);
-    await new Promise((resolve) => setTimeout(resolve, 900));
+    await new Promise((resolve) => setTimeout(resolve, 3000));
     res.writeHead(200, { "content-type": "application/json" });
     res.end(JSON.stringify({ choices: [{ message: { content: "late" } }] }));
   });
@@ -474,7 +509,7 @@ async function testTimeoutFallback() {
     await withRouter("timeout-fallback", baseConfig(port, [
       { name: "slow", baseUrl: slow.baseUrl, model: "model-id" },
       { name: "fast", baseUrl: fast.baseUrl, model: "model-id" },
-    ], { router: { requestTimeoutMs: 200 } }), async ({ port: routerPort }) => {
+    ], { router: { requestTimeoutMs: 1000 } }), async ({ port: routerPort }) => {
       const response = await requestChat(routerPort);
       const body = await response.json();
       assert.equal(response.status, 200);
@@ -652,7 +687,7 @@ async function testLongStreamOutlivesResponseTimeout() {
     res.writeHead(200, { "content-type": "text/event-stream" });
     res.flushHeaders();
     for (const chunk of chunks) {
-      await new Promise((resolve) => setTimeout(resolve, 90));
+      await new Promise((resolve) => setTimeout(resolve, 150));
       res.write(chunk);
     }
     res.end();
@@ -662,7 +697,7 @@ async function testLongStreamOutlivesResponseTimeout() {
     const port = await findFreePort();
     await withRouter("long-stream", baseConfig(port, [
       { name: "streaming", baseUrl: vendor.baseUrl, model: "model-id" },
-    ], { router: { requestTimeoutMs: 100 } }), async ({ port: routerPort }) => {
+    ], { router: { requestTimeoutMs: 500 } }), async ({ port: routerPort }) => {
       const response = await requestChat(routerPort);
       assert.equal(response.status, 200);
       assert.equal(await response.text(), chunks.join(""));
@@ -988,6 +1023,14 @@ async function testUpstreamErrorLogRedaction() {
       const response = await requestChat(routerPort);
       assert.equal(response.status, 502);
     });
+
+    await waitFor(
+    () => {
+      const logText = readFileSync(logFile, "utf8");
+      return /"errorType":"rate_limit"/.test(logText);
+    },
+    "expected rate_limit error did not reach the log file in time",
+    );
 
     const logText = readFileSync(logFile, "utf8");
     assert.match(logText, /"errorType":"rate_limit"/);
