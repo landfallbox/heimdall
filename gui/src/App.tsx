@@ -1151,9 +1151,9 @@ function AppSettingsPage({ app, setAppSetting, busy, pricingUpdatedAt }: {
         <PanelHeader icon={Tag} title="Pricing data" />
         <div className="form-grid">
           <div className="field wide">
-            <span>Catalog source</span>
+            <span>Price source</span>
             <span className="setting-value">
-              {pricingUpdatedAt ? `Remote catalog, updated ${pricingUpdatedAt}` : "Built-in catalog"}
+              {pricingUpdatedAt ? `Remote, updated ${pricingUpdatedAt}` : "Built-in"}
             </span>
           </div>
         </div>
@@ -1753,10 +1753,10 @@ function ModelPricingRow({
           <select
             value={model.pricingMode || "openai"}
             onChange={(event) => updateVendorModel(index, "pricingMode", event.target.value)}
-            title="Pricing catalog for this model"
+            title="Price source for this model: pick the vendor whose official price list applies, or Custom to set prices manually"
           >            {PRICING_CATALOG_KEYS.map((key) => (
               <option value={key} key={key}>
-                {PRICING_CATALOG_LABELS[key]} catalog
+                {PRICING_CATALOG_LABELS[key]} prices
               </option>
             ))}
             <option value="custom">Custom</option>
@@ -2002,7 +2002,7 @@ function UsagePeriod({ label, period }: { label: string; period: UsagePeriod }) 
           <span>Usage</span>
           <strong>{formatPercent(period.usageCoverage)}</strong>
         </div>
-        <div className="usage-period-metric" title="Share of usage-known requests with a resolved price. Below 100% means some requests have no cost (e.g. model not in the selected pricing catalog).">
+        <div className="usage-period-metric" title="Share of usage-known requests with a resolved price. Below 100% means some requests have no cost (e.g. model not in the selected vendor's price list).">
           <span>Price</span>
           <strong className={period.priceCoverage < 1 ? "attention" : ""}>{formatPercent(period.priceCoverage)}</strong>
         </div>
