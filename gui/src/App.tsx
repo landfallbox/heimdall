@@ -1749,20 +1749,24 @@ function ModelPricingRow({
       </div>
 
       <div className="pricing-editor">
-        <div className="pricing-catalog-select model-select">
-          <select
-            value={model.pricingMode || "openai"}
-            onChange={(event) => updateVendorModel(index, "pricingMode", event.target.value)}
-            title="Price source for this model: pick the vendor whose official price list applies, or Custom to set prices manually"
-          >            {PRICING_CATALOG_KEYS.map((key) => (
-              <option value={key} key={key}>
-                {PRICING_CATALOG_LABELS[key]} prices
-              </option>
-            ))}
-            <option value="custom">Custom</option>
-          </select>
-          <ChevronDown aria-hidden="true" size={16} />
-        </div>
+        <label className="pricing-catalog-select">
+          <span>Price source</span>
+          <div className="model-select">
+            <select
+              value={model.pricingMode || "openai"}
+              onChange={(event) => updateVendorModel(index, "pricingMode", event.target.value)}
+              title="Price source for this model: pick the vendor whose official price list applies, or Custom to set prices manually"
+            >
+              {PRICING_CATALOG_KEYS.map((key) => (
+                <option value={key} key={key}>
+                  {PRICING_CATALOG_LABELS[key]} prices
+                </option>
+              ))}
+              <option value="custom">Custom</option>
+            </select>
+            <ChevronDown aria-hidden="true" size={16} />
+          </div>
+        </label>
         <PricingFields
           currency={customPricing ? model.pricingCurrency : pricingView?.pricing?.currency}
           input={customPricing ? model.inputPerMillion : pricingView?.pricing?.inputPerMillion}
