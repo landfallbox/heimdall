@@ -1,7 +1,7 @@
 {
   "name": "heimdall",
   "productName": "Heimdall",
-  "version": "0.14.2",
+  "version": "0.15.0",
   "description": "Local OpenAI-compatible model router with vendor failover.",
   "author": "tang",
   "license": "MIT",
