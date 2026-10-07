@@ -194,4 +194,66 @@ assert.equal(suggestCatalogSwitch("openai", "private-model"), null);
 assert.equal(suggestCatalogSwitch("custom", "deepseek-v4-flash"), null);
 assert.equal(suggestCatalogSwitch("openai", ""), null);
 
+// VS Code metadata round-trips through the draft (numbers travel as strings).
+const vscodeRoundTrip = toConfig(toDraft(normalizeConfig({
+  router: { apiKey: "test-token" },
+  vendors: [{
+    name: "local",
+    baseUrl: "http://127.0.0.1:8000/v1",
+    models: [{
+      id: "model-id",
+      enabled: true,
+      vscode: {
+        name: "My Model",
+        toolCalling: true,
+        vision: false,
+        thinking: true,
+        contextWindow: 128000,
+        maxOutputTokens: 16384,
+        supportsReasoningEffort: ["low", "high"],
+      },
+    }],
+  }],
+})));
+assert.deepEqual(vscodeRoundTrip.vendors[0]!.models![0]!.vscode, {
+  name: "My Model",
+  toolCalling: true,
+  vision: false,
+  thinking: true,
+  contextWindow: 128000,
+  maxOutputTokens: 16384,
+  supportsReasoningEffort: ["low", "high"],
+});
+const vscodeDraft = toDraft(normalizeConfig({
+  router: { apiKey: "test-token" },
+  vendors: [{
+    name: "local",
+    baseUrl: "http://127.0.0.1:8000/v1",
+    models: [{ id: "model-id", enabled: true, vscode: { contextWindow: 128000 } }],
+  }],
+}));
+// Numeric metadata is exposed as a string so it binds to a text input.
+assert.equal(vscodeDraft.vendors[0]!.models![0]!.vscode?.contextWindow, "128000");
+
+// Empty vscode metadata is dropped on the way back to the config.
+const emptyVsCodeDraft = toDraft(normalizeConfig({
+  router: { apiKey: "test-token" },
+  vendors: [{
+    name: "local",
+    baseUrl: "http://127.0.0.1:8000/v1",
+    models: [{ id: "model-id", enabled: true }],
+  }],
+}));
+emptyVsCodeDraft.vendors[0]!.models![0]!.vscode = { name: "", contextWindow: "" };
+assert.equal(toConfig(emptyVsCodeDraft).vendors[0]!.models![0]!.vscode, undefined);
+
+// The sync toggle round-trips through the app section.
+assert.equal(toConfig(toDraft(normalizeConfig({
+  router: { apiKey: "test-token" },
+  app: { syncVsCodeModels: true },
+}))).app.syncVsCodeModels, true);
+assert.equal(toDraft(normalizeConfig({
+  router: { apiKey: "test-token" },
+})).app.syncVsCodeModels, false);
+
 console.log("config draft tests passed");

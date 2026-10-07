@@ -55,6 +55,32 @@ try {
     pricing: { mode: "custom", inputPerMillion: -1, outputPerMillion: 2 },
   }).success, false);
 
+  // VS Code metadata is accepted and validated.
+  assert.equal(vendorModelSchema.safeParse({
+    id: "m",
+    vscode: {
+      name: "My Model",
+      toolCalling: true,
+      vision: true,
+      thinking: false,
+      contextWindow: 128000,
+      maxOutputTokens: 16384,
+      supportsReasoningEffort: ["low", "high"],
+    },
+  }).success, true);
+  assert.equal(vendorModelSchema.safeParse({
+    id: "m",
+    vscode: { contextWindow: -1 },
+  }).success, false);
+  assert.equal(vendorModelSchema.safeParse({
+    id: "m",
+    vscode: { supportsReasoningEffort: ["not-a-level"] },
+  }).success, false);
+  assert.equal(vendorModelSchema.safeParse({
+    id: "m",
+    vscode: { name: "ok" },
+  }).success, true);
+
   const deepseekConfig = normalizeConfig({
     router: { apiKey: "test-token" },
     vendors: [{

@@ -3,6 +3,22 @@ export type RequestFormat = "chat-completions" | "responses" | "embeddings" | "c
 export type PricingMode = "openai" | "deepseek" | "anthropic" | "google" | "kimi" | "glm" | "mimo" | "custom";
 export type Authentication = "none" | "api-key";
 
+export type ReasoningEffortLevel = "none" | "low" | "medium" | "high" | "xhigh" | "max";
+
+/**
+ * GUI-facing VS Code metadata for a model. Numeric fields are strings so they
+ * bind to text inputs, mirroring how pricing fields are handled.
+ */
+export interface VendorModelVsCodeDraft {
+  name?: string;
+  toolCalling?: boolean;
+  vision?: boolean;
+  thinking?: boolean;
+  contextWindow?: string;
+  maxOutputTokens?: string;
+  supportsReasoningEffort?: ReasoningEffortLevel[];
+}
+
 export interface VendorModelDraft {
   id: string;
   enabled: boolean;
@@ -12,6 +28,7 @@ export interface VendorModelDraft {
   cachedInputPerMillion?: string;
   outputPerMillion?: string;
   enableThinking?: boolean;
+  vscode?: VendorModelVsCodeDraft;
   pricing?: {
     mode: PricingMode;
     currency?: string;
@@ -47,7 +64,7 @@ export interface RouterDraft {
 }
 
 export interface Draft {
-  app: { closeBehavior: CloseBehavior; startAtLogin: boolean };
+  app: { closeBehavior: CloseBehavior; startAtLogin: boolean; syncVsCodeModels: boolean };
   router: RouterDraft;
   vendors: VendorDraft[];
 }
@@ -69,6 +86,15 @@ export interface VendorModelConfig {
     | { mode: "custom"; currency: string; inputPerMillion: number; cachedInputPerMillion: number | null; outputPerMillion: number }
     | { mode: CatalogPricing };
   enableThinking?: boolean;
+  vscode?: {
+    name?: string;
+    toolCalling?: boolean;
+    vision?: boolean;
+    thinking?: boolean;
+    contextWindow?: number;
+    maxOutputTokens?: number;
+    supportsReasoningEffort?: ReasoningEffortLevel[];
+  };
 }
 
 export interface VendorConfig {
@@ -84,7 +110,7 @@ export interface VendorConfig {
 }
 
 export interface Config {
-  app: { closeBehavior: CloseBehavior; startAtLogin: boolean };
+  app: { closeBehavior: CloseBehavior; startAtLogin: boolean; syncVsCodeModels?: boolean };
   router: RouterConfig;
   vendors: VendorConfig[];
 }
@@ -103,7 +129,7 @@ export interface ConfigVendorInput {
 }
 
 export interface ConfigInput {
-  app?: { closeBehavior?: string; startAtLogin?: boolean };
+  app?: { closeBehavior?: string; startAtLogin?: boolean; syncVsCodeModels?: boolean };
   router?: {
     host?: string;
     port?: number | string;
@@ -117,7 +143,7 @@ export interface ConfigInput {
 }
 
 export const defaultDraft: Draft = {
-  app: { closeBehavior: "tray", startAtLogin: false },
+  app: { closeBehavior: "tray", startAtLogin: false, syncVsCodeModels: false },
   router: {
     host: "127.0.0.1",
     port: "4000",
@@ -130,6 +156,8 @@ export const defaultDraft: Draft = {
   },
   vendors: [],
 };
+
+export const REASONING_EFFORT_LEVELS: ReasoningEffortLevel[] = ["none", "low", "medium", "high", "xhigh", "max"];
 
 const closeBehaviorValues = new Set<CloseBehavior>(["tray", "exit", "ask"]);
 const requestFormatValues = new Set<RequestFormat>(["chat-completions", "responses", "embeddings", "custom"]);
@@ -188,7 +216,63 @@ function normalizeVendorModelForDraft(model: string | Record<string, unknown>): 
     inputPerMillion: inputPerMillion ?? (pricing ? String(pricing.inputPerMillion ?? "") : ""),
     cachedInputPerMillion: cachedInputPerMillion ?? (pricing ? String(pricing.cachedInputPerMillion ?? "") : ""),
     outputPerMillion: outputPerMillion ?? (pricing ? String(pricing.outputPerMillion ?? "") : ""),
+    vscode: normalizeVsCodeDraft(model.vscode),
   };
+}
+
+function normalizeVsCodeDraft(value: unknown): VendorModelVsCodeDraft | undefined {
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+  const raw = value as Record<string, unknown>;
+  const draft: VendorModelVsCodeDraft = {};
+  const name = String(raw.name || "").trim();
+  if (name) {
+    draft.name = name;
+  }
+  for (const key of ["toolCalling", "vision", "thinking"] as const) {
+    if (raw[key] === true || raw[key] === false) {
+      draft[key] = raw[key];
+    }
+  }
+  for (const key of ["contextWindow", "maxOutputTokens"] as const) {
+    const number = Number(raw[key]);
+    if (Number.isFinite(number) && number > 0) {
+      draft[key] = String(number);
+    }
+  }
+  if (Array.isArray(raw.supportsReasoningEffort)) {
+    const levels = raw.supportsReasoningEffort
+      .map((level) => String(level || "").trim())
+      .filter((level): level is ReasoningEffortLevel => (REASONING_EFFORT_LEVELS as readonly string[]).includes(level));
+    if (levels.length) {
+      draft.supportsReasoningEffort = [...new Set(levels)];
+    }
+  }
+  return Object.keys(draft).length ? draft : undefined;
+}
+
+function toVsCodeConfig(draft: VendorModelVsCodeDraft): NonNullable<VendorModelConfig["vscode"]> | undefined {
+  const config: NonNullable<VendorModelConfig["vscode"]> = {};
+  const name = String(draft.name || "").trim();
+  if (name) {
+    config.name = name;
+  }
+  for (const key of ["toolCalling", "vision", "thinking"] as const) {
+    if (draft[key] === true || draft[key] === false) {
+      config[key] = draft[key];
+    }
+  }
+  for (const key of ["contextWindow", "maxOutputTokens"] as const) {
+    const number = Number(draft[key]);
+    if (Number.isInteger(number) && number > 0) {
+      config[key] = number;
+    }
+  }
+  if (Array.isArray(draft.supportsReasoningEffort) && draft.supportsReasoningEffort.length) {
+    config.supportsReasoningEffort = draft.supportsReasoningEffort;
+  }
+  return Object.keys(config).length ? config : undefined;
 }
 
 export function getVendorModels(vendor: ConfigVendorInput | VendorDraft | null | undefined): VendorModelDraft[] {
@@ -203,6 +287,7 @@ export function toDraft(config: ConfigInput): Draft {
     app: {
       closeBehavior: normalizeCloseBehavior(app.closeBehavior),
       startAtLogin: app.startAtLogin === true,
+      syncVsCodeModels: app.syncVsCodeModels === true,
     },
     router: {
       host: router.host || defaultDraft.router.host,
@@ -234,6 +319,7 @@ export function toConfig(draft: Draft): Config {
     app: {
       closeBehavior: normalizeCloseBehavior(draft.app?.closeBehavior),
       startAtLogin: draft.app?.startAtLogin === true,
+      syncVsCodeModels: draft.app?.syncVsCodeModels === true,
     },
     router: {
       host: draft.router.host.trim() || defaultDraft.router.host,
@@ -265,6 +351,7 @@ export function toConfig(draft: Draft): Config {
             ? { pricing: { mode: model.pricingMode as CatalogPricing } }
             : {}),
           ...(model.enableThinking === true ? { enableThinking: true } : {}),
+          ...(model.vscode ? { vscode: toVsCodeConfig(model.vscode) } : {}),
         })),
         authentication: vendor.authentication === "api-key" ? "api-key" : "none",
         apiKeyHeader: vendor.apiKeyHeader || "authorization",

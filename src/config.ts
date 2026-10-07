@@ -22,11 +22,29 @@ export type ModelPricing =
       outputPerMillion: number;
     };
 
+export const REASONING_EFFORT_LEVELS = ["none", "low", "medium", "high", "xhigh", "max"] as const;
+export type ReasoningEffortLevel = (typeof REASONING_EFFORT_LEVELS)[number];
+
+/**
+ * Optional per-model metadata used only when syncing to VS Code's
+ * chatLanguageModels.json. These fields are not sent to the upstream vendor.
+ */
+export type ModelVsCodeMetadata = {
+  name?: string;
+  toolCalling?: boolean;
+  vision?: boolean;
+  thinking?: boolean;
+  contextWindow?: number;
+  maxOutputTokens?: number;
+  supportsReasoningEffort?: ReasoningEffortLevel[];
+};
+
 export type NormalizedVendorModel = {
   id: string;
   enabled: boolean;
   pricing?: ModelPricing;
   enableThinking?: boolean;
+  vscode?: ModelVsCodeMetadata;
   [key: string]: unknown;
 };
 
@@ -48,6 +66,7 @@ export type NormalizedVendor = {
 export type NormalizedAppConfig = {
   closeBehavior: CloseBehavior;
   startAtLogin: boolean;
+  syncVsCodeModels: boolean;
 };
 
 export type NormalizedRouterConfig = {
@@ -70,6 +89,7 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
   app: {
     closeBehavior: "tray",
     startAtLogin: false,
+    syncVsCodeModels: false,
   },
   router: {
     host: "127.0.0.1",
@@ -115,11 +135,24 @@ const modelPricingSchema = z.discriminatedUnion("mode", [
   customPricingSchema,
 ]);
 
+const reasoningEffortLevelSchema = z.enum(REASONING_EFFORT_LEVELS);
+
+export const modelVsCodeMetadataSchema = z.object({
+  name: z.string().trim().min(1).optional(),
+  toolCalling: z.boolean().optional(),
+  vision: z.boolean().optional(),
+  thinking: z.boolean().optional(),
+  contextWindow: z.number().int().positive().optional(),
+  maxOutputTokens: z.number().int().positive().optional(),
+  supportsReasoningEffort: z.array(reasoningEffortLevelSchema).min(1).optional(),
+}).loose();
+
 export const vendorModelSchema = z.object({
   id: z.string().trim().optional().default(""),
   enabled: z.boolean().optional().default(true),
   pricing: modelPricingSchema.optional(),
   enableThinking: z.boolean().optional().default(false),
+  vscode: modelVsCodeMetadataSchema.optional(),
 }).loose();
 
 export const vendorSchema = z.object({
@@ -179,6 +212,7 @@ export const configSchema = z.object({
   app: z.object({
     closeBehavior: closeBehaviorSchema.default(DEFAULT_CONFIG.app.closeBehavior),
     startAtLogin: z.boolean().default(DEFAULT_CONFIG.app.startAtLogin),
+    syncVsCodeModels: z.boolean().default(DEFAULT_CONFIG.app.syncVsCodeModels),
   }).default(DEFAULT_CONFIG.app),
   router: z.object({
     host: z.string().trim().min(1),
@@ -221,6 +255,7 @@ export function normalizeConfig(config: unknown): NormalizedConfig {
     app: {
       closeBehavior: normalizeCloseBehavior(app.closeBehavior),
       startAtLogin: app.startAtLogin === true,
+      syncVsCodeModels: app.syncVsCodeModels === true,
     },
     router: {
       host: String(router.host || DEFAULT_CONFIG.router.host).trim() || DEFAULT_CONFIG.router.host,
@@ -330,7 +365,45 @@ function normalizeVendorModel(model: any): NormalizedVendorModel {
   } else {
     delete normalized.enableThinking;
   }
+  const vscode = normalizeModelVsCodeMetadata(model?.vscode);
+  if (vscode) {
+    normalized.vscode = vscode;
+  } else {
+    delete normalized.vscode;
+  }
   return normalized;
+}
+
+function normalizeModelVsCodeMetadata(value: any): ModelVsCodeMetadata | undefined {
+  if (!isPlainObject(value)) {
+    return undefined;
+  }
+  const metadata: ModelVsCodeMetadata = {};
+  const name = String(value.name || "").trim();
+  if (name) {
+    metadata.name = name;
+  }
+  for (const key of ["toolCalling", "vision", "thinking"] as const) {
+    if (value[key] === true || value[key] === false) {
+      metadata[key] = value[key];
+    }
+  }
+  for (const key of ["contextWindow", "maxOutputTokens"] as const) {
+    if (Number.isInteger(value[key]) && (value[key] as number) > 0) {
+      metadata[key] = value[key] as number;
+    }
+  }
+  if (Array.isArray(value.supportsReasoningEffort)) {
+    const levels = [...new Set(
+      value.supportsReasoningEffort
+        .map((level: unknown) => String(level || "").trim())
+        .filter((level: string) => (REASONING_EFFORT_LEVELS as readonly string[]).includes(level)),
+    )] as ReasoningEffortLevel[];
+    if (levels.length) {
+      metadata.supportsReasoningEffort = levels;
+    }
+  }
+  return Object.keys(metadata).length ? metadata : undefined;
 }
 
 function normalizeModelPricing(value: any): ModelPricing | undefined {

@@ -114,6 +114,14 @@ const usageSummarySchema = z.object({
   models: z.array(namedUsageAggregateSchema),
 });
 
+const vscodeSyncResultSchema = z.object({
+  ok: z.boolean(),
+  filePath: z.string(),
+  modelCount: z.number().int().nonnegative(),
+  createdProvider: z.boolean(),
+  error: z.string().optional(),
+}).loose();
+
 const optionalOptionsRequest = (schema: z.ZodType) => z.tuple([schema.optional()]);
 const contract = (request: z.ZodType, response: z.ZodType) => ({ request, response });
 
@@ -156,6 +164,7 @@ export const ipcContracts: Record<string, { request: z.ZodType; response: z.ZodT
   "update:install": contract(emptyRequest, updateStateSchema),
   "update:openReleasePage": contract(emptyRequest, okResponse),
   "clipboard:writeText": contract(z.tuple([z.string()]), okResponse),
+  "vscode:sync": contract(emptyRequest, vscodeSyncResultSchema),
 });
 
 export const ipcContractChannels = Object.freeze(Object.keys(ipcContracts)) as readonly string[];

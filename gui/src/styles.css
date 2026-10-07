@@ -1340,6 +1340,90 @@ h2 {
   color: var(--danger);
 }
 
+.vscode-model-fields {
+  display: grid;
+  gap: 8px;
+}
+
+.vscode-model-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-self: start;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-alt);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.vscode-model-toggle:hover {
+  border-color: var(--line-strong);
+  color: var(--text);
+}
+
+.vscode-model-toggle > svg {
+  transition: transform 120ms ease;
+}
+
+.vscode-model-toggle > svg.expanded {
+  transform: rotate(180deg);
+}
+
+.vscode-model-badge {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--primary-soft, rgba(99, 102, 241, 0.15));
+  color: var(--primary);
+  font-size: 10px;
+}
+
+.vscode-model-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.vscode-model-toggles {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  align-items: center;
+}
+
+.vscode-model-effort {
+  display: grid;
+  gap: 6px;
+  grid-column: 1 / -1;
+}
+
+.vscode-model-effort > span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.vscode-model-effort-options {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.vscode-sync-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .hint-action {
   padding: 0;
   border: 0;

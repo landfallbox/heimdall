@@ -12,6 +12,7 @@ import { loadPricingCache } from "../../src/pricing-updater.ts";
 import { readUsageSummary } from "../../src/usage-store.ts";
 import { readConfigStore, writeConfigStore } from "./config-store.ts";
 import { parseIpcRequest, parseIpcResponse } from "./ipc-contracts.ts";
+import { syncVsCodeModels, type VsCodeSyncResult } from "../../src/vscode-sync.ts";
 import { ensureLogFile, readLogPage, resolveLogPath } from "./log-store.ts";
 import { createTrayController, healthDetail } from "./tray-controller.ts";
 import {
@@ -344,7 +345,24 @@ async function saveConfig(_event: IpcMainInvokeEvent, payload: unknown) {
   const saved = await writeConfigStore(paths.configPath, config as NormalizedConfig, revision);
   applyPackagedLoginStartup(saved.config.app.startAtLogin);
   const reload = await reloadManagedRouterAfterSave(paths);
-  return { ...saved, paths, endpoint: getEndpoint(saved.config), ...reload };
+  const vsCodeSync = await maybeSyncVsCodeModels(saved.config);
+  return { ...saved, paths, endpoint: getEndpoint(saved.config), ...reload, vsCodeSync };
+}
+
+/**
+ * Runs the VS Code model sync after a save when the user enabled it. Failures
+ * are reported in the result but never fail the save itself.
+ */
+async function maybeSyncVsCodeModels(config: NormalizedConfig): Promise<VsCodeSyncResult | undefined> {
+  if (config.app.syncVsCodeModels !== true) {
+    return undefined;
+  }
+  return syncVsCodeModels(config);
+}
+
+async function syncVsCodeModelsNow(): Promise<VsCodeSyncResult> {
+  const { config } = await loadConfig();
+  return syncVsCodeModels(config);
 }
 
 async function reloadManagedRouterAfterSave(paths: Paths): Promise<RouterReloadResult> {
@@ -1218,6 +1236,7 @@ registerIpcHandler("clipboard:writeText", (_event, text) => {
   clipboard.writeText(String(text || ""));
   return { ok: true };
 });
+registerIpcHandler("vscode:sync", syncVsCodeModelsNow);
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 

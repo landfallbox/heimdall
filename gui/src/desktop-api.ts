@@ -9,6 +9,14 @@ export interface AppState {
   revision: string;
 }
 
+export interface VsCodeSyncResult {
+  ok: boolean;
+  filePath: string;
+  modelCount: number;
+  createdProvider: boolean;
+  error?: string;
+}
+
 export interface SaveConfigResult {
   config: unknown;
   revision: string;
@@ -16,6 +24,7 @@ export interface SaveConfigResult {
   restartRequired?: boolean;
   restartFields?: string[];
   reloadError?: string;
+  vsCodeSync?: VsCodeSyncResult;
 }
 
 export interface RouterActionResult {
@@ -56,6 +65,7 @@ export interface HeimdallDesktopApi {
   installUpdate(): Promise<UpdateState>;
   openReleasePage(): Promise<void>;
   writeClipboard(text: string): Promise<void>;
+  syncVsCodeModels(): Promise<VsCodeSyncResult>;
   onOpenSettings(callback: () => void): (() => void) | undefined;
   onConfirmClose(callback: () => void): (() => void) | undefined;
   onUpdateState(callback: (state: UpdateState) => void): (() => void) | undefined;

@@ -21,6 +21,7 @@ import {
   ChevronDown,
   ChevronRight,
   Clipboard,
+  Code2,
   Eye,
   EyeOff,
   FileCog,
@@ -49,10 +50,13 @@ import {
   normalizeVendorModelsForDraft,
   toConfig,
   toDraft,
+  REASONING_EFFORT_LEVELS,
   type ConfigInput,
   type Draft,
+  type ReasoningEffortLevel,
   type VendorDraft,
   type VendorModelDraft,
+  type VendorModelVsCodeDraft,
 } from "./config-draft.ts";
 import {
   canLoadVendorModels,
@@ -417,7 +421,7 @@ export default function App() {
     }));
   }
 
-  async function setAppSetting(field: "closeBehavior" | "startAtLogin", value: CloseBehavior | boolean) {
+  async function setAppSetting(field: "closeBehavior" | "startAtLogin" | "syncVsCodeModels", value: CloseBehavior | boolean) {
     if (busy === "saveApp" || value === persistedDraft.app[field]) {
       return;
     }
@@ -434,6 +438,16 @@ export default function App() {
       setConfigRevision(result.revision || "");
       setPersistedDraft(savedDraft);
       setDraft((current) => ({ ...current, app: savedDraft.app }));
+      if (field === "syncVsCodeModels" && value === true) {
+        setToast(vsCodeSyncToast(result.vsCodeSync));
+      }
+    });
+  }
+
+  async function syncVsCodeModelsNow() {
+    await run("vsCodeSync", async () => {
+      const result = await getDesktopApi().syncVsCodeModels();
+      setToast(vsCodeSyncToast(result));
     });
   }
 
@@ -797,6 +811,7 @@ export default function App() {
               <AppSettingsPage
                 app={draft.app}
                 setAppSetting={setAppSetting}
+                syncNow={syncVsCodeModelsNow}
                 busy={busy}
                 pricingUpdatedAt={pricingUpdatedAt}
               />
@@ -1011,6 +1026,17 @@ function configSaveMessage(result: SaveConfigResult | null | undefined, savedMes
   return savedMessage;
 }
 
+function vsCodeSyncToast(result: SaveConfigResult["vsCodeSync"]) {
+  if (!result) {
+    return "";
+  }
+  if (!result.ok) {
+    return `VS Code sync failed: ${result.error || "unknown error"}`;
+  }
+  const created = result.createdProvider ? " Created the Heimdall provider." : "";
+  return `Synced ${result.modelCount} model${result.modelCount === 1 ? "" : "s"} to VS Code.${created}`;
+}
+
 function EndpointRow({ label, endpoint, copyEndpoint }: { label: string; endpoint: string; copyEndpoint: (endpoint: string, label: string) => Promise<void> }) {
   return (
     <div className="endpoint-row">
@@ -1139,9 +1165,10 @@ function RouterPage({ draft, updateRouter, showRouterKey, setShowRouterKey, copy
   );
 }
 
-function AppSettingsPage({ app, setAppSetting, busy, pricingUpdatedAt }: {
+function AppSettingsPage({ app, setAppSetting, syncNow, busy, pricingUpdatedAt }: {
   app: Draft["app"];
-  setAppSetting: (field: "closeBehavior" | "startAtLogin", value: CloseBehavior | boolean) => Promise<void>;
+  setAppSetting: (field: "closeBehavior" | "startAtLogin" | "syncVsCodeModels", value: CloseBehavior | boolean) => Promise<void>;
+  syncNow: () => Promise<void>;
   busy: string;
   pricingUpdatedAt: string | null;
 }) {
@@ -1187,6 +1214,38 @@ function AppSettingsPage({ app, setAppSetting, busy, pricingUpdatedAt }: {
               disabled={busy === "saveApp"}
             />
           </label>
+        </div>
+      </div>
+      <div className="panel wide">
+        <PanelHeader icon={Code2} title="VS Code" />
+        <div className="form-grid">
+          <label className="app-setting-row" title="On every save, merge enabled models into VS Code's chatLanguageModels.json">
+            <span>Sync models to VS Code</span>
+            <input
+              className="checkbox"
+              type="checkbox"
+              checked={app.syncVsCodeModels === true}
+              onChange={(event) => setAppSetting("syncVsCodeModels", event.target.checked)}
+              disabled={busy === "saveApp"}
+            />
+          </label>
+          <div className="field wide">
+            <span>chatLanguageModels.json</span>
+            <div className="vscode-sync-actions">
+              <button
+                type="button"
+                className="mini-command"
+                onClick={syncNow}
+                disabled={busy === "vsCodeSync"}
+              >
+                {busy === "vsCodeSync" ? <Loader2 className="spin" size={14} /> : <RefreshCw size={14} />}
+                <span>Sync now</span>
+              </button>
+              <small className="field-hint">
+                Merges enabled models into the Heimdall provider without touching other providers or VS Code secrets.
+              </small>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1779,6 +1838,13 @@ function ModelPricingRow({
           onChange={(field, value) => updateVendorModel(index, field, value)}
         />
       </div>
+
+      <VsCodeModelFields
+        model={model}
+        updateVendorModel={updateVendorModel}
+        modelIndex={index}
+      />
+
       {customPricing && !isValidCustomPricing(model) ? (
         <small className="model-row-message error">
           Enter valid non-negative prices for {model.id || "this model"}.
@@ -1816,6 +1882,126 @@ function formatPeakHours(peakHours: number[][] | null | undefined) {
   return `${peakHours
     .map(([start, end]) => `${String(start).padStart(2, "0")}:00–${String(end).padStart(2, "0")}:00`)
     .join(", ")} UTC`;
+}
+
+function VsCodeModelFields({ model, updateVendorModel, modelIndex }: {
+  model: VendorModelDraft;
+  updateVendorModel: (modelIndex: number, field: string, value: unknown) => void;
+  modelIndex: number;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const vscode = model.vscode;
+  const hasMetadata = Boolean(vscode && Object.keys(vscode).length);
+
+  function updateVsCode(patch: Partial<VendorModelVsCodeDraft>) {
+    const next: VendorModelVsCodeDraft = { ...vscode, ...patch };
+    // Drop keys that are empty so we never write a useless metadata block.
+    for (const key of Object.keys(next) as Array<keyof VendorModelVsCodeDraft>) {
+      const value = next[key];
+      if (value === undefined || value === "" || (Array.isArray(value) && !value.length)) {
+        delete next[key];
+      }
+    }
+    updateVendorModel(modelIndex, "vscode", Object.keys(next).length ? next : undefined);
+  }
+
+  function toggleReasoningEffort(level: ReasoningEffortLevel) {
+    const current = vscode?.supportsReasoningEffort || [];
+    const next = current.includes(level)
+      ? current.filter((item) => item !== level)
+      : [...current, level];
+    updateVsCode({ supportsReasoningEffort: next });
+  }
+
+  return (
+    <div className="vscode-model-fields">
+      <button
+        type="button"
+        className="vscode-model-toggle"
+        onClick={() => setExpanded((current) => !current)}
+        aria-expanded={expanded}
+      >
+        <ChevronDown className={expanded ? "expanded" : ""} size={14} />
+        <span>VS Code metadata</span>
+        {hasMetadata && <span className="vscode-model-badge">{Object.keys(vscode as object).length} set</span>}
+      </button>
+      {expanded && (
+        <div className="vscode-model-grid">
+          <label className="price-input">
+            <span>Display name</span>
+            <input
+              value={vscode?.name || ""}
+              placeholder={model.id || "Model id"}
+              onChange={(event) => updateVsCode({ name: event.target.value })}
+            />
+          </label>
+          <label className="price-input">
+            <span>Context window</span>
+            <input
+              value={vscode?.contextWindow || ""}
+              inputMode="numeric"
+              placeholder="e.g. 128000"
+              onChange={(event) => updateVsCode({ contextWindow: event.target.value })}
+            />
+          </label>
+          <label className="price-input">
+            <span>Max output tokens</span>
+            <input
+              value={vscode?.maxOutputTokens || ""}
+              inputMode="numeric"
+              placeholder="e.g. 16384"
+              onChange={(event) => updateVsCode({ maxOutputTokens: event.target.value })}
+            />
+          </label>
+          <div className="vscode-model-toggles">
+            <label className="toggle-row compact" title="Model can call tools">
+              <input
+                className="checkbox"
+                type="checkbox"
+                checked={vscode?.toolCalling === true}
+                onChange={(event) => updateVsCode({ toolCalling: event.target.checked })}
+              />
+              <span>Tool calling</span>
+            </label>
+            <label className="toggle-row compact" title="Model accepts image input">
+              <input
+                className="checkbox"
+                type="checkbox"
+                checked={vscode?.vision === true}
+                onChange={(event) => updateVsCode({ vision: event.target.checked })}
+              />
+              <span>Vision</span>
+            </label>
+            <label className="toggle-row compact" title="Model supports a thinking / reasoning mode">
+              <input
+                className="checkbox"
+                type="checkbox"
+                checked={vscode?.thinking === true}
+                onChange={(event) => updateVsCode({ thinking: event.target.checked })}
+              />
+              <span>Thinking</span>
+            </label>
+          </div>
+          <div className="vscode-model-effort">
+            <span>Reasoning effort</span>
+            <div className="vscode-model-effort-options">
+              {REASONING_EFFORT_LEVELS.map((level) => (
+                <label className="toggle-row compact" key={level}>
+                  <input
+                    className="checkbox"
+                    type="checkbox"
+                    checked={vscode?.supportsReasoningEffort?.includes(level) === true}
+                    onChange={() => toggleReasoningEffort(level)}
+                  />
+                  <span>{level}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function PricingFields({ currency, input, cached, output, editable, available, onChange }: {

@@ -96,6 +96,21 @@ Example client entry:
 }
 ```
 
+### Syncing models to VS Code
+
+Instead of hand-editing VS Code's `chatLanguageModels.json`, the GUI can write the file for you. On the Application page, turn on **Sync models to VS Code**. From then on, every time you save the configuration, Heimdall merges your enabled models into VS Code's file under a dedicated `Heimdall` provider (the router base URL plus `/v1`, and your `router.apiKey`).
+
+The merge is conservative:
+
+- Other providers in the file (for example VS Code's own `Copilot` provider) and their settings are left untouched.
+- A model's existing metadata is kept; Heimdall only overrides the fields it explicitly provides.
+- Models you disable or remove are dropped from the `Heimdall` provider on the next save.
+- If VS Code already stores the provider's `apiKey` as a secret reference (`${input:chat.lm.secret.…}`), that reference is never replaced — opaque secrets can only be managed inside VS Code.
+
+Per-model VS Code metadata (display name, tool calling, vision, thinking, context window, max output tokens, supported reasoning effort) is optional. Expand **VS Code metadata** on a model row in Vendor Settings to fill it in; only the fields you set are written, so a partial entry never clobbers richer metadata you already have in the file.
+
+The target file follows VS Code's per-platform user settings directory (`%APPDATA%\Code\User\chatLanguageModels.json` on Windows, `~/Library/Application Support/Code/User/chatLanguageModels.json` on macOS, `~/.config/Code/User/chatLanguageModels.json` on Linux) and can be overridden with `HEIMDALL_VSCODE_MODELS_FILE`. A **Sync now** button on the Application page runs the merge immediately without changing the configuration.
+
 ## Important Boundaries
 
 - Fallback is enabled for request timeouts, network failures before a response, `408`, `409`, `425`, `429`, `500`, `502`, `503`, `504`, and other `5xx` responses.
@@ -128,6 +143,7 @@ The main runtime boundaries are:
 - `gui/electron/main.ts`: Electron lifecycle, tray, IPC registration, and orchestration.
 - `gui/electron/config-store.ts`: validated, revision-checked, atomic configuration writes.
 - `gui/electron/log-store.ts`: byte-cursor log pagination.
+- `src/vscode-sync.ts`: builds the model entries from the config and merges them into VS Code's `chatLanguageModels.json` (other providers, secret references, and existing metadata are preserved).
 - `gui/src/config-draft.ts`: lossless conversion between persisted configuration and form state.
 
 The Router process is owned by the Electron main process and does not outlive an explicit app exit. The current app session uses a private parent-child IPC channel for graceful shutdown, with forced termination only as a timeout fallback. PID metadata and instance identity are retained for recovery after an abnormal app exit.

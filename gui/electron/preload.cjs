@@ -32,6 +32,7 @@ contextBridge.exposeInMainWorld("heimdall", {
   installUpdate: () => ipcRenderer.invoke("update:install"),
   openReleasePage: () => ipcRenderer.invoke("update:openReleasePage"),
   writeClipboard: (text) => ipcRenderer.invoke("clipboard:writeText", text),
+  syncVsCodeModels: () => ipcRenderer.invoke("vscode:sync"),
   onOpenSettings: (callback) => {
     const listener = () => callback();
     ipcRenderer.on("app:openSettings", listener);
