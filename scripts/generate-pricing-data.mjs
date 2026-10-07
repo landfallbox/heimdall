@@ -46,7 +46,8 @@ if (process.argv.includes("--check")) {
     console.error("src/pricing-data.ts is missing. Run `npm run pricing:generate`.");
     process.exit(1);
   }
-  if (existing !== rendered) {
+  // Normalize CRLF so the check passes on Windows checkouts (core.autocrlf).
+  if (existing.replace(/\r\n/g, "\n") !== rendered) {
     console.error("src/pricing-data.ts is out of date. Run `npm run pricing:generate`.");
     process.exit(1);
   }
