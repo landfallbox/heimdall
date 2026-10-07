@@ -1,3 +1,4 @@
+import type { RemotePricingData } from "../../src/usage.ts";
 import type { HealthState, LogPage, UpdateState, UsageSummary } from "./types.ts";
 
 export interface AppState {
@@ -26,6 +27,11 @@ export interface VendorModelListResult {
   models: string[];
 }
 
+export interface PricingCacheResult {
+  ok: boolean;
+  data: RemotePricingData | null;
+}
+
 export interface HeimdallDesktopApi {
   getState(): Promise<AppState>;
   rendererReady(): Promise<void>;
@@ -41,6 +47,7 @@ export interface HeimdallDesktopApi {
   checkHealth(options?: { includeProcessCount?: boolean }): Promise<HealthState>;
   readLogs(options?: { limit?: number; before?: number | null }): Promise<LogPage>;
   readUsageSummary(options?: { vendor?: string; model?: string }): Promise<UsageSummary>;
+  loadPricingCache(): Promise<PricingCacheResult>;
   openConfig(): Promise<void>;
   openLog(): Promise<void>;
   getUpdateState(): Promise<UpdateState>;

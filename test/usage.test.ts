@@ -38,6 +38,15 @@ const defaultPricing = resolveModelPricing("gpt-5-mini-2025-08-07", undefined)!;
 assert.equal(defaultPricing.source, "openai");
 assert.equal(defaultPricing.sourceModel, "gpt-5-mini");
 assert.equal(resolveModelPricing("gpt-5-future-variant", undefined), null);
+assert.equal(resolveModelPricing("gpt-6-sol", undefined)!.outputPerMillion, 10);
+assert.equal(resolveModelPricing("gpt-6-luna", undefined)!.inputPerMillion, 0.1);
+assert.equal(resolveModelPricing("gpt-5.2-codex", undefined)!.outputPerMillion, 14);
+assert.equal(resolveModelPricing("gpt-5.1-codex", undefined)!.inputPerMillion, 1.25);
+assert.equal(resolveModelPricing("gpt-5.3-instant", undefined)!.outputPerMillion, 14);
+assert.equal(resolveModelPricing("gpt-5.2-instant", undefined)!.inputPerMillion, 1.5);
+assert.equal(resolveModelPricing("gpt-5.6-sol", undefined)!.inputPerMillion, 4);
+assert.equal(resolveModelPricing("gpt-5.6-sol", undefined)!.cachedInputPerMillion, 0.4);
+assert.equal(resolveModelPricing("gpt-5.6-sol", undefined)!.outputPerMillion, 20);
 assert.deepEqual(estimateUsageCost(chatUsage, defaultPricing), {
   amount: 0.000119375,
   currency: "USD",
@@ -128,6 +137,24 @@ assert.equal(anthropicPricing.inputPerMillion, 1);
 assert.equal(anthropicPricing.cachedInputPerMillion, 0.1);
 assert.equal(anthropicPricing.outputPerMillion, 5);
 assert.equal(resolveModelPricing("claude-future-model", { mode: "anthropic" }), null);
+
+const opus55Pricing = resolveModelPricing("claude-opus-5-5", { mode: "anthropic" })!;
+assert.equal(opus55Pricing.sourceModel, "claude-opus-5-5");
+assert.equal(opus55Pricing.inputPerMillion, 4);
+assert.equal(opus55Pricing.cachedInputPerMillion, 0.2);
+assert.equal(opus55Pricing.outputPerMillion, 20);
+assert.equal(getCatalogPriceView("anthropic", "claude-opus-5-5")!.sourceModel, "claude-opus-5-5");
+assert.equal(resolveModelPricing("claude-opus-4-8", { mode: "anthropic" })!.outputPerMillion, 25);
+assert.equal(resolveModelPricing("claude-opus-4-7", { mode: "anthropic" })!.inputPerMillion, 5);
+assert.equal(resolveModelPricing("claude-opus-4-5", { mode: "anthropic" })!.outputPerMillion, 25);
+assert.equal(resolveModelPricing("claude-opus-4-1", { mode: "anthropic" })!.outputPerMillion, 75);
+assert.equal(resolveModelPricing("claude-sonnet-5-5", { mode: "anthropic" })!.inputPerMillion, 2);
+assert.equal(resolveModelPricing("claude-sonnet-5", { mode: "anthropic" })!.outputPerMillion, 10);
+assert.equal(resolveModelPricing("claude-sonnet-4-6", { mode: "anthropic" })!.outputPerMillion, 15);
+assert.equal(resolveModelPricing("claude-sonnet-4-5", { mode: "anthropic" })!.outputPerMillion, 15);
+assert.equal(resolveModelPricing("claude-haiku-4-5", { mode: "anthropic" })!.inputPerMillion, 1);
+assert.equal(resolveModelPricing("claude-fable-5-1", { mode: "anthropic" })!.inputPerMillion, 10);
+assert.equal(resolveModelPricing("claude-fable-5-1", { mode: "anthropic" })!.outputPerMillion, 50);
 
 const geminiPricing = resolveModelPricing("gemini-3.1-pro", { mode: "google" })!;
 assert.equal(geminiPricing.source, "google");

@@ -722,6 +722,11 @@ h2 {
   min-width: 0;
 }
 
+.setting-value {
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .field.wide {
   grid-column: 1 / -1;
 }

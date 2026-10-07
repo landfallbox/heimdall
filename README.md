@@ -55,7 +55,9 @@ In the GUI, set:
 
 Each vendor can support multiple models. Requests are routed only to vendors that list the requested model id, and the same model id is sent to the selected upstream provider.
 
-The Usage page reports daily, weekly, and monthly input/output token totals, a 30-day trend, and current-month vendor/model breakdowns. Known model ids use the standard API prices published by each provider; the bundled catalogs (OpenAI, DeepSeek, Anthropic, Google Gemini, Kimi, GLM, Xiaomi MiMo) record their source URL and update date in `src/usage.ts`. DeepSeek moved to peak/off-peak billing on 2026-08-16, so DeepSeek estimates pick the peak or off-peak rate card from the request's UTC hour (peak hours 01:00-04:00 and 06:00-10:00 UTC). Select `Custom` in Vendor Settings to override prices or price models outside the built-in catalogs. Each event stores its price snapshot so later configuration changes do not rewrite historical estimates.
+The Usage page reports daily, weekly, and monthly input/output token totals, a 30-day trend, and current-month vendor/model breakdowns. Known model ids use the standard API prices published by each provider; the bundled catalogs (OpenAI, DeepSeek, Anthropic, Google Gemini, Kimi, GLM, Xiaomi MiMo) are generated from `data/pricing.json` into `src/pricing-data.ts` and record their source URL and update date there. DeepSeek moved to peak/off-peak billing on 2026-08-16, so DeepSeek estimates pick the peak or off-peak rate card from the request's UTC hour (peak hours 01:00-04:00 and 06:00-10:00 UTC). Select `Custom` in Vendor Settings to override prices or price models outside the built-in catalogs. Each event stores its price snapshot so later configuration changes do not rewrite historical estimates.
+
+Catalogs can be updated without shipping a new app release. `data/pricing.json` is the single source of truth for model pricing. The Router fetches it from the repository (override the URL with `HEIMDALL_PRICING_URL`), caches it as `pricing-cache.json` next to `config.json`, and re-checks every 24 hours; when the fetch fails, the last cache and the bundled tables keep working. To publish a price change, edit `data/pricing.json`, bump its top-level `updatedAt` (YYYY-MM-DD), run `npm run pricing:generate` to refresh the bundled fallback, and commit both files — remote entries override the built-in catalog per model, and built-in entries are never removed. The GUI shows the effective catalog source on the Application page.
 
 Keep `config.json` private. It is ignored by git and may contain API keys. The desktop app manages the Router process and performs health checks internally.
 
@@ -119,7 +121,9 @@ The main runtime boundaries are:
 - `src/vendor-circuit-breaker.ts`: per-vendor, per-model passive failure tracking and half-open recovery.
 - `src/runtime-config.ts`: file and environment configuration for the Router process.
 - `src/logger.ts`: structured logging and recursive secret redaction.
-- `src/usage.ts`: usage normalization and provider catalogs (OpenAI, DeepSeek peak/off-peak, Anthropic, Google, Kimi, GLM, MiMo) / custom token pricing.
+- `src/usage.ts`: usage normalization, provider catalog wiring (OpenAI, DeepSeek peak/off-peak, Anthropic, Google, Kimi, GLM, MiMo), and custom token pricing.
+- `data/pricing.json` / `src/pricing-data.ts`: the single source of truth for model pricing and the generated bundled fallback it produces (`npm run pricing:generate`).
+- `src/pricing-updater.ts`: remote pricing fetch, `pricing-cache.json` persistence, and the 24-hour refresh loop.
 - `src/usage-store.ts`: monthly JSONL persistence and local-calendar aggregation.
 - `gui/electron/main.ts`: Electron lifecycle, tray, IPC registration, and orchestration.
 - `gui/electron/config-store.ts`: validated, revision-checked, atomic configuration writes.

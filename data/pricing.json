@@ -1,0 +1,720 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-10-07",
+  "catalogs": {
+    "openai": {
+      "sourceUrl": "https://developers.openai.com/api/docs/pricing",
+      "updatedAt": "2026-10-07",
+      "models": {
+        "gpt-6-astra": {
+          "currency": "USD",
+          "inputPerMillion": 10,
+          "cachedInputPerMillion": 1,
+          "outputPerMillion": 50
+        },
+        "gpt-6-sol": {
+          "currency": "USD",
+          "inputPerMillion": 2,
+          "cachedInputPerMillion": 0.2,
+          "outputPerMillion": 10
+        },
+        "gpt-6-luna": {
+          "currency": "USD",
+          "inputPerMillion": 0.1,
+          "cachedInputPerMillion": 0.01,
+          "outputPerMillion": 0.5
+        },
+        "gpt-5.6-sol": {
+          "currency": "USD",
+          "inputPerMillion": 4,
+          "cachedInputPerMillion": 0.4,
+          "outputPerMillion": 20
+        },
+        "gpt-5.6-terra": {
+          "currency": "USD",
+          "inputPerMillion": 2,
+          "cachedInputPerMillion": 0.2,
+          "outputPerMillion": 12
+        },
+        "gpt-5.6-luna": {
+          "currency": "USD",
+          "inputPerMillion": 0.2,
+          "cachedInputPerMillion": 0.02,
+          "outputPerMillion": 1.2
+        },
+        "gpt-5.5": {
+          "currency": "USD",
+          "inputPerMillion": 5,
+          "cachedInputPerMillion": 0.5,
+          "outputPerMillion": 30
+        },
+        "gpt-5.5-pro": {
+          "currency": "USD",
+          "inputPerMillion": 30,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 180
+        },
+        "gpt-5.4": {
+          "currency": "USD",
+          "inputPerMillion": 2.5,
+          "cachedInputPerMillion": 0.25,
+          "outputPerMillion": 15
+        },
+        "gpt-5.4-mini": {
+          "currency": "USD",
+          "inputPerMillion": 0.75,
+          "cachedInputPerMillion": 0.075,
+          "outputPerMillion": 4.5
+        },
+        "gpt-5.4-nano": {
+          "currency": "USD",
+          "inputPerMillion": 0.2,
+          "cachedInputPerMillion": 0.02,
+          "outputPerMillion": 1.25
+        },
+        "gpt-5.4-pro": {
+          "currency": "USD",
+          "inputPerMillion": 30,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 180
+        },
+        "gpt-5.3-codex": {
+          "currency": "USD",
+          "inputPerMillion": 1.75,
+          "cachedInputPerMillion": 0.175,
+          "outputPerMillion": 14
+        },
+        "gpt-5.2-codex": {
+          "currency": "USD",
+          "inputPerMillion": 1.75,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 14
+        },
+        "gpt-5.1-codex": {
+          "currency": "USD",
+          "inputPerMillion": 1.25,
+          "cachedInputPerMillion": 0.125,
+          "outputPerMillion": 10
+        },
+        "gpt-5.3-instant": {
+          "currency": "USD",
+          "inputPerMillion": 1.75,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 14
+        },
+        "gpt-5.2-instant": {
+          "currency": "USD",
+          "inputPerMillion": 1.5,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 6
+        },
+        "gpt-5.2": {
+          "currency": "USD",
+          "inputPerMillion": 1.75,
+          "cachedInputPerMillion": 0.175,
+          "outputPerMillion": 14
+        },
+        "gpt-5.2-pro": {
+          "currency": "USD",
+          "inputPerMillion": 21,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 168
+        },
+        "gpt-5.1": {
+          "currency": "USD",
+          "inputPerMillion": 1.25,
+          "cachedInputPerMillion": 0.125,
+          "outputPerMillion": 10
+        },
+        "gpt-5": {
+          "currency": "USD",
+          "inputPerMillion": 1.25,
+          "cachedInputPerMillion": 0.125,
+          "outputPerMillion": 10
+        },
+        "gpt-5-mini": {
+          "currency": "USD",
+          "inputPerMillion": 0.25,
+          "cachedInputPerMillion": 0.025,
+          "outputPerMillion": 2
+        },
+        "gpt-5-nano": {
+          "currency": "USD",
+          "inputPerMillion": 0.05,
+          "cachedInputPerMillion": 0.005,
+          "outputPerMillion": 0.4
+        },
+        "gpt-5-pro": {
+          "currency": "USD",
+          "inputPerMillion": 15,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 120
+        },
+        "gpt-5-search-api": {
+          "currency": "USD",
+          "inputPerMillion": 1.25,
+          "cachedInputPerMillion": 0.125,
+          "outputPerMillion": 10
+        },
+        "gpt-4.1": {
+          "currency": "USD",
+          "inputPerMillion": 2,
+          "cachedInputPerMillion": 0.5,
+          "outputPerMillion": 8
+        },
+        "gpt-4.1-mini": {
+          "currency": "USD",
+          "inputPerMillion": 0.4,
+          "cachedInputPerMillion": 0.1,
+          "outputPerMillion": 1.6
+        },
+        "gpt-4.1-nano": {
+          "currency": "USD",
+          "inputPerMillion": 0.1,
+          "cachedInputPerMillion": 0.025,
+          "outputPerMillion": 0.4
+        },
+        "gpt-4o": {
+          "currency": "USD",
+          "inputPerMillion": 2.5,
+          "cachedInputPerMillion": 1.25,
+          "outputPerMillion": 10
+        },
+        "gpt-4o-2024-05-13": {
+          "currency": "USD",
+          "inputPerMillion": 5,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 15
+        },
+        "gpt-4o-mini": {
+          "currency": "USD",
+          "inputPerMillion": 0.15,
+          "cachedInputPerMillion": 0.075,
+          "outputPerMillion": 0.6
+        },
+        "o1": {
+          "currency": "USD",
+          "inputPerMillion": 15,
+          "cachedInputPerMillion": 7.5,
+          "outputPerMillion": 60
+        },
+        "o1-pro": {
+          "currency": "USD",
+          "inputPerMillion": 150,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 600
+        },
+        "o3": {
+          "currency": "USD",
+          "inputPerMillion": 2,
+          "cachedInputPerMillion": 0.5,
+          "outputPerMillion": 8
+        },
+        "o3-pro": {
+          "currency": "USD",
+          "inputPerMillion": 20,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 80
+        },
+        "o3-mini": {
+          "currency": "USD",
+          "inputPerMillion": 1.1,
+          "cachedInputPerMillion": 0.55,
+          "outputPerMillion": 4.4
+        },
+        "o4-mini": {
+          "currency": "USD",
+          "inputPerMillion": 1.1,
+          "cachedInputPerMillion": 0.275,
+          "outputPerMillion": 4.4
+        },
+        "gpt-4-turbo-2024-04-09": {
+          "currency": "USD",
+          "inputPerMillion": 10,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 30
+        },
+        "gpt-4-0613": {
+          "currency": "USD",
+          "inputPerMillion": 30,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 60
+        },
+        "gpt-3.5-turbo": {
+          "currency": "USD",
+          "inputPerMillion": 0.5,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 1.5
+        },
+        "gpt-3.5-turbo-0125": {
+          "currency": "USD",
+          "inputPerMillion": 0.5,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 1.5
+        },
+        "gpt-3.5-turbo-1106": {
+          "currency": "USD",
+          "inputPerMillion": 1,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 2
+        },
+        "gpt-3.5-turbo-instruct": {
+          "currency": "USD",
+          "inputPerMillion": 1.5,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 2
+        },
+        "davinci-002": {
+          "currency": "USD",
+          "inputPerMillion": 2,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 2
+        },
+        "babbage-002": {
+          "currency": "USD",
+          "inputPerMillion": 0.4,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 0.4
+        },
+        "chat-latest": {
+          "currency": "USD",
+          "inputPerMillion": 5,
+          "cachedInputPerMillion": 0.5,
+          "outputPerMillion": 30
+        }
+      }
+    },
+    "deepseek": {
+      "sourceUrl": "https://api-docs.deepseek.com/quick_start/pricing",
+      "updatedAt": "2026-08-16",
+      "models": {
+        "deepseek-v4-flash": {
+          "peak": {
+            "currency": "CNY",
+            "inputPerMillion": 0.44,
+            "cachedInputPerMillion": 0.014,
+            "outputPerMillion": 1.32
+          },
+          "offPeak": {
+            "currency": "CNY",
+            "inputPerMillion": 0.22,
+            "cachedInputPerMillion": 0.007,
+            "outputPerMillion": 0.66
+          }
+        },
+        "deepseek-v4.1-flash": {
+          "peak": {
+            "currency": "CNY",
+            "inputPerMillion": 2,
+            "cachedInputPerMillion": 0.04,
+            "outputPerMillion": 8
+          },
+          "offPeak": {
+            "currency": "CNY",
+            "inputPerMillion": 1,
+            "cachedInputPerMillion": 0.02,
+            "outputPerMillion": 4
+          }
+        },
+        "deepseek-v4-pro": {
+          "peak": {
+            "currency": "CNY",
+            "inputPerMillion": 1.32,
+            "cachedInputPerMillion": 0.044,
+            "outputPerMillion": 3.96
+          },
+          "offPeak": {
+            "currency": "CNY",
+            "inputPerMillion": 0.66,
+            "cachedInputPerMillion": 0.022,
+            "outputPerMillion": 1.98
+          }
+        }
+      }
+    },
+    "anthropic": {
+      "sourceUrl": "https://platform.claude.com/docs/en/about-claude/pricing",
+      "updatedAt": "2026-10-07",
+      "models": {
+        "claude-opus-5-5": {
+          "currency": "USD",
+          "inputPerMillion": 4,
+          "cachedInputPerMillion": 0.2,
+          "outputPerMillion": 20
+        },
+        "claude-opus-5": {
+          "currency": "USD",
+          "inputPerMillion": 5,
+          "cachedInputPerMillion": 0.5,
+          "outputPerMillion": 25
+        },
+        "claude-opus-4-8": {
+          "currency": "USD",
+          "inputPerMillion": 5,
+          "cachedInputPerMillion": 0.5,
+          "outputPerMillion": 25
+        },
+        "claude-opus-4-7": {
+          "currency": "USD",
+          "inputPerMillion": 5,
+          "cachedInputPerMillion": 0.5,
+          "outputPerMillion": 25
+        },
+        "claude-opus-4-6": {
+          "currency": "USD",
+          "inputPerMillion": 5,
+          "cachedInputPerMillion": 0.5,
+          "outputPerMillion": 25
+        },
+        "claude-opus-4.6": {
+          "currency": "USD",
+          "inputPerMillion": 5,
+          "cachedInputPerMillion": 0.5,
+          "outputPerMillion": 25
+        },
+        "claude-opus-4-5": {
+          "currency": "USD",
+          "inputPerMillion": 5,
+          "cachedInputPerMillion": 0.5,
+          "outputPerMillion": 25
+        },
+        "claude-opus-4.5": {
+          "currency": "USD",
+          "inputPerMillion": 5,
+          "cachedInputPerMillion": 0.5,
+          "outputPerMillion": 25
+        },
+        "claude-opus-4-1": {
+          "currency": "USD",
+          "inputPerMillion": 15,
+          "cachedInputPerMillion": 1.5,
+          "outputPerMillion": 75
+        },
+        "claude-opus-4.1": {
+          "currency": "USD",
+          "inputPerMillion": 15,
+          "cachedInputPerMillion": 1.5,
+          "outputPerMillion": 75
+        },
+        "claude-sonnet-5-5": {
+          "currency": "USD",
+          "inputPerMillion": 2,
+          "cachedInputPerMillion": 0.2,
+          "outputPerMillion": 10
+        },
+        "claude-sonnet-5": {
+          "currency": "USD",
+          "inputPerMillion": 2,
+          "cachedInputPerMillion": 0.2,
+          "outputPerMillion": 10
+        },
+        "claude-sonnet-4-6": {
+          "currency": "USD",
+          "inputPerMillion": 3,
+          "cachedInputPerMillion": 0.3,
+          "outputPerMillion": 15
+        },
+        "claude-sonnet-4.6": {
+          "currency": "USD",
+          "inputPerMillion": 3,
+          "cachedInputPerMillion": 0.3,
+          "outputPerMillion": 15
+        },
+        "claude-sonnet-4-5": {
+          "currency": "USD",
+          "inputPerMillion": 3,
+          "cachedInputPerMillion": 0.3,
+          "outputPerMillion": 15
+        },
+        "claude-sonnet-4.5": {
+          "currency": "USD",
+          "inputPerMillion": 3,
+          "cachedInputPerMillion": 0.3,
+          "outputPerMillion": 15
+        },
+        "claude-sonnet-4": {
+          "currency": "USD",
+          "inputPerMillion": 3,
+          "cachedInputPerMillion": 0.3,
+          "outputPerMillion": 15
+        },
+        "claude-haiku-4-5": {
+          "currency": "USD",
+          "inputPerMillion": 1,
+          "cachedInputPerMillion": 0.1,
+          "outputPerMillion": 5
+        },
+        "claude-haiku-4.5": {
+          "currency": "USD",
+          "inputPerMillion": 1,
+          "cachedInputPerMillion": 0.1,
+          "outputPerMillion": 5
+        },
+        "claude-fable-5-1": {
+          "currency": "USD",
+          "inputPerMillion": 10,
+          "cachedInputPerMillion": 0.25,
+          "outputPerMillion": 50
+        },
+        "claude-mythos-5-1": {
+          "currency": "USD",
+          "inputPerMillion": 10,
+          "cachedInputPerMillion": 0.25,
+          "outputPerMillion": 50
+        },
+        "claude-3-5-sonnet": {
+          "currency": "USD",
+          "inputPerMillion": 3,
+          "cachedInputPerMillion": 0.3,
+          "outputPerMillion": 15
+        },
+        "claude-3-5-haiku": {
+          "currency": "USD",
+          "inputPerMillion": 0.8,
+          "cachedInputPerMillion": 0.08,
+          "outputPerMillion": 4
+        },
+        "claude-3-opus": {
+          "currency": "USD",
+          "inputPerMillion": 15,
+          "cachedInputPerMillion": 1.5,
+          "outputPerMillion": 75
+        },
+        "claude-3-haiku": {
+          "currency": "USD",
+          "inputPerMillion": 0.25,
+          "cachedInputPerMillion": 0.025,
+          "outputPerMillion": 1.25
+        }
+      }
+    },
+    "google": {
+      "sourceUrl": "https://ai.google.dev/gemini-api/docs/pricing",
+      "updatedAt": "2026-10-01",
+      "models": {
+        "gemini-3.1-pro": {
+          "currency": "USD",
+          "inputPerMillion": 2,
+          "cachedInputPerMillion": 0.2,
+          "outputPerMillion": 12
+        },
+        "gemini-3-pro": {
+          "currency": "USD",
+          "inputPerMillion": 2,
+          "cachedInputPerMillion": 0.2,
+          "outputPerMillion": 12
+        },
+        "gemini-3.5-flash": {
+          "currency": "USD",
+          "inputPerMillion": 1.5,
+          "cachedInputPerMillion": 0.15,
+          "outputPerMillion": 9
+        },
+        "gemini-3.8-flash": {
+          "currency": "USD",
+          "inputPerMillion": 0.75,
+          "cachedInputPerMillion": 0.075,
+          "outputPerMillion": 3.75
+        },
+        "gemini-3.7-flash": {
+          "currency": "USD",
+          "inputPerMillion": 0.75,
+          "cachedInputPerMillion": 0.075,
+          "outputPerMillion": 3.75
+        },
+        "gemini-3.6-flash": {
+          "currency": "USD",
+          "inputPerMillion": 0.75,
+          "cachedInputPerMillion": 0.075,
+          "outputPerMillion": 3.75
+        },
+        "gemini-3-flash": {
+          "currency": "USD",
+          "inputPerMillion": 0.5,
+          "cachedInputPerMillion": 0.05,
+          "outputPerMillion": 3
+        },
+        "gemini-3.5-flash-lite": {
+          "currency": "USD",
+          "inputPerMillion": 0.3,
+          "cachedInputPerMillion": 0.03,
+          "outputPerMillion": 2.5
+        },
+        "gemini-3.1-flash-lite": {
+          "currency": "USD",
+          "inputPerMillion": 0.25,
+          "cachedInputPerMillion": 0.025,
+          "outputPerMillion": 1.5
+        },
+        "gemini-2.5-pro": {
+          "currency": "USD",
+          "inputPerMillion": 1.25,
+          "cachedInputPerMillion": 0.125,
+          "outputPerMillion": 10
+        },
+        "gemini-2.5-flash": {
+          "currency": "USD",
+          "inputPerMillion": 0.3,
+          "cachedInputPerMillion": 0.03,
+          "outputPerMillion": 2.5
+        },
+        "gemini-2.5-flash-lite": {
+          "currency": "USD",
+          "inputPerMillion": 0.1,
+          "cachedInputPerMillion": 0.01,
+          "outputPerMillion": 0.4
+        }
+      }
+    },
+    "kimi": {
+      "sourceUrl": "https://platform.kimi.ai/docs/pricing/chat.md",
+      "updatedAt": "2026-09-20",
+      "models": {
+        "kimi-k3": {
+          "currency": "USD",
+          "inputPerMillion": 3,
+          "cachedInputPerMillion": 0.3,
+          "outputPerMillion": 15
+        },
+        "kimi-k2.7-code": {
+          "currency": "USD",
+          "inputPerMillion": 0.95,
+          "cachedInputPerMillion": 0.19,
+          "outputPerMillion": 4
+        },
+        "kimi-k2.7-code-highspeed": {
+          "currency": "USD",
+          "inputPerMillion": 1.9,
+          "cachedInputPerMillion": 0.38,
+          "outputPerMillion": 8
+        },
+        "kimi-k2.6": {
+          "currency": "USD",
+          "inputPerMillion": 0.95,
+          "cachedInputPerMillion": 0.16,
+          "outputPerMillion": 4
+        },
+        "kimi-k2.5": {
+          "currency": "USD",
+          "inputPerMillion": 0.6,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 3
+        },
+        "kimi-k2": {
+          "currency": "USD",
+          "inputPerMillion": 0.6,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 2.5
+        }
+      }
+    },
+    "glm": {
+      "sourceUrl": "https://docs.bigmodel.cn/cn/guide/start/pricing.md",
+      "updatedAt": "2026-09-28",
+      "models": {
+        "glm-5.3": {
+          "currency": "CNY",
+          "inputPerMillion": 8,
+          "cachedInputPerMillion": 2,
+          "outputPerMillion": 28
+        },
+        "glm-5.3-flash": {
+          "currency": "CNY",
+          "inputPerMillion": 0.8,
+          "cachedInputPerMillion": 0.23,
+          "outputPerMillion": 2.8
+        },
+        "glm-5.3-flashx": {
+          "currency": "CNY",
+          "inputPerMillion": 2,
+          "cachedInputPerMillion": 0.57,
+          "outputPerMillion": 7
+        },
+        "glm-5.2": {
+          "currency": "CNY",
+          "inputPerMillion": 8,
+          "cachedInputPerMillion": 2,
+          "outputPerMillion": 28
+        },
+        "glm-5.1": {
+          "currency": "CNY",
+          "inputPerMillion": 6,
+          "cachedInputPerMillion": 1.3,
+          "outputPerMillion": 24
+        },
+        "glm-5-turbo": {
+          "currency": "CNY",
+          "inputPerMillion": 5,
+          "cachedInputPerMillion": 1.2,
+          "outputPerMillion": 22
+        },
+        "glm-5": {
+          "currency": "CNY",
+          "inputPerMillion": 4,
+          "cachedInputPerMillion": 1,
+          "outputPerMillion": 18
+        },
+        "glm-4.7": {
+          "currency": "CNY",
+          "inputPerMillion": 2,
+          "cachedInputPerMillion": 0.4,
+          "outputPerMillion": 8
+        },
+        "glm-4.5-air": {
+          "currency": "CNY",
+          "inputPerMillion": 0.8,
+          "cachedInputPerMillion": 0.16,
+          "outputPerMillion": 2
+        },
+        "glm-4.6v": {
+          "currency": "CNY",
+          "inputPerMillion": 1,
+          "cachedInputPerMillion": 0.2,
+          "outputPerMillion": 3
+        },
+        "glm-4.7-flashx": {
+          "currency": "CNY",
+          "inputPerMillion": 0.5,
+          "cachedInputPerMillion": 0.1,
+          "outputPerMillion": 3
+        }
+      }
+    },
+    "mimo": {
+      "sourceUrl": "https://mimo.mi.com/docs/zh-CN/pricing",
+      "updatedAt": "2026-10-06",
+      "models": {
+        "mimo-v2.6-pro": {
+          "currency": "CNY",
+          "inputPerMillion": 3,
+          "cachedInputPerMillion": 0.025,
+          "outputPerMillion": 6
+        },
+        "mimo-v2.6-flash": {
+          "currency": "CNY",
+          "inputPerMillion": 1,
+          "cachedInputPerMillion": 0.02,
+          "outputPerMillion": 2
+        },
+        "mimo-v2.6-pro-ultraspeed": {
+          "currency": "CNY",
+          "inputPerMillion": 30,
+          "cachedInputPerMillion": 0.25,
+          "outputPerMillion": 60
+        },
+        "mimo-v2.5-pro": {
+          "currency": "CNY",
+          "inputPerMillion": 3,
+          "cachedInputPerMillion": 0.025,
+          "outputPerMillion": 6
+        },
+        "mimo-v2.5": {
+          "currency": "CNY",
+          "inputPerMillion": 1,
+          "cachedInputPerMillion": 0.02,
+          "outputPerMillion": 2
+        }
+      }
+    }
+  }
+}
