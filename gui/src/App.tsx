@@ -35,6 +35,7 @@ import {
   Server,
   Settings2,
   Square,
+  Tag,
   Terminal,
   Trash2,
   XCircle,
@@ -70,7 +71,7 @@ import {
   validateVendor,
   type ValidationResult,
 } from "./app-model.ts";
-import { useLogsController, useUpdateController, useUsageController } from "./app-controllers.ts";
+import { useLogsController, usePricingCache, useUpdateController, useUsageController } from "./app-controllers.ts";
 import { getDesktopApi, type SaveConfigResult } from "./desktop-api.ts";
 import { getCatalogPriceView, isPricingCatalogKey, PRICING_CATALOG_KEYS, PRICING_CATALOG_LABELS } from "../../src/usage.ts";
 import type { ChartSegment, HealthState, LogEntry, LogPage, UpdateState, UsageDaily, UsagePeriod, UsageSummary, VendorHealth } from "./types.ts";
@@ -152,6 +153,7 @@ export default function App() {
   const { logs, refreshLogs, loadOlderLogs } = useLogsController({ busy, run });
   const { usage, refreshUsage } = useUsageController();
   const { updateState, checkAppUpdate, downloadAppUpdate, installAppUpdate } = useUpdateController({ run, setToast });
+  const { pricingUpdatedAt } = usePricingCache();
 
   useEffect(() => {
     void loadState();
@@ -796,6 +798,7 @@ export default function App() {
                 app={draft.app}
                 setAppSetting={setAppSetting}
                 busy={busy}
+                pricingUpdatedAt={pricingUpdatedAt}
               />
             </div>
           )}
@@ -1136,13 +1139,25 @@ function RouterPage({ draft, updateRouter, showRouterKey, setShowRouterKey, copy
   );
 }
 
-function AppSettingsPage({ app, setAppSetting, busy }: {
+function AppSettingsPage({ app, setAppSetting, busy, pricingUpdatedAt }: {
   app: Draft["app"];
   setAppSetting: (field: "closeBehavior" | "startAtLogin", value: CloseBehavior | boolean) => Promise<void>;
   busy: string;
+  pricingUpdatedAt: string | null;
 }) {
   return (
     <div className="panel-grid single">
+      <div className="panel wide">
+        <PanelHeader icon={Tag} title="Pricing data" />
+        <div className="form-grid">
+          <div className="field wide">
+            <span>Catalog source</span>
+            <span className="setting-value">
+              {pricingUpdatedAt ? `Remote catalog, updated ${pricingUpdatedAt}` : "Built-in catalog"}
+            </span>
+          </div>
+        </div>
+      </div>
       <div className="panel wide">
         <PanelHeader icon={Settings2} title="Window" />
         <div className="form-grid">

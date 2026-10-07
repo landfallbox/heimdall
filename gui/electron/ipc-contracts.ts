@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { configSchema } from "../../src/config.ts";
+import { remotePricingSchema } from "../../src/pricing-updater.ts";
 
 const emptyRequest = z.tuple([]);
 const okResponse = z.object({ ok: z.boolean() }).loose();
@@ -146,6 +147,7 @@ export const ipcContracts: Record<string, { request: z.ZodType; response: z.ZodT
     vendor: z.string().optional(),
     model: z.string().optional(),
   })), usageSummarySchema),
+  "pricing:loadCache": contract(emptyRequest, z.object({ ok: z.boolean(), data: remotePricingSchema.nullable() })),
   "file:openConfig": contract(emptyRequest, z.string()),
   "file:openLog": contract(emptyRequest, z.string()),
   "update:getState": contract(emptyRequest, updateStateSchema),

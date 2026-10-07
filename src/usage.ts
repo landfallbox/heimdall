@@ -1,3 +1,5 @@
+import { BUILTIN_PRICING_DATA } from "./pricing-data.ts";
+
 export interface Pricing {
   currency: string;
   inputPerMillion: number;
@@ -15,6 +17,18 @@ export interface PricingCatalog {
   updatedAt: string;
   peakHours: [number, number][] | null;
   models: Record<string, Pricing | RateCard>;
+}
+
+export interface RemotePricingCatalogEntry {
+  sourceUrl?: string;
+  updatedAt?: string;
+  models: Record<string, Pricing | RateCard>;
+}
+
+export interface RemotePricingData {
+  schemaVersion: number;
+  updatedAt: string;
+  catalogs: Record<string, RemotePricingCatalogEntry>;
 }
 
 export interface Usage {
@@ -38,21 +52,7 @@ export interface ResolvedPricing extends Pricing {
   card?: string;
 }
 
-export const OPENAI_PRICING_UPDATED_AT = "2026-10-07";
-export const OPENAI_PRICING_SOURCE = "https://developers.openai.com/api/docs/pricing";
-export const DEEPSEEK_PRICING_UPDATED_AT = "2026-08-16";
-export const DEEPSEEK_PRICING_SOURCE = "https://api-docs.deepseek.com/quick_start/pricing";
 export const DEEPSEEK_PEAK_HOURS: [number, number][] = [[1, 4], [6, 10]];
-export const ANTHROPIC_PRICING_UPDATED_AT = "2026-10-07";
-export const ANTHROPIC_PRICING_SOURCE = "https://platform.claude.com/docs/en/about-claude/pricing";
-export const GOOGLE_PRICING_UPDATED_AT = "2026-10-01";
-export const GOOGLE_PRICING_SOURCE = "https://ai.google.dev/gemini-api/docs/pricing";
-export const KIMI_PRICING_UPDATED_AT = "2026-09-20";
-export const KIMI_PRICING_SOURCE = "https://platform.kimi.ai/docs/pricing/chat.md";
-export const GLM_PRICING_UPDATED_AT = "2026-09-28";
-export const GLM_PRICING_SOURCE = "https://docs.bigmodel.cn/cn/guide/start/pricing.md";
-export const MIMO_PRICING_UPDATED_AT = "2026-10-06";
-export const MIMO_PRICING_SOURCE = "https://mimo.mi.com/docs/zh-CN/pricing";
 
 export type PricingCatalogKey = "openai" | "deepseek" | "anthropic" | "google" | "kimi" | "glm" | "mimo";
 
@@ -68,182 +68,37 @@ export const PRICING_CATALOG_LABELS: Record<PricingCatalogKey, string> = Object.
 
 export const PRICING_CATALOG_KEYS = Object.keys(PRICING_CATALOG_LABELS) as PricingCatalogKey[];
 
-const OPENAI_STANDARD_PRICING: Record<string, Pricing> = Object.freeze({
-  "gpt-6-astra": price(10, 1, 50),
-  "gpt-6-sol": price(2, 0.2, 10),
-  "gpt-6-luna": price(0.1, 0.01, 0.5),
-  "gpt-5.6-sol": price(4, 0.4, 20),
-  "gpt-5.6-terra": price(2, 0.2, 12),
-  "gpt-5.6-luna": price(0.2, 0.02, 1.2),
-  "gpt-5.5": price(5, 0.5, 30),
-  "gpt-5.5-pro": price(30, null, 180),
-  "gpt-5.4": price(2.5, 0.25, 15),
-  "gpt-5.4-mini": price(0.75, 0.075, 4.5),
-  "gpt-5.4-nano": price(0.2, 0.02, 1.25),
-  "gpt-5.4-pro": price(30, null, 180),
-  "gpt-5.3-codex": price(1.75, 0.175, 14),
-  "gpt-5.2-codex": price(1.75, null, 14),
-  "gpt-5.1-codex": price(1.25, 0.125, 10),
-  "gpt-5.3-instant": price(1.75, null, 14),
-  "gpt-5.2-instant": price(1.5, null, 6),
-  "gpt-5.2": price(1.75, 0.175, 14),
-  "gpt-5.2-pro": price(21, null, 168),
-  "gpt-5.1": price(1.25, 0.125, 10),
-  "gpt-5": price(1.25, 0.125, 10),
-  "gpt-5-mini": price(0.25, 0.025, 2),
-  "gpt-5-nano": price(0.05, 0.005, 0.4),
-  "gpt-5-pro": price(15, null, 120),
-  "gpt-5-search-api": price(1.25, 0.125, 10),
-  "gpt-4.1": price(2, 0.5, 8),
-  "gpt-4.1-mini": price(0.4, 0.1, 1.6),
-  "gpt-4.1-nano": price(0.1, 0.025, 0.4),
-  "gpt-4o": price(2.5, 1.25, 10),
-  "gpt-4o-2024-05-13": price(5, null, 15),
-  "gpt-4o-mini": price(0.15, 0.075, 0.6),
-  "o1": price(15, 7.5, 60),
-  "o1-pro": price(150, null, 600),
-  "o3": price(2, 0.5, 8),
-  "o3-pro": price(20, null, 80),
-  "o3-mini": price(1.1, 0.55, 4.4),
-  "o4-mini": price(1.1, 0.275, 4.4),
-  "gpt-4-turbo-2024-04-09": price(10, null, 30),
-  "gpt-4-0613": price(30, null, 60),
-  "gpt-3.5-turbo": price(0.5, null, 1.5),
-  "gpt-3.5-turbo-0125": price(0.5, null, 1.5),
-  "gpt-3.5-turbo-1106": price(1, null, 2),
-  "gpt-3.5-turbo-instruct": price(1.5, null, 2),
-  "davinci-002": price(2, null, 2),
-  "babbage-002": price(0.4, null, 0.4),
-  "chat-latest": price(5, 0.5, 30),
-});
-
-const DEEPSEEK_STANDARD_PRICING: Record<string, RateCard> = Object.freeze({
-  "deepseek-v4-flash": rateCards(price(0.44, 0.014, 1.32, "CNY"), price(0.22, 0.007, 0.66, "CNY")),
-  "deepseek-v4.1-flash": rateCards(price(2, 0.04, 8, "CNY"), price(1, 0.02, 4, "CNY")),
-  "deepseek-v4-pro": rateCards(price(1.32, 0.044, 3.96, "CNY"), price(0.66, 0.022, 1.98, "CNY")),
-});
-
-// Anthropic 官方模型 ID 为连字符风格（如 claude-opus-5-5）；点号风格别名保留以兼容旧配置。
-const ANTHROPIC_STANDARD_PRICING: Record<string, Pricing> = Object.freeze({
-  "claude-opus-5-5": price(4, 0.2, 20),
-  "claude-opus-5": price(5, 0.5, 25),
-  "claude-opus-4-8": price(5, 0.5, 25),
-  "claude-opus-4-7": price(5, 0.5, 25),
-  "claude-opus-4-6": price(5, 0.5, 25),
-  "claude-opus-4.6": price(5, 0.5, 25),
-  "claude-opus-4-5": price(5, 0.5, 25),
-  "claude-opus-4.5": price(5, 0.5, 25),
-  "claude-opus-4-1": price(15, 1.5, 75),
-  "claude-opus-4.1": price(15, 1.5, 75),
-  "claude-sonnet-5-5": price(2, 0.2, 10),
-  "claude-sonnet-5": price(2, 0.2, 10),
-  "claude-sonnet-4-6": price(3, 0.3, 15),
-  "claude-sonnet-4.6": price(3, 0.3, 15),
-  "claude-sonnet-4-5": price(3, 0.3, 15),
-  "claude-sonnet-4.5": price(3, 0.3, 15),
-  "claude-sonnet-4": price(3, 0.3, 15),
-  "claude-haiku-4-5": price(1, 0.1, 5),
-  "claude-haiku-4.5": price(1, 0.1, 5),
-  "claude-fable-5-1": price(10, 0.25, 50),
-  "claude-mythos-5-1": price(10, 0.25, 50),
-  "claude-3-5-sonnet": price(3, 0.3, 15),
-  "claude-3-5-haiku": price(0.8, 0.08, 4),
-  "claude-3-opus": price(15, 1.5, 75),
-  "claude-3-haiku": price(0.25, 0.025, 1.25),
-});
-
-const GOOGLE_STANDARD_PRICING: Record<string, Pricing> = Object.freeze({
-  "gemini-3.1-pro": price(2, 0.2, 12),
-  "gemini-3-pro": price(2, 0.2, 12),
-  "gemini-3.5-flash": price(1.5, 0.15, 9),
-  "gemini-3.8-flash": price(0.75, 0.075, 3.75),
-  "gemini-3.7-flash": price(0.75, 0.075, 3.75),
-  "gemini-3.6-flash": price(0.75, 0.075, 3.75),
-  "gemini-3-flash": price(0.5, 0.05, 3),
-  "gemini-3.5-flash-lite": price(0.3, 0.03, 2.5),
-  "gemini-3.1-flash-lite": price(0.25, 0.025, 1.5),
-  "gemini-2.5-pro": price(1.25, 0.125, 10),
-  "gemini-2.5-flash": price(0.3, 0.03, 2.5),
-  "gemini-2.5-flash-lite": price(0.1, 0.01, 0.4),
-});
-
-const KIMI_STANDARD_PRICING: Record<string, Pricing> = Object.freeze({
-  "kimi-k3": price(3, 0.3, 15),
-  "kimi-k2.7-code": price(0.95, 0.19, 4),
-  "kimi-k2.7-code-highspeed": price(1.9, 0.38, 8),
-  "kimi-k2.6": price(0.95, 0.16, 4),
-  "kimi-k2.5": price(0.6, null, 3),
-  "kimi-k2": price(0.6, null, 2.5),
-});
-
-// 智谱按 输入/缓存命中/输出 分别计费，单位为元/百万 tokens。带长度分档的模型取最常用档位（输入 <32K）。
-const GLM_STANDARD_PRICING: Record<string, Pricing> = Object.freeze({
-  "glm-5.3": price(8, 2, 28, "CNY"),
-  "glm-5.3-flash": price(0.8, 0.23, 2.8, "CNY"),
-  "glm-5.3-flashx": price(2, 0.57, 7, "CNY"),
-  "glm-5.2": price(8, 2, 28, "CNY"),
-  "glm-5.1": price(6, 1.3, 24, "CNY"),
-  "glm-5-turbo": price(5, 1.2, 22, "CNY"),
-  "glm-5": price(4, 1, 18, "CNY"),
-  "glm-4.7": price(2, 0.4, 8, "CNY"),
-  "glm-4.5-air": price(0.8, 0.16, 2, "CNY"),
-  "glm-4.6v": price(1, 0.2, 3, "CNY"),
-  "glm-4.7-flashx": price(0.5, 0.1, 3, "CNY"),
-});
-
-// 小米 MiMo 按国内人民币定价（元/百万 tokens）。官方另有海外美元价；mimo-v2.5-pro/mimo-v2.5 将于 2026-10-21 下线。
-const MIMO_STANDARD_PRICING: Record<string, Pricing> = Object.freeze({
-  "mimo-v2.6-pro": price(3, 0.025, 6, "CNY"),
-  "mimo-v2.6-flash": price(1, 0.02, 2, "CNY"),
-  "mimo-v2.6-pro-ultraspeed": price(30, 0.25, 60, "CNY"),
-  "mimo-v2.5-pro": price(3, 0.025, 6, "CNY"),
-  "mimo-v2.5": price(1, 0.02, 2, "CNY"),
-});
-
-export const PRICING_CATALOGS: Record<string, PricingCatalog> = Object.freeze({
-  openai: {
-    sourceUrl: OPENAI_PRICING_SOURCE,
-    updatedAt: OPENAI_PRICING_UPDATED_AT,
-    peakHours: null,
-    models: OPENAI_STANDARD_PRICING,
-  },
-  deepseek: {
-    sourceUrl: DEEPSEEK_PRICING_SOURCE,
-    updatedAt: DEEPSEEK_PRICING_UPDATED_AT,
-    peakHours: DEEPSEEK_PEAK_HOURS,
-    models: DEEPSEEK_STANDARD_PRICING,
-  },
-  anthropic: {
-    sourceUrl: ANTHROPIC_PRICING_SOURCE,
-    updatedAt: ANTHROPIC_PRICING_UPDATED_AT,
-    peakHours: null,
-    models: ANTHROPIC_STANDARD_PRICING,
-  },
-  google: {
-    sourceUrl: GOOGLE_PRICING_SOURCE,
-    updatedAt: GOOGLE_PRICING_UPDATED_AT,
-    peakHours: null,
-    models: GOOGLE_STANDARD_PRICING,
-  },
-  kimi: {
-    sourceUrl: KIMI_PRICING_SOURCE,
-    updatedAt: KIMI_PRICING_UPDATED_AT,
-    peakHours: null,
-    models: KIMI_STANDARD_PRICING,
-  },
-  glm: {
-    sourceUrl: GLM_PRICING_SOURCE,
-    updatedAt: GLM_PRICING_UPDATED_AT,
-    peakHours: null,
-    models: GLM_STANDARD_PRICING,
-  },
-  mimo: {
-    sourceUrl: MIMO_PRICING_SOURCE,
-    updatedAt: MIMO_PRICING_UPDATED_AT,
-    peakHours: null,
-    models: MIMO_STANDARD_PRICING,
-  },
-});
+// Bundled fallback pricing, generated from data/pricing.json by
+// scripts/generate-pricing-data.mjs (run `npm run pricing:generate`). The top-level
+// record is shallow-frozen so catalog keys are fixed, while each catalog object stays
+// mutable so applyRemotePricing can override sourceUrl/updatedAt/models per model.
+//
+// Data notes (the prices themselves live in data/pricing.json):
+// - Anthropic official model ids are hyphen-style (e.g. claude-opus-5-5); dot-style
+//   aliases are kept for legacy config compatibility.
+// - GLM bills input/cached-hit/output separately in CNY per million tokens; tiered
+//   models use the most common tier (input <32K).
+// - MiMo uses domestic CNY pricing (CNY per million tokens); an overseas USD price
+//   also exists. mimo-v2.5-pro/mimo-v2.5 retire on 2026-10-21.
+export const PRICING_CATALOGS: Record<string, PricingCatalog> = Object.freeze(
+  Object.fromEntries(
+    PRICING_CATALOG_KEYS.map((key): [string, PricingCatalog] => {
+      const entry = BUILTIN_PRICING_DATA.catalogs[key];
+      if (!entry || !entry.sourceUrl || !entry.updatedAt) {
+        throw new Error("Bundled pricing data is incomplete for catalog " + key + "; run `npm run pricing:generate`.");
+      }
+      return [
+        key,
+        {
+          sourceUrl: entry.sourceUrl,
+          updatedAt: entry.updatedAt,
+          peakHours: key === "deepseek" ? DEEPSEEK_PEAK_HOURS : null,
+          models: Object.freeze(entry.models),
+        },
+      ];
+    }),
+  ),
+);
 
 export function normalizeUsage(body: any, format: unknown): Usage | null {
   const usage = body?.usage;
@@ -354,7 +209,7 @@ export function estimateUsageCost(usage: Usage | null, pricing: ResolvedPricing 
 }
 
 export function getOpenAIPricingCatalog() {
-  return Object.entries(OPENAI_STANDARD_PRICING).map(([model, pricing]) => ({ model, ...pricing }));
+  return Object.entries(PRICING_CATALOGS.openai.models).map(([model, pricing]) => ({ model, ...pricing }));
 }
 
 export function isPricingCatalogKey(value: unknown): value is PricingCatalogKey {
@@ -373,6 +228,43 @@ export function getPricingCatalogSummary() {
       peakHours: catalog.peakHours,
     };
   });
+}
+
+/**
+ * Merges validated remote pricing into the in-memory catalogs. Remote entries
+ * win per model; unknown catalog keys are ignored. Built-in entries are never
+ * removed, so the built-in tables stay the offline fallback.
+ */
+export function applyRemotePricing(data: RemotePricingData): { applied: number; catalogs: string[] } {
+  let applied = 0;
+  const changed: string[] = [];
+  for (const [key, entry] of Object.entries(data?.catalogs ?? {})) {
+    const catalog = PRICING_CATALOGS[key];
+    if (!catalog || !entry || typeof entry !== "object") {
+      continue;
+    }
+    let catalogChanged = false;
+    if (typeof entry.sourceUrl === "string" && entry.sourceUrl.trim()) {
+      catalog.sourceUrl = entry.sourceUrl.trim();
+      catalogChanged = true;
+    }
+    if (typeof entry.updatedAt === "string" && entry.updatedAt.trim()) {
+      catalog.updatedAt = entry.updatedAt.trim();
+      catalogChanged = true;
+    }
+    if (entry.models && typeof entry.models === "object") {
+      const models = Object.entries(entry.models).filter(([, pricing]) => pricing && typeof pricing === "object");
+      if (models.length > 0) {
+        catalog.models = { ...catalog.models, ...Object.fromEntries(models) };
+        applied += models.length;
+        catalogChanged = true;
+      }
+    }
+    if (catalogChanged) {
+      changed.push(key);
+    }
+  }
+  return { applied, catalogs: changed };
 }
 
 function findCatalogPriceModel(catalogModels: Record<string, Pricing | RateCard>, value: unknown): string | null {
@@ -421,14 +313,6 @@ function normalizeCustomPricing(value: any): Pricing | null {
     cachedInputPerMillion,
     outputPerMillion,
   };
-}
-
-function price(inputPerMillion: number, cachedInputPerMillion: number | null, outputPerMillion: number, currency = "USD"): Pricing {
-  return { currency, inputPerMillion, cachedInputPerMillion, outputPerMillion };
-}
-
-function rateCards(peak: Pricing, offPeak: Pricing): RateCard {
-  return { peak, offPeak };
 }
 
 function tokenCount(value: unknown): number | null {

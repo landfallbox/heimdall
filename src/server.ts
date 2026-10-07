@@ -8,6 +8,7 @@ import { StringDecoder } from "node:string_decoder";
 import { createLogger, type Logger } from "./logger.ts";
 import { convertRequestBody, convertResponseBody, isProtocolError, normalizeRequestFormat } from "./openai-protocol.ts";
 import { loadRuntimeConfig, runtimeRoot, type RuntimeConfig, type RuntimeVendor } from "./runtime-config.ts";
+import { startPricingRefresh } from "./pricing-updater.ts";
 import { createUsageStore, type UsageStore } from "./usage-store.ts";
 import { estimateUsageCost, normalizeUsage, resolveModelPricing, type Usage } from "./usage.ts";
 import { VendorCircuitBreaker, type CircuitPermission } from "./vendor-circuit-breaker.ts";
@@ -762,6 +763,7 @@ function main() {
   let configWatcher: FSWatcher | null = null;
   let configWatchTimer: NodeJS.Timeout | null = null;
   let stopping = false;
+  const stopPricingRefresh = startPricingRefresh({ dataDir: runtimeRoot, logger });
 
   const server = http.createServer((req, res) => {
     const snapshot = runtime;
@@ -868,6 +870,7 @@ function main() {
       clearTimeout(configWatchTimer);
     }
     configWatcher?.close();
+    stopPricingRefresh();
     logger.info("router_stopping", { reason });
     server.close(() => {
       void usageStore.close().finally(() => logger.close(() => process.exit(0)));

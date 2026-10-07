@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
+import { applyRemotePricing } from "../../src/usage.ts";
 import { getDesktopApi } from "./desktop-api.ts";
 import type { LogPage, UpdateState, UsageSummary } from "./types.ts";
+
+const PRICING_CACHE_POLL_MS = 5 * 60 * 1000;
 
 const defaultUpdateState: UpdateState = {
   status: "unsupported",
@@ -50,6 +53,41 @@ export function useUsageController() {
   }
 
   return { usage, refreshUsage };
+}
+
+export function usePricingCache() {
+  const [pricingUpdatedAt, setPricingUpdatedAt] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    let lastUpdatedAt: string | null = null;
+
+    async function refreshPricingCache() {
+      try {
+        const result = await getDesktopApi().loadPricingCache();
+        const data = result?.data;
+        if (!active || !data || !data.updatedAt || data.updatedAt === lastUpdatedAt) {
+          return;
+        }
+        lastUpdatedAt = data.updatedAt;
+        applyRemotePricing(data);
+        setPricingUpdatedAt(data.updatedAt);
+      } catch {
+        // Best-effort: the built-in catalogs stay available when the cache is missing or invalid.
+      }
+    }
+
+    void refreshPricingCache();
+    const timer = window.setInterval(() => {
+      void refreshPricingCache();
+    }, PRICING_CACHE_POLL_MS);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  return { pricingUpdatedAt };
 }
 
 export function useUpdateController({ run, setToast }: { run: (name: string, action: () => Promise<void>) => Promise<void>; setToast: (toast: string) => void }) {

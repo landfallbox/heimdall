@@ -8,6 +8,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DEFAULT_CONFIG, normalizeConfig } from "../../src/config.ts";
 import { getChatCompletionsUrl, getRouterBaseUrl } from "../../src/router-urls.ts";
+import { loadPricingCache } from "../../src/pricing-updater.ts";
 import { readUsageSummary } from "../../src/usage-store.ts";
 import { readConfigStore, writeConfigStore } from "./config-store.ts";
 import { parseIpcRequest, parseIpcResponse } from "./ipc-contracts.ts";
@@ -863,6 +864,11 @@ async function readUsage(_event: IpcMainInvokeEvent, options: { vendor?: string;
   });
 }
 
+async function readPricingCache() {
+  const { paths } = await loadConfig();
+  return { ok: true, data: loadPricingCache(paths.dataDir) };
+}
+
 function clampNumber(value: unknown, fallback: number, min: number, max: number): number {
   const number = Number(value);
   if (!Number.isFinite(number)) {
@@ -1200,6 +1206,7 @@ registerIpcHandler("router:restart", restartRouter);
 registerIpcHandler("router:health", (_event, options) => getHealth(null, options));
 registerIpcHandler("logs:read", readLogs);
 registerIpcHandler("usage:summary", readUsage);
+registerIpcHandler("pricing:loadCache", readPricingCache);
 registerIpcHandler("file:openConfig", openConfigFile);
 registerIpcHandler("file:openLog", openLogFile);
 registerIpcHandler("update:getState", getUpdateState);
