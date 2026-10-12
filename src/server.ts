@@ -296,24 +296,53 @@ function copyUpstreamHeaders(upstream: Response, res: http.ServerResponse, vendo
   res.setHeader("x-router-vendor", vendorName);
 }
 
-async function pipeUpstreamWithUsage(upstream: Response, res: http.ServerResponse, format: RequestFormat, logger: Logger): Promise<Usage | null> {
+async function pipeUpstreamWithUsage(
+  upstream: Response,
+  res: http.ServerResponse,
+  format: RequestFormat,
+  logger: Logger,
+  context: { requestId: string; vendor: string; model: string },
+): Promise<Usage | null> {
   if (!upstream.body) {
     res.end();
     return null;
   }
 
   let usage: Usage | null = null;
-  const tracker = createSseUsageTracker(format, (nextUsage) => {
+  const { stream: tracker, getFinishState } = createSseUsageTracker(format, (nextUsage) => {
     usage = nextUsage;
   }, logger);
+  const startedAt = Date.now();
   await pipeline(Readable.fromWeb(upstream.body as unknown as import("node:stream/web").ReadableStream), tracker, res);
+  const finish = getFinishState();
+  if (finish.finishKnown && !finish.sawFinish) {
+    // The stream ended cleanly but never carried the terminal marker, so the
+    // upstream cut it before the model finished. Clients see a silent stop.
+    logger.warn("stream_completed_without_finish", {
+      ...context,
+      format,
+      elapsedMs: Date.now() - startedAt,
+      sseChunkCount: finish.sseChunkCount,
+      usageKnown: Boolean(usage),
+    });
+  }
   return usage;
 }
+
+type SseFinishState = {
+  /** Whether the format defines a terminal marker this tracker can detect. */
+  finishKnown: boolean;
+  /** Whether the terminal marker was observed before the stream ended. */
+  sawFinish: boolean;
+  sseChunkCount: number;
+};
 
 function createSseUsageTracker(format: RequestFormat, onUsage: (usage: Usage) => void, logger: Logger) {
   const decoder = new StringDecoder("utf8");
   let pending = "";
   let sseChunkCount = 0;
+  let sawFinish = false;
+  const finishKnown = format === "chat-completions" || format === "responses";
 
   function inspectText(text: string, flush = false) {
     pending += text;
@@ -321,7 +350,11 @@ function createSseUsageTracker(format: RequestFormat, onUsage: (usage: Usage) =>
     pending = flush ? "" : lines.pop() || "";
     for (const line of lines) {
       const payload = line.startsWith("data:") ? line.slice(5).trim() : "";
-      if (!payload || payload === "[DONE]") {
+      if (payload === "[DONE]") {
+        sawFinish = true;
+        continue;
+      }
+      if (!payload) {
         continue;
       }
       try {
@@ -329,6 +362,12 @@ function createSseUsageTracker(format: RequestFormat, onUsage: (usage: Usage) =>
         if (sseChunkCount < 5) {
           sseChunkCount++;
           logger.debug("upstream_sse_chunk", { index: sseChunkCount, payload });
+        }
+        if (format === "chat-completions" && Array.isArray(event.choices) && event.choices.some((choice: any) => choice?.finish_reason != null)) {
+          sawFinish = true;
+        }
+        if (format === "responses" && event?.type === "response.completed") {
+          sawFinish = true;
         }
         const usage = normalizeUsage(event, format) || normalizeUsage(event.response, format);
         if (usage) {
@@ -340,7 +379,7 @@ function createSseUsageTracker(format: RequestFormat, onUsage: (usage: Usage) =>
     }
   }
 
-  return new Transform({
+  const stream = new Transform({
     transform(chunk, _encoding, callback) {
       inspectText(decoder.write(chunk));
       callback(null, chunk);
@@ -350,6 +389,11 @@ function createSseUsageTracker(format: RequestFormat, onUsage: (usage: Usage) =>
       callback();
     },
   });
+
+  return {
+    stream,
+    getFinishState: (): SseFinishState => ({ finishKnown, sawFinish, sseChunkCount }),
+  };
 }
 
 function recordUsage(usageStore: UsageStore, logger: Logger, context: { requestId: string; vendor: string; model: string; format: RequestFormat; stream: boolean }, usage: Usage | null, customPricing: unknown) {
@@ -500,7 +544,7 @@ async function handleGeneration(
       };
       if (responseIsStream) {
         copyUpstreamHeaders(upstream, res, vendor.name);
-        const usage = await pipeUpstreamWithUsage(upstream, res, upstreamFormat, logger);
+        const usage = await pipeUpstreamWithUsage(upstream, res, upstreamFormat, logger, usageContext);
         recordUsage(usageStore, logger, usageContext, usage, vendor.selectedModel.pricing);
       } else {
         const upstreamText = await upstream.text();

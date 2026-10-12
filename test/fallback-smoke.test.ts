@@ -744,6 +744,59 @@ async function testNoFallbackAfterPartialStream() {
   }
 }
 
+async function testStreamWithoutFinishMarkerLogsWarning() {
+  const vendor = await createMockVendor(async (req, res) => {
+    await readBody(req);
+    res.writeHead(200, { "content-type": "text/event-stream" });
+    res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "partial" } }] })}\n\n`);
+    // Upstream cut: the stream ends cleanly without finish_reason or [DONE].
+    res.end();
+  });
+
+  try {
+    const port = await findFreePort();
+    await withRouter("stream-no-finish", baseConfig(port, [
+      { name: "streaming", baseUrl: vendor.baseUrl, model: "model-id" },
+    ]), async ({ port: routerPort, router }) => {
+      const response = await requestChat(routerPort);
+      assert.equal(response.status, 200);
+      assert.match(await response.text(), /partial/);
+      await waitFor(
+        () => getRouterOutput(router).includes("stream_completed_without_finish"),
+        "Router did not log stream_completed_without_finish for a cut stream.",
+      );
+    });
+  } finally {
+    vendor.server.close();
+  }
+}
+
+async function testStreamWithFinishMarkerDoesNotWarn() {
+  const vendor = await createMockVendor(async (req, res) => {
+    await readBody(req);
+    res.writeHead(200, { "content-type": "text/event-stream" });
+    res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "done" } }] })}\n\n`);
+    res.write(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: "stop" }] })}\n\n`);
+    res.end("data: [DONE]\n\n");
+  });
+
+  try {
+    const port = await findFreePort();
+    await withRouter("stream-with-finish", baseConfig(port, [
+      { name: "streaming", baseUrl: vendor.baseUrl, model: "model-id" },
+    ]), async ({ port: routerPort, router }) => {
+      const response = await requestChat(routerPort);
+      assert.equal(response.status, 200);
+      await response.text();
+      // Allow the child process stdout to be flushed before asserting absence.
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      assert.doesNotMatch(getRouterOutput(router), /stream_completed_without_finish/);
+    });
+  } finally {
+    vendor.server.close();
+  }
+}
+
 async function testClientAbortStopsFallback() {
   const calls = { slow: 0, fallback: 0 };
   const slow = await createMockVendor(async (req, res) => {
@@ -1169,6 +1222,8 @@ await testCircuitBreakerSkipsFailedVendorPerModel();
 await testRuntimeConfigReload();
 await testLongStreamOutlivesResponseTimeout();
 await testNoFallbackAfterPartialStream();
+await testStreamWithoutFinishMarkerLogsWarning();
+await testStreamWithFinishMarkerDoesNotWarn();
 await testClientAbortStopsFallback();
 await testNonFallbackStatus();
 await testRouterAuth();
