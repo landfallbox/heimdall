@@ -9,6 +9,11 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("heimdall", {
+  // Marker so the renderer can tell this real bridge apart from the
+  // in-memory mock that main.tsx installs for plain-browser previews
+  // (VS Code's integrated browser is Electron-based, so the user agent
+  // alone cannot distinguish the two).
+  __heimdallPreload: true,
   getState: () => ipcRenderer.invoke("app:getState"),
   rendererReady: () => ipcRenderer.invoke("app:rendererReady"),
   hideToTray: () => ipcRenderer.invoke("app:hideToTray"),

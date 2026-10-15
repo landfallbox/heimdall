@@ -79,6 +79,7 @@ export interface UsageCost {
 export interface UsagePeriod {
   totalTokens: number;
   inputTokens: number;
+  cachedInputTokens: number;
   outputTokens: number;
   requestCount: number;
   usageCoverage: number;
