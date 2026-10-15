@@ -1,16 +1,16 @@
 import { app, BrowserWindow, clipboard, ipcMain, nativeImage, nativeTheme, shell, type IpcMainInvokeEvent } from "electron";
 import { spawn, type ChildProcess } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
-import { closeSync, existsSync, openSync } from "node:fs";
+import { closeSync, existsSync, openSync, watch, type FSWatcher } from "node:fs";
 import fs from "node:fs/promises";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DEFAULT_CONFIG, normalizeConfig } from "../../src/config.ts";
 import { getChatCompletionsUrl, getRouterBaseUrl } from "../../src/router-urls.ts";
 import { loadPricingCache } from "../../src/pricing-updater.ts";
 import { readUsageSummary } from "../../src/usage-store.ts";
-import { readConfigStore, writeConfigStore } from "./config-store.ts";
+import { readConfigStore, revisionFor, writeConfigStore } from "./config-store.ts";
 import { parseIpcRequest, parseIpcResponse } from "./ipc-contracts.ts";
 import { syncVsCodeModels, type VsCodeSyncResult } from "../../src/vscode-sync.ts";
 import { ensureLogFile, readLogPage, resolveLogPath } from "./log-store.ts";
@@ -224,10 +224,72 @@ function generateRouterApiKey(): string {
   return `lmr_${randomBytes(24).toString("base64url")}`;
 }
 
+// Revision of the config file as last seen by this app instance. Used to tell
+// external on-disk edits apart from our own loads/writes.
+let lastKnownConfigRevision = "";
+let configWatcher: FSWatcher | null = null;
+let configChangeTimer: NodeJS.Timeout | null = null;
+
+/**
+ * Watches the config file (via its parent directory, so atomic rename-based
+ * writes are seen) and notifies the renderer when the file changes on disk
+ * outside of this app.
+ */
+function startConfigWatcher() {
+  if (configWatcher) {
+    return;
+  }
+
+  const paths = getPaths();
+  ensureConfigFile(paths);
+  const configName = basename(paths.configPath);
+
+  try {
+    configWatcher = watch(dirname(paths.configPath), { persistent: false }, (_event, filename) => {
+      if (filename !== null && filename !== configName) {
+        return;
+      }
+
+      if (configChangeTimer) {
+        clearTimeout(configChangeTimer);
+      }
+      configChangeTimer = setTimeout(() => {
+        configChangeTimer = null;
+        void (async () => {
+          try {
+            const text = (await fs.readFile(paths.configPath, "utf8")).replace(/^\uFEFF/, "");
+            if (revisionFor(text) === lastKnownConfigRevision) {
+              return;
+            }
+
+            for (const win of BrowserWindow.getAllWindows()) {
+              win.webContents.send("config:changed", { revision: revisionFor(text) });
+            }
+          } catch {
+            // File may be mid-rename; the next watcher event retries.
+          }
+        })();
+      }, 400);
+    });
+  } catch (error) {
+    console.warn(`Failed to start config watcher: ${(error as Error).message || String(error)}`);
+  }
+}
+
+function stopConfigWatcher() {
+  if (configChangeTimer) {
+    clearTimeout(configChangeTimer);
+    configChangeTimer = null;
+  }
+  configWatcher?.close();
+  configWatcher = null;
+}
+
 async function loadConfig() {
   const paths = getPaths();
   ensureConfigFile(paths);
   const { config, revision } = await readConfigStore(paths.configPath);
+  lastKnownConfigRevision = revision;
 
   return {
     config,
@@ -343,6 +405,7 @@ async function saveConfig(_event: IpcMainInvokeEvent, payload: unknown) {
   const config = (payload as { config?: unknown } | null)?.config || payload;
   const revision = (payload as { revision?: string } | null)?.revision || "";
   const saved = await writeConfigStore(paths.configPath, config as NormalizedConfig, revision);
+  lastKnownConfigRevision = saved.revision;
   applyPackagedLoginStartup(saved.config.app.startAtLogin);
   const reload = await reloadManagedRouterAfterSave(paths);
   const vsCodeSync = await maybeSyncVsCodeModels(saved.config);
@@ -1069,6 +1132,8 @@ function createWindow({ showWhenReady = true }: { showWhenReady?: boolean } = {}
     return mainWindow;
   }
 
+  const isMac = process.platform === "darwin";
+
   mainWindow = new BrowserWindow({
     show: false,
     width: 1240,
@@ -1076,9 +1141,26 @@ function createWindow({ showWhenReady = true }: { showWhenReady?: boolean } = {}
     minWidth: 1040,
     minHeight: 700,
     icon: createAppIcon() || undefined,
-    backgroundColor: nativeTheme.shouldUseDarkColors ? "#0B1020" : "#F4F6F8",
+    backgroundColor: "#00000000",
     title: APP_DISPLAY_NAME,
-    titleBarStyle: "default",
+    // 无边框窗口：macOS 用红绿灯 + under-window 毛玻璃，
+    // Windows 用 titleBarOverlay 接管右上角控制按钮 + mica 云母材质
+    titleBarStyle: "hidden",
+    ...(isMac
+      ? {
+          trafficLightPosition: { x: 18, y: 16 },
+          vibrancy: "under-window",
+          visualEffectState: "active",
+        }
+      : {
+          backgroundMaterial: "mica",
+          titleBarOverlay: {
+            color: "#00000000",
+            symbolColor: nativeTheme.shouldUseDarkColors ? "#94A3B8" : "#475569",
+            // 与 .electron-shell .app-shell 的 34px 顶部拖拽条对齐
+            height: 34,
+          },
+        }),
     webPreferences: {
       preload: join(__dirname, "preload.cjs"),
       contextIsolation: true,
@@ -1259,6 +1341,8 @@ if (!hasSingleInstanceLock) {
     } catch (error) {
       trayController.showNotification("Heimdall", `Failed to load startup settings: ${(error as Error).message || String(error)}`);
     }
+
+    startConfigWatcher();
     initializeUpdater();
     onUpdateState(handleUpdateStateChanged);
     trayController.create();
@@ -1276,6 +1360,7 @@ if (!hasSingleInstanceLock) {
 
   app.on("before-quit", () => {
     isQuitting = true;
+    stopConfigWatcher();
     trayController.dispose();
   });
 

@@ -7,7 +7,7 @@ type NormalizedConfig = ReturnType<typeof normalizeConfig>;
 
 let writeQueue: Promise<unknown> = Promise.resolve();
 
-function revisionFor(text: string): string {
+export function revisionFor(text: string): string {
   return createHash("sha256").update(text).digest("hex");
 }
 
