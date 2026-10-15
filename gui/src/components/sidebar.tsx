@@ -1,8 +1,11 @@
-import { Gauge, Loader2, Play, RefreshCw, RotateCcw, Settings2, Server, Square, Terminal, type LucideIcon } from "lucide-react";
+import { useState } from "react";
+import { Check, Copy, Gauge, Info, Loader2, Play, RefreshCw, RotateCcw, Settings2, Server, Square, Terminal, type LucideIcon } from "lucide-react";
 
+import { getDesktopApi } from "../desktop-api.ts";
 import { cn } from "../lib/utils.ts";
 import { Button } from "./ui/button.tsx";
 import { StatusDot, type StatusTone } from "./status-dot.tsx";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover.tsx";
 import type { UpdateState } from "../types.ts";
 
 export type PageId = "application" | "router" | "usage" | "logs";
@@ -17,6 +20,7 @@ export const navItems: Array<{ id: PageId; label: string; icon: LucideIcon }> = 
 interface SidebarStatus {
   label: string;
   tone: StatusTone;
+  detail?: string;
 }
 
 interface SidebarProps {
@@ -53,7 +57,7 @@ export function Sidebar({
   onRestartRouter,
 }: SidebarProps) {
   return (
-    <aside className="flex h-full w-[264px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar">
+    <aside className="sidebar-root flex h-full w-[264px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar">
       <div className="px-5 pt-6 pb-4">
         <div className="flex items-center gap-3">
           <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-[15px] font-bold text-primary-foreground shadow-sm">
@@ -102,7 +106,13 @@ export function Sidebar({
         <div className="rounded-xl border border-border bg-card p-3.5 shadow-card">
           <div className="flex items-center gap-2">
             <StatusDot tone={status.tone} pulse={status.tone === "success"} />
-            <span className="text-sm font-semibold">{status.label}</span>
+            <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+              {status.label}
+              {status.detail && (
+                <span className="font-normal text-muted-foreground"> · {summarizeStatusDetail(status.detail)}</span>
+              )}
+            </span>
+            {status.detail && <StatusDetailPopover detail={status.detail} />}
           </div>
           {restartRequired && (
             <div className="mt-1.5 rounded-md bg-warning-soft px-2 py-1 text-[11px] font-medium text-warning">
@@ -228,5 +238,53 @@ function SidebarUpdateButton({
       <span className="size-1.5 rounded-full bg-primary" />
       Update available
     </Button>
+  );
+}
+
+/** 把原始错误压缩成一行摘要，完整内容由 Popover 展示 */
+function summarizeStatusDetail(detail: string): string {
+  if (/ECONNREFUSED/i.test(detail)) return "Connection refused";
+  if (/ECONNRESET/i.test(detail)) return "Connection reset";
+  if (/ECONNABORTED/i.test(detail)) return "Connection aborted";
+  if (/ETIMEDOUT|timed out/i.test(detail)) return "Timed out";
+  if (/EADDRINUSE/i.test(detail)) return "Port in use";
+  const trimmed = detail.trim();
+  return trimmed.length > 32 ? `${trimmed.slice(0, 32)}…` : trimmed;
+}
+
+function StatusDetailPopover({ detail }: { detail: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    try {
+      await getDesktopApi().writeClipboard(detail);
+    } catch {
+      await navigator.clipboard.writeText(detail);
+    }
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1500);
+  }
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          aria-label="Show status details"
+          title="Show status details"
+        >
+          <Info size={13} />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-72">
+        <p className="text-xs font-semibold">Status details</p>
+        <p className="mt-1.5 max-h-32 overflow-y-auto break-all font-mono text-[11px] leading-relaxed text-muted-foreground">{detail}</p>
+        <Button variant="outline" size="sm" className="mt-3 w-full" onClick={() => void copy()}>
+          {copied ? <Check size={13} className="text-success" /> : <Copy size={13} />}
+          {copied ? "Copied" : "Copy error"}
+        </Button>
+      </PopoverContent>
+    </Popover>
   );
 }

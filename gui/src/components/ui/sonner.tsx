@@ -8,14 +8,7 @@ function Toaster({ ...props }: ToasterProps) {
       theme="system"
       className="toaster group"
       position="bottom-right"
-      richColors
       closeButton
-      toastOptions={{
-        classNames: {
-          toast:
-            "group toast group-[.toaster]:bg-card group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-float group-[.toaster]:rounded-xl",
-        },
-      }}
       {...props}
     />
   );

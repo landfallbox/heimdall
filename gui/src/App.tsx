@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { arrayMove } from "@dnd-kit/sortable";
-import { ChevronLeft, Layers, RefreshCw, Save, Undo2, XCircle } from "lucide-react";
+import { FileWarning, Layers, Plus, Save, Server, Undo2, X, XCircle } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -34,26 +34,29 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Toaster } from "./components/ui/sonner.tsx";
 import { AppSettingsPage } from "./pages/application-page.tsx";
 import { RouterPage } from "./pages/router-page.tsx";
-import { VendorsPage } from "./pages/vendors-page.tsx";
 import { VendorEditorPage } from "./pages/vendor-editor-page.tsx";
+import { VendorsRail } from "./components/vendors-rail.tsx";
 import { UsagePage } from "./pages/usage-page.tsx";
 import { LogsPage } from "./pages/logs-page.tsx";
 
 const defaultAppName = "Heimdall";
 
-type Page = PageId | "vendor-edit";
+type Page = PageId;
 
 type ModalState =
   | { type: "delete"; index: number; name: string }
   | { type: "deleteVendorModel"; index: number; name: string }
   | { type: "revertVendor" }
   | { type: "enableThinking"; modelIndex: number }
+  | { type: "reloadConfig" }
   | { type: "close" }
   | null;
 
 interface StatusView {
   label: string;
   tone: "neutral" | "success" | "warning";
+  /** 非运行态的原始错误信息，侧栏状态卡以摘要 + Popover 展示 */
+  detail?: string;
 }
 
 function getStatus(health: HealthState | null): StatusView {
@@ -66,9 +69,10 @@ function getStatus(health: HealthState | null): StatusView {
   }
 
   if (health.processCount > 0) {
-    return { label: "Process found", tone: "warning" };
+    return { label: "Process found", tone: "warning", detail: health.error || "Router process is running but not responding." };
   }
 
+  // 未运行时连接被拒绝是必然结果，没有信息量，不展示详情
   return { label: "Stopped", tone: "neutral" };
 }
 
@@ -99,11 +103,7 @@ function vsCodeSyncToast(result: SaveConfigResult["vsCodeSync"]) {
   return `Synced ${result.modelCount} model${result.modelCount === 1 ? "" : "s"} to VS Code.${created}`;
 }
 
-function titleForPage(page: Page, vendorEditorDraft: VendorDraft | null) {
-  if (page === "vendor-edit") {
-    return vendorEditorDraft?.name || "Vendor Settings";
-  }
-
+function titleForPage(page: Page) {
   return {
     application: "Application",
     router: "Router",
@@ -130,11 +130,10 @@ export default function App() {
   const [restartRequired, setRestartRequired] = useState(false);
   const [appName, setAppName] = useState(defaultAppName);
   const [appVersion, setAppVersion] = useState("");
-  const [isDevelopmentRuntime, setIsDevelopmentRuntime] = useState(false);
   const [configRevision, setConfigRevision] = useState("");
+  const [configChanged, setConfigChanged] = useState(false);
   const vendorModelsRequestRef = useRef(0);
   const vendorModelsSourceKeyRef = useRef("");
-  const vendorScrollTargetRef = useRef<number | null>(null);
 
   const notify = useCallback((message: string, kind: "info" | "error" = "info") => {
     if (!message) {
@@ -143,7 +142,8 @@ export default function App() {
     if (kind === "error") {
       toast.error(message);
     } else {
-      toast(message);
+      // info 类型会渲染前置图标，与错误通知的排版节奏保持一致
+      toast.info(message);
     }
   }, []);
 
@@ -185,7 +185,6 @@ export default function App() {
 
   useEffect(() => {
     const unsubscribe = getDesktopApi().onOpenSettings?.(() => {
-      vendorScrollTargetRef.current = null;
       closeVendorEditor();
       setPage("application");
       void refreshHealth({ silent: true });
@@ -204,6 +203,14 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const unsubscribe = getDesktopApi().onConfigChanged?.(() => {
+      setConfigChanged(true);
+    });
+
+    return typeof unsubscribe === "function" ? unsubscribe : undefined;
+  }, []);
+
+  useEffect(() => {
     if (page === "logs") {
       void run("logs", refreshLogs);
     }
@@ -213,30 +220,6 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
 
-  useEffect(() => {
-    if (page !== "router" || vendorScrollTargetRef.current == null) {
-      return undefined;
-    }
-
-    const top = vendorScrollTargetRef.current;
-    vendorScrollTargetRef.current = null;
-    window.requestAnimationFrame(() => {
-      window.scrollTo({ top });
-    });
-    return undefined;
-  }, [page]);
-
-  useEffect(() => {
-    if (page !== "vendor-edit") {
-      return undefined;
-    }
-
-    window.requestAnimationFrame(() => {
-      window.scrollTo({ top: 0 });
-    });
-    return undefined;
-  }, [page]);
-
   async function loadState({ toastMessage = "" }: { toastMessage?: string } = {}) {
     let configLoaded = false;
     setBusy("load");
@@ -244,12 +227,12 @@ export default function App() {
       const state = await getDesktopApi().loadConfig();
       setAppName(state.appName || defaultAppName);
       setAppVersion(state.appVersion || "");
-      setIsDevelopmentRuntime(Boolean(state.isDevelopmentRuntime));
       const loadedDraft = toDraft(state.config as ConfigInput);
       setConfigRevision(state.revision || "");
       setDraft(loadedDraft);
       setPersistedDraft(loadedDraft);
       setRestartRequired(false);
+      setConfigChanged(false);
       configLoaded = true;
       if (toastMessage) {
         notify(toastMessage);
@@ -270,17 +253,14 @@ export default function App() {
     }
   }
 
-  async function reloadConfig() {
+  /** 配置文件在外部被修改后：重新从磁盘加载，Router 运行时先重启以应用新配置。 */
+  async function confirmReloadConfig() {
     setModal(null);
-    if (page === "vendor-edit") {
-      setVendorEditorIndex(null);
-      setVendorEditorDraft(null);
-      setVendorEditorOriginal(null);
-      setVendorEditorIsNew(false);
-      clearVendorModelOptions();
-      setPage("router");
+    if (routerActive) {
+      await restartRouter();
     }
-    await loadState({ toastMessage: "Config reloaded." });
+    await loadState();
+    setConfigChanged(false);
   }
 
   async function startRouter() {
@@ -352,6 +332,7 @@ export default function App() {
     setConfigRevision(result.revision || "");
     setPersistedDraft(savedDraft);
     setRestartRequired(result.restartRequired === true || Boolean(result.reloadError));
+    setConfigChanged(false);
     return { savedDraft, saveResult: result };
   }
 
@@ -398,6 +379,7 @@ export default function App() {
       setConfigRevision(result.revision || "");
       setPersistedDraft(savedDraft);
       setDraft((current) => ({ ...current, app: savedDraft.app }));
+      setConfigChanged(false);
       if (field === "syncVsCodeModels" && value === true) {
         notify(vsCodeSyncToast(result.vsCodeSync));
       }
@@ -452,8 +434,6 @@ export default function App() {
     setVendorEditorIsNew(true);
     setShowVendorKey(false);
     clearVendorModelOptions();
-    vendorScrollTargetRef.current = window.scrollY;
-    setPage("vendor-edit");
   }
 
   function removeVendor(index: number) {
@@ -494,8 +474,6 @@ export default function App() {
     setVendorEditorIsNew(false);
     setShowVendorKey(false);
     clearVendorModelOptions();
-    vendorScrollTargetRef.current = window.scrollY;
-    setPage("vendor-edit");
   }
 
   function closeVendorEditor() {
@@ -505,7 +483,6 @@ export default function App() {
     setVendorEditorIsNew(false);
     setShowVendorKey(false);
     clearVendorModelOptions();
-    setPage("router");
   }
 
   function updateVendorEditor(field: string, value: unknown) {
@@ -674,9 +651,22 @@ export default function App() {
     notify(`${label} endpoint copied.`);
   }
 
+  // 校验失败时让对应输入框就地聚焦并短暂红色高亮，避免视线在通知和表单间来回找
+  function flashInputError(ariaLabel: string) {
+    const input = document.querySelector<HTMLInputElement>(`input[aria-label="${ariaLabel}"]`);
+    if (!input) {
+      return;
+    }
+    input.focus();
+    input.classList.remove("input-error-flash");
+    void input.offsetWidth; // 强制回流，允许连续触发时重启动画
+    input.classList.add("input-error-flash");
+  }
+
   async function copyRouterApiKey() {
     if (!draft.router.apiKey) {
       notify("Router API key is empty.", "error");
+      flashInputError("Router API key");
       return;
     }
 
@@ -687,6 +677,7 @@ export default function App() {
   async function copyVendorApiKey() {
     if (!vendorEditorDraft?.apiKey) {
       notify("Vendor API key is empty.", "error");
+      flashInputError("Vendor API key");
       return;
     }
 
@@ -718,17 +709,14 @@ export default function App() {
   }
 
   function navigateTo(target: PageId) {
-    if (target !== "router") {
-      vendorScrollTargetRef.current = null;
-    }
     closeVendorEditor();
     setPage(target);
   }
 
-  const activePage: PageId = page === "vendor-edit" ? "router" : page;
+  const activePage: PageId = page;
   return (
-    <div className="flex min-h-screen">
-      <div className="sticky top-0 hidden h-screen md:block">
+    <div className="app-shell flex h-screen overflow-hidden">
+      <div className="hidden h-full shrink-0 md:block">
         <Sidebar
           appName={appName}
           appVersion={appVersion}
@@ -747,31 +735,44 @@ export default function App() {
         />
       </div>
 
-      <main className="min-w-0 flex-1">
-        <header className="sticky top-0 z-20 border-b border-border/60 bg-background/85 backdrop-blur-md">
+      <main className="inset-canvas m-2 ml-0 flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border/70 bg-canvas shadow-card">
+        <header className="canvas-header shrink-0 border-b border-border/60">
           <div className="flex items-center justify-between px-8 py-3">
-            {page === "vendor-edit" ? (
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={closeVendorEditor}
-                  className="flex items-center gap-0.5 rounded-lg px-2 py-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                  title="Back to Router"
-                >
-                  <ChevronLeft size={15} />
-                  Router
-                </button>
-                <ChevronLeft size={12} className="text-muted-foreground/40" aria-hidden="true" />
-                <span className="flex min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-bold tracking-tight">
-                  <Layers size={14} className="shrink-0 text-primary" aria-hidden="true" />
-                  <span className="truncate">{vendorEditorDraft?.name || "Vendor Settings"}</span>
-                </span>
-              </div>
+            {vendorEditorDraft ? (
+              <h1 className="flex min-w-0 items-center gap-2 text-xl font-bold tracking-tight">
+                <Layers size={17} className="shrink-0 text-primary" aria-hidden="true" />
+                <span className="truncate">{vendorEditorDraft.name || "Vendor Settings"}</span>
+              </h1>
             ) : (
-              <h1 className="text-xl font-bold tracking-tight">{titleForPage(page, vendorEditorDraft)}</h1>
+              <h1 className="text-xl font-bold tracking-tight">{titleForPage(page)}</h1>
             )}
-            <div className="flex items-center gap-2">
-              {page === "vendor-edit" && (
+            <div className="flex min-w-0 items-center gap-2">
+              {configChanged && (
+                <div
+                  role="alert"
+                  className="flex h-8 shrink-0 items-center gap-2 rounded-full border border-warning/35 bg-muted/40 pl-3 pr-1.5 text-xs text-warning"
+                >
+                  <FileWarning size={14} className="shrink-0" />
+                  <span className="truncate">Config changed on disk</span>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="h-6 rounded-full px-2 text-xs"
+                    onClick={() => setModal({ type: "reloadConfig" })}
+                  >
+                    {routerActive ? "Restart" : "Reload"}
+                  </Button>
+                  <button
+                    type="button"
+                    aria-label="Dismiss"
+                    className="rounded-full p-1 opacity-60 transition hover:opacity-100"
+                    onClick={() => setConfigChanged(false)}
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              )}
+              {vendorEditorDraft && (
                 <>
                   <Button
                     variant="ghost"
@@ -793,23 +794,12 @@ export default function App() {
                   </Button>
                 </>
               )}
-              {isDevelopmentRuntime && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => void reloadConfig()}
-                disabled={busy === "load"}
-                title="Reload config"
-                aria-label="Reload config"
-              >
-                <RefreshCw className={busy === "load" ? "animate-spin" : ""} size={16} />
-              </Button>
-            )}
           </div>
           </div>
         </header>
 
-        <div className="mx-auto w-full max-w-[1100px] px-8 py-6">
+        <div className="flex-1 overflow-y-auto">
+          <div className="mx-auto w-full max-w-[1100px] px-8 py-6">
           {page === "router" && (
             <motion.section
               aria-label="Router endpoints"
@@ -851,36 +841,56 @@ export default function App() {
                     busy={busy}
                     validation={routerValidation}
                   />
-                  <VendorsPage
-                    vendors={draft.vendors}
-                    vendorHealth={health?.ok ? health.body?.vendors : []}
-                    onUpdateVendor={updateVendor}
-                    onAddVendor={addVendor}
-                    onRemoveVendor={removeVendor}
-                    onReorderVendors={reorderVendors}
-                    onOpenVendorEditor={openVendorEditor}
-                    busy={busy === "vendors"}
-                  />
+                  <section
+                    aria-label="Vendors"
+                    className="grid grid-cols-1 overflow-hidden rounded-xl border border-border bg-card/40 xl:grid-cols-[230px_minmax(0,1fr)]"
+                  >
+                    <div className="border-b border-border bg-muted/20 xl:border-b-0 xl:border-r">
+                      <VendorsRail
+                        vendors={draft.vendors}
+                        selectedIndex={vendorEditorIndex}
+                        hasUnsavedNew={vendorEditorIsNew}
+                        unsavedName={vendorEditorDraft?.name ?? ""}
+                        onAddVendor={addVendor}
+                        onRemoveVendor={removeVendor}
+                        onReorderVendors={reorderVendors}
+                        onSelectVendor={openVendorEditor}
+                        onEnableChange={(index, enabled) => updateVendor(index, "enabled", enabled)}
+                        busy={busy === "vendors"}
+                      />
+                    </div>
+                    <div className="min-w-0 p-5">
+                      {vendorEditorDraft ? (
+                        <VendorEditorPage
+                          vendor={vendorEditorDraft}
+                          onUpdateVendor={updateVendorEditor}
+                          onUpdateVendorModel={updateVendorEditorModel}
+                          onAddVendorModel={addVendorEditorModel}
+                          onRemoveVendorModel={requestRemoveVendorEditorModel}
+                          availableModels={availableVendorModels}
+                          vendorModelsError={vendorModelsError}
+                          onRefreshVendorModels={refreshVendorModels}
+                          onLoadVendorModelsOnSelect={loadVendorModelsOnSelect}
+                          showVendorKey={showVendorKey}
+                          onSetShowVendorKey={setShowVendorKey}
+                          onCopyVendorApiKey={copyVendorApiKey}
+                          onSaveVendor={saveVendorEditor}
+                          onRevertVendor={requestRevertVendorEditor}
+                          busy={busy}
+                        />
+                      ) : (
+                        <div className="flex h-full min-h-[420px] flex-col items-center justify-center gap-2 text-muted-foreground">
+                          <Server size={22} className="opacity-50" aria-hidden="true" />
+                          <p className="text-sm">Select a vendor to edit its settings</p>
+                          <Button variant="outline" size="sm" onClick={addVendor}>
+                            <Plus size={14} />
+                            Add vendor
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </section>
                 </div>
-              )}
-              {page === "vendor-edit" && (
-                <VendorEditorPage
-                  vendor={vendorEditorDraft}
-                  onUpdateVendor={updateVendorEditor}
-                  onUpdateVendorModel={updateVendorEditorModel}
-                  onAddVendorModel={addVendorEditorModel}
-                  onRemoveVendorModel={requestRemoveVendorEditorModel}
-                  availableModels={availableVendorModels}
-                  vendorModelsError={vendorModelsError}
-                  onRefreshVendorModels={refreshVendorModels}
-                  onLoadVendorModelsOnSelect={loadVendorModelsOnSelect}
-                  showVendorKey={showVendorKey}
-                  onSetShowVendorKey={setShowVendorKey}
-                  onCopyVendorApiKey={copyVendorApiKey}
-                  onSaveVendor={saveVendorEditor}
-                  onRevertVendor={requestRevertVendorEditor}
-                  busy={busy}
-                />
               )}
               {page === "usage" && <UsagePage usage={usage} onRefreshUsage={(options) => void run("usage", () => refreshUsage(options))} busy={busy} />}
               {page === "logs" && (
@@ -895,6 +905,7 @@ export default function App() {
               )}
             </motion.div>
           </AnimatePresence>
+          </div>
         </div>
       </main>
 
@@ -966,6 +977,23 @@ export default function App() {
               Cancel
             </Button>
             <Button onClick={confirmEnableThinking}>Enable</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={modal?.type === "reloadConfig"} onOpenChange={(open) => { if (!open) setModal(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reload config</DialogTitle>
+            <DialogDescription>
+              The config file was changed outside the GUI. Reloading will replace
+              unsaved edits in this window with the on-disk values
+              {routerActive ? ", and the Router will be restarted to apply them." : "."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setModal(null)}>Cancel</Button>
+            <Button onClick={() => void confirmReloadConfig()}>Reload</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

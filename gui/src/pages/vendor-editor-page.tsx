@@ -1,5 +1,5 @@
 import * as React from "react";
-import { ChevronDown, Info, Loader2, Plus, RefreshCw, Server, Trash2 } from "lucide-react";
+import { ArrowLeftRight, ChevronDown, Info, Loader2, Plus, RefreshCw, Server, Trash2 } from "lucide-react";
 
 import { Field } from "../components/field.tsx";
 import { SecretInput } from "../components/secret-input.tsx";
@@ -223,6 +223,31 @@ export function VendorEditorPage({
   );
 }
 
+function VllmThinkingPill({
+  checked,
+  disabled = false,
+  onToggle,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      disabled={disabled}
+      onClick={onToggle}
+      className={cn("vllm-thinking-pill", checked && "is-active")}
+      data-tooltip="Map reasoning/thinking fields between OpenAI and vLLM"
+    >
+      <ArrowLeftRight size={13} className="vllm-thinking-pill-icon" />
+      <span>vLLM Thinking</span>
+    </button>
+  );
+}
+
 function ModelPricingRow({
   model,
   index,
@@ -284,12 +309,10 @@ function ModelPricingRow({
             ))}
           </SelectContent>
         </Select>
-        <ToggleRow
-          label="Thinking"
+        <VllmThinkingPill
           checked={model.enableThinking === true}
-          onCheckedChange={(checked) => onUpdateVendorModel(index, "enableThinking", checked)}
-          compact
-          title="Send chat_template_kwargs.enable_thinking=true to the upstream. Only valid for models served by a vLLM endpoint that supports this parameter; keep it off for any other vendor or deployment."
+          disabled={model.enabled === false}
+          onToggle={() => onUpdateVendorModel(index, "enableThinking", model.enableThinking !== true)}
         />
         <Button
           type="button"
@@ -442,7 +465,7 @@ function PriceInput({
       <Input
         value={value}
         inputMode={numeric ? "decimal" : "text"}
-        placeholder={unavailable ? "Not available" : optional ? "Same as input" : ""}
+        placeholder={unavailable ? "N/A" : optional ? "Same as input" : ""}
         readOnly={readOnly}
         onChange={(event) => onChange(event.target.value)}
         aria-label={label}

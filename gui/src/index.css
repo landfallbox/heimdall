@@ -5,7 +5,10 @@
 :root {
   --radius: 0.625rem;
 
-  --background: oklch(0.973 0.005 258);
+  /* 外层底壳（Electron 下透出系统材质），比画布暗一档 */
+  --background: oklch(0.945 0.008 258);
+  /* 内嵌画布：页面内容的实际承载面 */
+  --canvas: oklch(0.973 0.005 258);
   --foreground: oklch(0.205 0.02 262);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.205 0.02 262);
@@ -29,7 +32,7 @@
   --input: oklch(0.88 0.012 258);
   --ring: oklch(0.545 0.19 257);
 
-  --sidebar: oklch(0.955 0.006 258);
+  --sidebar: oklch(0.945 0.008 258);
   --sidebar-border: oklch(0.9 0.01 258);
   --console: oklch(0.958 0.008 258);
   --console-foreground: oklch(0.3 0.02 260);
@@ -50,7 +53,10 @@
 }
 
 .dark {
-  --background: oklch(0.175 0.028 262);
+  /* 外层底壳：最暗一档，Electron 下透出 mica/vibrancy 材质 */
+  --background: oklch(0.148 0.026 262);
+  /* 内嵌画布：比底壳提亮一档 */
+  --canvas: oklch(0.175 0.028 262);
   --foreground: oklch(0.92 0.01 258);
   --card: oklch(0.215 0.032 262);
   --card-foreground: oklch(0.92 0.01 258);
@@ -99,6 +105,7 @@
   --font-mono: "Cascadia Mono", Consolas, "SF Mono", monospace;
 
   --color-background: var(--background);
+  --color-canvas: var(--canvas);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
@@ -168,8 +175,9 @@
   }
 
   html {
-    @apply overflow-y-scroll overflow-x-hidden;
-    scrollbar-gutter: stable;
+    /* 外层壳不滚动：只保留内嵌画布的细滚动条，
+       避免视口边缘出现原生滚动条轨道与画布滚动条并排的“双轨” */
+    @apply overflow-hidden;
   }
 
   body {
@@ -217,6 +225,264 @@
     background: color-mix(in oklch, var(--muted-foreground) 58%, transparent);
     background-clip: padding-box;
   }
+}
+
+/* Radix Popover 入场动画（transform-origin 由 Radix 通过 CSS 变量提供） */
+.popover-panel {
+  transform-origin: var(--radix-popover-content-transform-origin);
+  animation: popover-in 0.14s ease-out;
+}
+
+@keyframes popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ============ sonner 通知（toast）覆盖（暗色模式） ============
+   sonner 在运行时把默认样式注入 <head> 末尾，同优先级会压过本文件，
+   因此这里统一用 .dark [data-sonner-toaster] 前缀抬高特异性覆盖：
+   - 底色改为比画布微亮的深灰蓝 + 毛玻璃 + 深投影，替代纯黑 / 满铺暗红
+   - 宽度随内容伸缩（240–420px）并在容器内右对齐
+   - 关闭按钮从左上角外挂移入卡片内部右侧，默认半透明、悬停提亮
+   - 语义色只出现在图标、边框微光与左侧细条上，不再整块染色
+   亮色模式不覆盖，沿用 sonner 默认外观。 */
+.dark [data-sonner-toaster] {
+  /* 容器加宽到最大 toast 宽度，保证变宽的 toast 不超出右对齐锚点 */
+  width: 420px;
+}
+
+.dark [data-sonner-toaster] [data-sonner-toast][data-styled="true"] {
+  width: fit-content;
+  min-width: 240px;
+  max-width: 420px;
+  margin-left: auto;
+  padding: 10px 10px 10px 14px;
+  background: rgba(22, 29, 42, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
+  box-shadow:
+    0 12px 28px -6px rgba(0, 0, 0, 0.65),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+  color: #f1f5f9;
+  font-size: 13.5px;
+  gap: 10px;
+}
+
+/* 错误态：底色保持深色，仅边框微光、图标与左侧细条转红 */
+.dark [data-sonner-toaster] [data-sonner-toast][data-styled="true"][data-type="error"] {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: linear-gradient(90deg, rgba(239, 68, 68, 0.12) 0%, rgba(22, 29, 42, 0.95) 45%);
+  box-shadow:
+    0 12px 28px -6px rgba(0, 0, 0, 0.65),
+    inset 2px 0 0 rgba(239, 68, 68, 0.45),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+
+/* 语义图标色：info 灰蓝 / error 珊瑚红 / success 绿 / warning 琥珀 */
+.dark [data-sonner-toaster] [data-sonner-toast][data-type="info"] [data-icon] {
+  color: #94a3b8;
+}
+.dark [data-sonner-toaster] [data-sonner-toast][data-type="error"] [data-icon] {
+  color: #f87171;
+}
+.dark [data-sonner-toaster] [data-sonner-toast][data-type="success"] [data-icon] {
+  color: #34d399;
+}
+.dark [data-sonner-toaster] [data-sonner-toast][data-type="warning"] [data-icon] {
+  color: #fbbf24;
+}
+
+/* 关闭按钮：移入卡片内部右侧，与图标、文字同一水平线 */
+.dark [data-sonner-toaster] [data-sonner-toast][data-styled="true"] [data-close-button] {
+  position: static;
+  order: 10;
+  width: 22px;
+  height: 22px;
+  transform: none;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #64748b;
+  opacity: 0.5;
+  transition:
+    opacity 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.dark [data-sonner-toaster] [data-sonner-toast][data-styled="true"]:hover [data-close-button],
+.dark [data-sonner-toaster] [data-sonner-toast][data-styled="true"] [data-close-button]:hover {
+  opacity: 1;
+}
+.dark [data-sonner-toaster] [data-sonner-toast][data-styled="true"] [data-close-button]:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+}
+.dark [data-sonner-toaster] [data-sonner-toast][data-styled="true"] [data-close-button]:focus-visible {
+  box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.4);
+}
+
+/* 表单校验错误：对应输入框就地红色高亮闪烁（由 App.tsx 的 flashInputError 触发） */
+@keyframes input-error-flash {
+  0% {
+    border-color: rgba(239, 68, 68, 0.9);
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
+  }
+  100% {
+    border-color: var(--input);
+    box-shadow: none;
+  }
+}
+.input-error-flash {
+  animation: input-error-flash 1.4s ease-out;
+}
+
+/* ============ vLLM Thinking 胶囊切换器（模型卡片头部） ============
+   四态：默认关闭（暗灰内敛）/ 激活（青蓝微光）/ 从属禁用（模型 Off 时降透明度）
+   / 悬停 0.3s 后弹出纯 CSS 气泡提示。 */
+.vllm-thinking-pill {
+  position: relative;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  color: #64748b;
+}
+
+.vllm-thinking-pill:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #94a3b8;
+}
+
+.vllm-thinking-pill.is-active {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.45);
+  color: #38bdf8;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.08);
+}
+
+.vllm-thinking-pill.is-active:hover:not(:disabled) {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: rgba(56, 189, 248, 0.6);
+}
+
+.vllm-thinking-pill:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.vllm-thinking-pill-icon {
+  opacity: 0.75;
+  transition: opacity 0.2s ease;
+}
+.vllm-thinking-pill.is-active .vllm-thinking-pill-icon {
+  opacity: 1;
+}
+
+/* 悬停气泡提示：悬停 0.3s 后淡入，移开立即淡出 */
+.vllm-thinking-pill::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: #1e2638;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+  color: #e2e8f0;
+  font-size: 11.5px;
+  font-weight: 400;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 50;
+}
+.vllm-thinking-pill:hover::after {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.3s;
+}
+
+/* ============ Electron 无边框外壳 ============
+   仅在 Electron 渲染进程内生效（main.tsx 检测到 preload 标记后
+   给 <html> 加 .electron-shell 类）：外层底壳半透明以透出
+   mica / vibrancy 系统材质，内嵌画布保持不透明。
+   顶部 34px 为专属系统条：Windows titleBarOverlay 控制按钮
+   （height: 34）与 macOS 红绿灯都落在这一条里，边栏和画布
+   从其下方开始布局，互不重叠。浏览器中预览时这些规则不生效。 */
+.electron-shell {
+  background: transparent;
+  overflow: hidden;
+}
+
+.electron-shell body {
+  background: transparent;
+  overflow: hidden;
+}
+
+.electron-shell .app-shell {
+  background: color-mix(in oklch, var(--background) 82%, transparent);
+  -webkit-app-region: drag;
+  /* 顶部 34px 系统条：整条可拖拽，系统按钮独占右上角 */
+  padding-top: 34px;
+}
+
+/* 画布整体恢复普通鼠标行为，内部内容可点击可选中 */
+.electron-shell .app-shell > main {
+  -webkit-app-region: no-drag;
+}
+
+.electron-shell .sidebar-root {
+  border-right: 0;
+  background-color: transparent;
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.electron-shell .sidebar-root button,
+.electron-shell .sidebar-root a,
+.electron-shell .sidebar-root input {
+  -webkit-app-region: no-drag;
+}
+
+/* macOS 红绿灯已落在顶部系统条内，边栏只需少量呼吸间距 */
+.electron-shell.platform-mac .sidebar-root {
+  padding-top: 4px;
+}
+
+/* 画布标题栏可拖动窗口，右侧按钮除外 */
+.electron-shell .canvas-header {
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.electron-shell .canvas-header button,
+.electron-shell .canvas-header a {
+  -webkit-app-region: no-drag;
 }
 
 @media (prefers-reduced-motion: reduce) {
