@@ -4,8 +4,7 @@ import { ArrowLeftRight, ChevronDown, Info, Loader2, Plus, RefreshCw, Server, Tr
 import { Field } from "../components/field.tsx";
 import { SecretInput } from "../components/secret-input.tsx";
 import { SegmentedControl } from "../components/segmented-control.tsx";
-import { ToggleRow } from "../components/toggle-row.tsx";
-import { formatPeakHours } from "../lib/format.ts";
+import { formatCompactTokenCount, formatPeakHours, formatTokenCount } from "../lib/format.ts";
 import { cn } from "../lib/utils.ts";
 import {
   getVendorModelOptions,
@@ -29,6 +28,7 @@ import { Card, CardContent } from "../components/ui/card.tsx";
 import { Separator } from "../components/ui/separator.tsx";
 import { Input } from "../components/ui/input.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.tsx";
+import { Switch } from "../components/ui/switch.tsx";
 
 const requestFormatOptions: Array<{ value: RequestFormat; label: string }> = [
   { value: "chat-completions", label: "Chat Completions" },
@@ -272,16 +272,43 @@ function ModelPricingRow({
       : null;
   const catalogLabel = PRICING_CATALOG_LABELS[catalogKey];
   const otherCatalogLabel = otherCatalogKey ? PRICING_CATALOG_LABELS[otherCatalogKey] : "";
+  const [expanded, setExpanded] = React.useState(false);
+
+  const priceParts: string[] = [];
+  const priceValue = (value: string | number | undefined) => (value === undefined || value === "" ? "—" : String(value));
+  if (customPricing || pricingView) {
+    priceParts.push(
+      priceValue(customPricing ? model.inputPerMillion : pricingView?.pricing?.inputPerMillion),
+      priceValue(customPricing ? model.cachedInputPerMillion : pricingView?.pricing?.cachedInputPerMillion ?? pricingView?.pricing?.inputPerMillion),
+      priceValue(customPricing ? model.outputPerMillion : pricingView?.pricing?.outputPerMillion),
+    );
+  }
+  const priceCurrency = customPricing ? normalizeCurrency(model.pricingCurrency) : pricingView?.pricing?.currency;
+  const priceSummary = priceParts.length ? `${priceCurrency} ${priceParts.join(" / ")} / 1M` : null;
+  const contextSummary = vscodeSummaryContext(model);
+  const capabilitySummary = vscodeSummaryCapabilities(model);
 
   return (
-    <div className="flex min-w-0 flex-col gap-2.5 rounded-xl border border-white/5 bg-card p-3 shadow-[0_1px_2px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.04)]">
-      <div className="grid grid-cols-[76px_minmax(120px,1fr)_auto_38px] items-center gap-2 border-b border-border/60 pb-2.5">
-        <ToggleRow
-          label={model.enabled === false ? "Off" : "On"}
+    <div className="flex min-w-0 flex-col rounded-xl border border-white/5 bg-card shadow-[0_1px_2px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.04)]">
+      <div
+        role="button"
+        tabIndex={0}
+        aria-expanded={expanded}
+        onClick={() => setExpanded((value) => !value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            setExpanded((value) => !value);
+          }
+        }}
+        className="grid grid-cols-[32px_minmax(120px,1fr)_auto_30px] cursor-pointer items-center gap-2 rounded-t-xl bg-foreground/[0.03] px-3 py-2 outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+      >
+        <Switch
           checked={model.enabled !== false}
           onCheckedChange={(checked) => onUpdateVendorModel(index, "enabled", checked)}
-          compact
+          aria-label={model.enabled === false ? "Enable model" : "Disable model"}
           title={model.enabled === false ? "Enable model" : "Disable model"}
+          onClick={(event) => event.stopPropagation()}
         />
         <Select
           value={model.id || undefined}
@@ -298,7 +325,11 @@ function ModelPricingRow({
             }
           }}
         >
-          <SelectTrigger className="w-full bg-background/40 font-mono text-xs" aria-label="Model id">
+          <SelectTrigger
+            className="w-full bg-background/40 font-mono text-xs"
+            aria-label="Model id"
+            onClick={(event) => event.stopPropagation()}
+          >
             <SelectValue placeholder="Select model" />
           </SelectTrigger>
           <SelectContent>
@@ -309,137 +340,172 @@ function ModelPricingRow({
             ))}
           </SelectContent>
         </Select>
-        <VllmThinkingPill
-          checked={model.enableThinking === true}
-          disabled={model.enabled === false}
-          onToggle={() => onUpdateVendorModel(index, "enableThinking", model.enableThinking !== true)}
-        />
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          onClick={() => onRemoveVendorModel(index)}
-          title="Remove model"
-          aria-label="Remove model"
-          className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-        >
-          <Trash2 size={15} />
-        </Button>
-      </div>
-
-      <div className="grid grid-cols-[220px_1fr] items-end gap-2.5">
-        <div className="flex min-w-0 flex-col gap-1.5">
-          <span className="text-xs font-semibold text-muted-foreground">Price source</span>
-          <Select
-            value={model.pricingMode || "openai"}
-            onValueChange={(value) => onUpdateVendorModel(index, "pricingMode", value)}
+        <div className="flex items-center gap-2" onClick={(event) => event.stopPropagation()}>
+          <VllmThinkingPill
+            checked={model.enableThinking === true}
+            disabled={model.enabled === false}
+            onToggle={() => onUpdateVendorModel(index, "enableThinking", model.enableThinking !== true)}
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => onRemoveVendorModel(index)}
+            title="Remove model"
+            aria-label="Remove model"
+            className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
           >
-            <SelectTrigger className="w-full bg-background/40" aria-label="Price source">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {PRICING_CATALOG_KEYS.map((key) => (
-                <SelectItem key={key} value={key}>
-                  {PRICING_CATALOG_LABELS[key]} prices
-                </SelectItem>
-              ))}
-              <SelectItem value="custom">Custom</SelectItem>
-            </SelectContent>
-          </Select>
+            <Trash2 size={15} />
+          </Button>
         </div>
-        <PricingFields
-          currency={customPricing ? model.pricingCurrency : pricingView?.pricing?.currency}
-          input={customPricing ? model.inputPerMillion : pricingView?.pricing?.inputPerMillion}
-          cached={customPricing
-            ? model.cachedInputPerMillion
-            : pricingView?.pricing?.cachedInputPerMillion ?? pricingView?.pricing?.inputPerMillion}
-          output={customPricing ? model.outputPerMillion : pricingView?.pricing?.outputPerMillion}
-          editable={customPricing}
-          available={customPricing || Boolean(pricingView)}
-          onChange={(field, value) => onUpdateVendorModel(index, field, value)}
+        <ChevronDown
+          size={15}
+          className={cn("justify-self-end text-muted-foreground/70 transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]", expanded && "rotate-180")}
         />
       </div>
 
-      <VsCodeModelFields model={model} onUpdateVendorModel={onUpdateVendorModel} modelIndex={index} />
-
-      {customPricing && !isValidCustomPricing(model) ? (
-        <small className="text-[11px] leading-snug text-destructive">
-          Enter valid non-negative prices for {model.id || "this model"}.
-        </small>
-      ) : customPricing ? null : pricingView?.offPeakPricing ? (
-        <small className="text-[11px] leading-snug text-muted-foreground">
-          Peak {pricingView.pricing.currency} {pricingView.pricing.inputPerMillion} / {pricingView.pricing.cachedInputPerMillion} /{" "}
-          {pricingView.pricing.outputPerMillion} per 1M · Off-peak ({formatPeakHours(pricingView.peakHours)}){" "}
-          {pricingView.offPeakPricing.currency} {pricingView.offPeakPricing.inputPerMillion} / {pricingView.offPeakPricing.cachedInputPerMillion} /{" "}
-          {pricingView.offPeakPricing.outputPerMillion}
-        </small>
-      ) : !pricingView && model.id ? (
-        <small className="flex items-start gap-1.5 text-[11px] leading-snug text-warning">
-          <Info size={12} className="mt-0.5 shrink-0" />
-          {otherCatalogKey ? (
-            <>
-              Not in {catalogLabel} —{" "}
-              <button
-                type="button"
-                className="bg-none p-0 font-bold text-primary underline-offset-2 hover:underline"
-                onClick={() => onUpdateVendorModel(index, "pricingMode", otherCatalogKey)}
-              >
-                switch to {otherCatalogLabel}
-              </button>
-            </>
-          ) : (
-            `Not in ${catalogLabel} — use Custom`
+      <div
+        className={cn(
+          "grid transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
+          expanded ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100",
+        )}
+      >
+        <div className="min-h-0 overflow-hidden">
+          {(priceSummary || contextSummary || capabilitySummary.length > 0) && (
+            <div
+              className="flex min-w-0 items-center gap-2 px-3 pb-2 text-[11px] text-muted-foreground"
+              onClick={(event) => event.stopPropagation()}
+            >
+              {priceSummary && <span className="shrink-0 font-mono">{priceSummary}</span>}
+              {contextSummary && (
+                <>
+                  <span className="text-border">·</span>
+                  <span className="shrink-0">{contextSummary}</span>
+                </>
+              )}
+              {capabilitySummary.length > 0 && (
+                <>
+                  <span className="text-border">·</span>
+                  <span className="flex min-w-0 items-center gap-1">
+                    {capabilitySummary.map((item) => (
+                      <span key={item} className="shrink-0 rounded-full border border-border/70 bg-background/40 px-1.5 py-px text-[10px]">
+                        {item}
+                      </span>
+                    ))}
+                  </span>
+                </>
+              )}
+            </div>
           )}
-        </small>
-      ) : null}
-    </div>
-  );
-}
-
-function PricingFields({
-  currency,
-  input,
-  cached,
-  output,
-  editable,
-  available,
-  onChange,
-}: {
-  currency: string | undefined;
-  input: string | number | undefined;
-  cached: string | number | undefined;
-  output: string | number | undefined;
-  editable: boolean;
-  available: boolean;
-  onChange: (field: string, value: string) => void;
-}) {
-  return (
-    <div className="grid min-w-0 grid-cols-[90px_repeat(3,minmax(0,1fr))] items-end gap-2">
-      <div className="flex min-w-0 flex-col gap-1.5">
-        <span className="text-xs font-semibold text-muted-foreground">Currency</span>
-        <Select value={normalizeCurrency(currency)} disabled={!editable} onValueChange={(value) => onChange("pricingCurrency", value)}>
-          <SelectTrigger className="w-full bg-background/40" aria-label="Currency">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {currencyOptions.map((option) => (
-              <SelectItem key={option} value={option}>
-                {option}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        </div>
       </div>
-      <PriceInput label="Input / 1M" value={String(input ?? "")} onChange={(value) => onChange("inputPerMillion", value)} numeric readOnly={!editable} unavailable={!available} />
-      <PriceInput label="Cached / 1M" value={String(cached ?? "")} onChange={(value) => onChange("cachedInputPerMillion", value)} numeric optional readOnly={!editable} unavailable={!available} />
-      <PriceInput label="Output / 1M" value={String(output ?? "")} onChange={(value) => onChange("outputPerMillion", value)} numeric readOnly={!editable} unavailable={!available} />
+
+      <div
+        className={cn(
+          "grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
+          expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+        )}
+      >
+        <div className="min-h-0 overflow-hidden" aria-hidden={!expanded} {...(!expanded ? { inert: true } : {})}>
+          <div
+            className={cn(
+              "flex min-w-0 flex-col gap-2.5 p-3 pt-2.5 transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
+              expanded ? "translate-y-0 opacity-100" : "-translate-y-3 opacity-0",
+            )}
+          >
+          <div className="grid min-w-0 grid-cols-[148px_repeat(3,minmax(0,1fr))] items-end gap-2.5">
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <span className="text-xs font-semibold text-muted-foreground">Price source</span>
+              <Select
+                value={model.pricingMode || "openai"}
+                onValueChange={(value) => onUpdateVendorModel(index, "pricingMode", value)}
+              >
+                <SelectTrigger className="w-full bg-background/40" aria-label="Price source">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PRICING_CATALOG_KEYS.map((key) => (
+                    <SelectItem key={key} value={key}>
+                      {PRICING_CATALOG_LABELS[key]} prices
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="custom">Custom</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <PriceInput
+              label={`Input / 1M (${normalizeCurrency(customPricing ? model.pricingCurrency : pricingView?.pricing?.currency)})`}
+              value={String(customPricing ? model.inputPerMillion : pricingView?.pricing?.inputPerMillion ?? "")}
+              onChange={(value) => onUpdateVendorModel(index, "inputPerMillion", value)}
+              numeric
+              readOnly={!customPricing}
+              unavailable={!customPricing && !pricingView}
+            />
+            <PriceInput
+              label="Cached / 1M"
+              value={String(
+                customPricing
+                  ? model.cachedInputPerMillion
+                  : pricingView?.pricing?.cachedInputPerMillion ?? pricingView?.pricing?.inputPerMillion ?? "",
+              )}
+              onChange={(value) => onUpdateVendorModel(index, "cachedInputPerMillion", value)}
+              numeric
+              optional
+              readOnly={!customPricing}
+              unavailable={!customPricing && !pricingView}
+            />
+            <PriceInput
+              label="Output / 1M"
+              value={String(customPricing ? model.outputPerMillion : pricingView?.pricing?.outputPerMillion ?? "")}
+              onChange={(value) => onUpdateVendorModel(index, "outputPerMillion", value)}
+              numeric
+              readOnly={!customPricing}
+              unavailable={!customPricing && !pricingView}
+            />
+          </div>
+
+          <VsCodeModelFields model={model} onUpdateVendorModel={onUpdateVendorModel} modelIndex={index} />
+
+          {customPricing && !isValidCustomPricing(model) ? (
+            <small className="text-[11px] leading-snug text-destructive">
+              Enter valid non-negative prices for {model.id || "this model"}.
+            </small>
+          ) : customPricing ? null : pricingView?.offPeakPricing ? (
+            <small className="text-[11px] leading-snug text-muted-foreground">
+              Peak {pricingView.pricing.currency} {pricingView.pricing.inputPerMillion} / {pricingView.pricing.cachedInputPerMillion} /{" "}
+              {pricingView.pricing.outputPerMillion} per 1M · Off-peak ({formatPeakHours(pricingView.peakHours)}){" "}
+              {pricingView.offPeakPricing.currency} {pricingView.offPeakPricing.inputPerMillion} / {pricingView.offPeakPricing.cachedInputPerMillion} /{" "}
+              {pricingView.offPeakPricing.outputPerMillion}
+            </small>
+          ) : !pricingView && model.id ? (
+            <small className="flex items-start gap-1.5 text-[11px] leading-snug text-warning">
+              <Info size={12} className="mt-0.5 shrink-0" />
+              {otherCatalogKey ? (
+                <>
+                  Not in {catalogLabel} —{" "}
+                  <button
+                    type="button"
+                    className="bg-none p-0 font-bold text-primary underline-offset-2 hover:underline"
+                    onClick={() => onUpdateVendorModel(index, "pricingMode", otherCatalogKey)}
+                  >
+                    switch to {otherCatalogLabel}
+                  </button>
+                </>
+              ) : (
+                `Not in ${catalogLabel} — use Custom`
+              )}
+            </small>
+          ) : null}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
 
 function normalizeCurrency(value: string | undefined) {
   const normalized = String(value || "USD").trim().toUpperCase();
-  return currencyOptions.includes(normalized) ? normalized : "USD";
+  return normalized === "CNY" ? "CNY" : "USD";
 }
 
 function PriceInput({
@@ -484,9 +550,7 @@ function VsCodeModelFields({
   onUpdateVendorModel: (modelIndex: number, field: string, value: unknown) => void;
   modelIndex: number;
 }) {
-  const [expanded, setExpanded] = React.useState(false);
   const vscode = model.vscode;
-  const hasMetadata = Boolean(vscode && Object.keys(vscode).length);
 
   function updateVsCode(patch: Partial<VendorModelVsCodeDraft>) {
     const next: VendorModelVsCodeDraft = { ...vscode, ...patch };
@@ -507,84 +571,134 @@ function VsCodeModelFields({
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      <button
-        type="button"
-        className="inline-flex w-fit items-center gap-1.5 self-start rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-border/80 hover:text-foreground"
-        onClick={() => setExpanded((current) => !current)}
-        aria-expanded={expanded}
-      >
-        <ChevronDown className={cn("transition-transform duration-150", expanded && "rotate-180")} size={13} />
-        <span>VS Code metadata</span>
-        {hasMetadata && (
-          <span className="rounded-full bg-primary/12 px-1.5 py-px text-[10px] font-semibold text-primary">
-            {Object.keys(vscode as object).length} set
-          </span>
-        )}
-      </button>
-      {expanded && (
-        <div className="grid grid-cols-3 gap-2.5 rounded-xl border border-border bg-card p-3">
-          <label className="flex min-w-0 flex-col gap-1.5">
-            <span className="text-xs font-semibold text-muted-foreground">Display name</span>
-            <Input value={vscode?.name || ""} placeholder={model.id || "Model id"} onChange={(event) => updateVsCode({ name: event.target.value })} />
-          </label>
-          <label className="flex min-w-0 flex-col gap-1.5">
-            <span className="text-xs font-semibold text-muted-foreground">Context window</span>
+    <div className="flex flex-col gap-2.5">
+      <div className="flex items-center gap-3 pt-0.5">
+        <span className="shrink-0 text-[11px] font-semibold text-muted-foreground/70">VS Code</span>
+        <div className="h-px flex-1 bg-border/50" />
+      </div>
+      <div className="grid gap-2.5 sm:grid-cols-3">
+        <label className="flex min-w-0 flex-col gap-1.5">
+          <span className="text-xs font-semibold text-muted-foreground">Display name</span>
+          <Input value={vscode?.name || ""} placeholder={model.id || "Model id"} onChange={(event) => updateVsCode({ name: event.target.value })} />
+        </label>
+        <label className="flex min-w-0 flex-col gap-1.5">
+          <span className="text-xs font-semibold text-muted-foreground">Context window</span>
+          <div className="relative">
             <Input
-              value={vscode?.contextWindow || ""}
+              value={formatTokenInput(vscode?.contextWindow)}
               inputMode="numeric"
               placeholder="e.g. 128000"
-              onChange={(event) => updateVsCode({ contextWindow: event.target.value })}
+              className="pr-14"
+              onChange={(event) => updateVsCode({ contextWindow: event.target.value.replace(/\D/g, "") })}
             />
-          </label>
-          <label className="flex min-w-0 flex-col gap-1.5">
-            <span className="text-xs font-semibold text-muted-foreground">Max output tokens</span>
+            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[11px] text-muted-foreground">tokens</span>
+          </div>
+        </label>
+        <label className="flex min-w-0 flex-col gap-1.5">
+          <span className="text-xs font-semibold text-muted-foreground">Max output tokens</span>
+          <div className="relative">
             <Input
-              value={vscode?.maxOutputTokens || ""}
+              value={formatTokenInput(vscode?.maxOutputTokens)}
               inputMode="numeric"
               placeholder="e.g. 16384"
-              onChange={(event) => updateVsCode({ maxOutputTokens: event.target.value })}
+              className="pr-14"
+              onChange={(event) => updateVsCode({ maxOutputTokens: event.target.value.replace(/\D/g, "") })}
             />
-          </label>
-          <div className="col-span-3 grid grid-cols-3 gap-2">
-            <ToggleRow
-              label="Tool calling"
-              checked={vscode?.toolCalling === true}
-              onCheckedChange={(checked) => updateVsCode({ toolCalling: checked })}
-              compact
-              title="Model can call tools"
-            />
-            <ToggleRow
-              label="Vision"
-              checked={vscode?.vision === true}
-              onCheckedChange={(checked) => updateVsCode({ vision: checked })}
-              compact
-              title="Model accepts image input"
-            />
-            <ToggleRow
-              label="Thinking"
-              checked={vscode?.thinking === true}
-              onCheckedChange={(checked) => updateVsCode({ thinking: checked })}
-              compact
-              title="Model supports a thinking / reasoning mode"
-            />
+            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[11px] text-muted-foreground">tokens</span>
           </div>
-          <div className="col-span-3 flex flex-col gap-1.5">
-            <span className="text-xs font-semibold text-muted-foreground">Reasoning effort</span>
-            <div className="grid grid-cols-3 gap-x-2 gap-y-1.5 sm:grid-cols-6">
-              {REASONING_EFFORT_LEVELS.map((level) => (
-                <ToggleRow
-                  key={level}
-                  label={level}
-                  checked={vscode?.supportsReasoningEffort?.includes(level) === true}
-                  onCheckedChange={() => toggleReasoningEffort(level)}
-                  compact
-                />
-              ))}
-            </div>
+        </label>
+      </div>
+      <div className="flex flex-wrap items-start gap-x-8 gap-y-2.5">
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <span className="text-xs font-semibold text-muted-foreground">Capabilities</span>
+          <div className="flex flex-wrap gap-1.5">
+            <CapabilityPill
+              label="Tool calling"
+              active={vscode?.toolCalling === true}
+              onClick={() => updateVsCode({ toolCalling: vscode?.toolCalling !== true })}
+            />
+            <CapabilityPill label="Vision" active={vscode?.vision === true} onClick={() => updateVsCode({ vision: vscode?.vision !== true })} />
+            <CapabilityPill
+              label="Thinking"
+              active={vscode?.thinking === true}
+              onClick={() => updateVsCode({ thinking: vscode?.thinking !== true })}
+            />
           </div>
         </div>
-      )}
+        <div
+          className={cn(
+            "flex min-w-0 flex-col gap-1.5 transition-all duration-200 ease-out",
+            vscode?.thinking === true
+              ? "translate-x-0 opacity-100"
+              : "pointer-events-none -translate-x-2.5 opacity-0",
+          )}
+          aria-hidden={vscode?.thinking !== true}
+        >
+          <span className="text-xs font-semibold text-muted-foreground">Reasoning effort</span>
+          <div className="flex flex-wrap gap-1">
+            {REASONING_EFFORT_LEVELS.map((level) => (
+              <button
+                key={level}
+                type="button"
+                onClick={() => toggleReasoningEffort(level)}
+                className={cn(
+                  "h-6 rounded-md px-2 text-[11px] transition-colors",
+                  vscode?.supportsReasoningEffort?.includes(level)
+                    ? "bg-foreground/30 font-semibold text-foreground"
+                    : "bg-foreground/[0.05] font-medium text-muted-foreground hover:bg-foreground/10 hover:text-foreground",
+                )}
+              >
+                {level}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
+  );
+}
+
+function formatTokenInput(raw: string | undefined) {
+  const digits = String(raw || "").replace(/\D/g, "");
+  if (!digits) {
+    return "";
+  }
+  return formatTokenCount(Number(digits));
+}
+
+function vscodeSummaryContext(model: VendorModelDraft): string | null {
+  const raw = String(model.vscode?.contextWindow || "").replace(/\D/g, "");
+  return raw ? `${formatCompactTokenCount(Number(raw))} ctx` : null;
+}
+
+function vscodeSummaryCapabilities(model: VendorModelDraft): string[] {
+  const vscode = model.vscode;
+  const items: string[] = [];
+  if (vscode?.toolCalling === true) {
+    items.push("Tools");
+  }
+  if (vscode?.vision === true) {
+    items.push("Vision");
+  }
+  if (vscode?.thinking === true) {
+    items.push("Thinking");
+  }
+  return items;
+}
+
+function CapabilityPill({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "h-6 rounded-full border px-2.5 text-[11px] font-medium transition-colors",
+        active
+          ? "border-primary/45 bg-primary/15 text-primary"
+          : "border-border bg-background/40 text-muted-foreground hover:border-foreground/25 hover:text-foreground",
+      )}
+    >
+      {label}
+    </button>
   );
 }
