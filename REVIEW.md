@@ -18,3 +18,13 @@
 - 以下路径默认跳过，除非 diff 明确触碰：`src/pricing-data.ts`（生成文件）、`gui/dist/`、`build/`、图标与静态资源。
 - 摘要以数量开头（如"2 个 Important，1 个 Nit"）；没有可修的就明说"没有发现"，不要凑数。
 - 区分"本 PR 引入"和"既有问题"；既有问题单独标注，不算作者的缺陷。
+
+## 风险分级（按变更定级，不按作者）
+
+| 级别 | 典型范围 | 合并前要求 |
+| --- | --- | --- |
+| 低 | 文档、`data/pricing.json`、GUI 样式/文案 | CI + AI 审查绿即可合并 |
+| 中 | `src/server.ts`、协议转换、配置逻辑（`src/config.ts`） | 人读 diff + 测试证据（`npm test` 输出） |
+| 高 | `gui/electron/config-store.ts`、`gui/electron/updater.ts`、鉴权、`.github/workflows/ci.yml`、`release.yml` | 人深审 + 手动测打包版（`npm run test:electron` + 安装一次） |
+
+拿不准级别时按更高一级处理。
