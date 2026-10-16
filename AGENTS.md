@@ -28,6 +28,11 @@ npm run gui:build    # GUI 构建
 
 行为变更必须加/改 `test/` 下的测试；Electron 生命周期行为放 `test/electron-lifecycle.test.ts`。
 
+## 工作方式
+
+- 实现前先给计划；方向或方案被否时直接放弃该改动，不心疼已写的代码——agent 让"开始一件事"变得便宜，所以有些工作根本不该落地。
+- 方向问题提早提出（实现前），不在完成的改动上提 blocking 评论。
+
 ## 其他文档
 
 - 贡献流程、PR 要求、密钥管理：`CONTRIBUTING.md`
