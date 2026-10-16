@@ -719,7 +719,6 @@ export default function App() {
       <div className="hidden h-full shrink-0 md:block">
         <Sidebar
           appName={appName}
-          appVersion={appVersion}
           page={activePage}
           onNavigate={navigateTo}
           status={status}
@@ -824,8 +823,13 @@ export default function App() {
               {page === "application" && (
                 <AppSettingsPage
                   app={draft.app}
+                  appVersion={appVersion}
+                  updateState={updateState}
                   onSetAppSetting={setAppSetting}
                   onSyncNow={syncVsCodeModelsNow}
+                  onCheckUpdate={checkAppUpdate}
+                  onDownloadUpdate={downloadAppUpdate}
+                  onInstallUpdate={installAppUpdate}
                   busy={busy}
                 />
               )}

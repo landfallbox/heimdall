@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, Copy, Gauge, Info, Loader2, Play, RefreshCw, RotateCcw, Settings2, Server, Square, Terminal, type LucideIcon } from "lucide-react";
+import { Check, Copy, Download, Gauge, Info, Loader2, Play, RefreshCw, RotateCcw, Settings2, Server, Square, Terminal, type LucideIcon } from "lucide-react";
 
 import { getDesktopApi } from "../desktop-api.ts";
 import { cn } from "../lib/utils.ts";
@@ -25,7 +25,6 @@ interface SidebarStatus {
 
 interface SidebarProps {
   appName: string;
-  appVersion: string;
   page: PageId;
   onNavigate: (page: PageId) => void;
   status: SidebarStatus;
@@ -42,7 +41,6 @@ interface SidebarProps {
 
 export function Sidebar({
   appName,
-  appVersion,
   page,
   onNavigate,
   status,
@@ -63,19 +61,7 @@ export function Sidebar({
           <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-[15px] font-bold text-primary-foreground shadow-sm">
             H
           </div>
-          <div className="min-w-0">
-            <div className="truncate text-[15px] font-bold tracking-tight">{appName}</div>
-            {appVersion && <div className="text-[11px] text-muted-foreground">v{appVersion}</div>}
-          </div>
-        </div>
-        <div className="mt-3">
-          <SidebarUpdateButton
-            updateState={updateState}
-            onCheckUpdate={onCheckUpdate}
-            onDownloadUpdate={onDownloadUpdate}
-            onInstallUpdate={onInstallUpdate}
-            busy={busy}
-          />
+          <div className="min-w-0 truncate text-[15px] font-bold tracking-tight">{appName}</div>
         </div>
       </div>
 
@@ -102,7 +88,14 @@ export function Sidebar({
         })}
       </nav>
 
-      <div className="mt-auto p-4">
+      <div className="mt-auto flex flex-col gap-3 p-4">
+        <SidebarUpdateCard
+          updateState={updateState}
+          onCheckUpdate={onCheckUpdate}
+          onDownloadUpdate={onDownloadUpdate}
+          onInstallUpdate={onInstallUpdate}
+          busy={busy}
+        />
         <div className="rounded-xl border border-border bg-card p-3.5 shadow-card">
           <div className="flex items-center gap-2">
             <StatusDot tone={status.tone} pulse={status.tone === "success"} />
@@ -156,7 +149,8 @@ export function Sidebar({
   );
 }
 
-function SidebarUpdateButton({
+/** 侧边栏底部更新通知卡片：有更新时高亮提醒，平时仅保留一行低调的“检查更新”入口 */
+function SidebarUpdateCard({
   updateState,
   onCheckUpdate,
   onDownloadUpdate,
@@ -181,63 +175,113 @@ function SidebarUpdateButton({
 
   if (updateState.status === "downloaded") {
     return (
-      <Button size="sm" className="w-full" onClick={() => void onInstallUpdate()} disabled={isInstalling} title={`Install version ${updateState.availableVersion}`}>
-        {isInstalling ? <Loader2 className="animate-spin" size={13} /> : <span className="size-1.5 rounded-full bg-primary-foreground/90" />}
-        Restart to update
-      </Button>
+      <div className="rounded-xl border border-primary/40 bg-gradient-to-b from-primary/15 to-primary/5 p-3 shadow-card">
+        <div className="flex items-center gap-2">
+          <span className="size-1.5 shrink-0 animate-pulse rounded-full bg-primary" />
+          <span className="text-sm font-semibold">Update ready</span>
+        </div>
+        <VersionTransition current={updateState.currentVersion} next={updateState.availableVersion} />
+        <Button size="sm" className="mt-2.5 w-full" onClick={() => void onInstallUpdate()} disabled={isInstalling} title={`Install version ${updateState.availableVersion}`}>
+          {isInstalling ? <Loader2 className="animate-spin" size={14} /> : <RotateCcw size={14} />}
+          {isInstalling ? "Installing..." : "Restart to update"}
+        </Button>
+      </div>
     );
   }
 
   if (isDownloading) {
     return (
-      <div className="flex h-8 items-center justify-center gap-2 rounded-lg border border-border bg-card text-xs font-medium text-muted-foreground" aria-label={`Downloading update ${percent}%`}>
-        <Loader2 className="animate-spin" size={13} />
-        <span>Downloading {percent}%</span>
+      <div className="rounded-xl border border-primary/30 bg-primary/5 p-3" aria-label={`Downloading update ${percent}%`}>
+        <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+          <Loader2 className="animate-spin size-3.5 shrink-0" />
+          <span className="min-w-0 truncate">Downloading {percent}%</span>
+        </div>
+        <div className="mt-2 h-1 overflow-hidden rounded-full bg-primary/15">
+          <div className="h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${percent}%` }} />
+        </div>
       </div>
     );
   }
 
   if (isChecking) {
     return (
-      <div className="flex h-8 items-center justify-center gap-2 rounded-lg border border-border bg-card text-xs font-medium text-muted-foreground" aria-label="Checking for updates">
-        <Loader2 className="animate-spin" size={13} />
-        <span>Checking...</span>
+      <div className="flex items-center gap-2 px-1 text-[11px] font-medium text-muted-foreground/70" aria-label="Checking for updates">
+        <Loader2 className="animate-spin size-3 shrink-0" />
+        Checking for updates...
       </div>
     );
   }
 
   if (downloadFailed) {
     return (
-      <Button size="sm" variant="outline" className="w-full text-destructive" onClick={() => void onDownloadUpdate()} title={updateState.error || "Update download failed"}>
-        <span className="size-1.5 rounded-full bg-destructive" />
-        Update failed · Retry
-      </Button>
+      <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3">
+        <div className="flex items-center gap-2">
+          <span className="size-1.5 shrink-0 rounded-full bg-destructive" />
+          <span className="min-w-0 truncate text-sm font-semibold" title={updateState.error || "Update download failed"}>
+            Update failed
+          </span>
+        </div>
+        <Button size="sm" variant="outline" className="mt-2.5 w-full text-destructive" onClick={() => void onDownloadUpdate()} title={updateState.error || "Update download failed"}>
+          <RefreshCw size={14} />
+          Retry download
+        </Button>
+      </div>
     );
   }
 
   if (updateState.status === "error") {
     return (
-      <Button size="sm" variant="outline" className="w-full text-destructive" onClick={() => void onCheckUpdate()} title={updateState.error || "Update check failed"}>
-        <RefreshCw size={13} />
-        Check failed · Retry
-      </Button>
+      <button
+        type="button"
+        onClick={() => void onCheckUpdate()}
+        title={updateState.error || "Update check failed"}
+        className="flex w-full items-center gap-2 rounded-lg px-1 py-0.5 text-[11px] font-medium text-muted-foreground/70 transition-colors hover:text-foreground"
+      >
+        <RefreshCw size={12} className="shrink-0" />
+        <span className="min-w-0 truncate">Update check failed · Retry</span>
+      </button>
     );
   }
 
   if (updateState.status !== "available") {
     return (
-      <Button size="sm" variant="ghost" className="w-full text-muted-foreground" onClick={() => void onCheckUpdate()} title="Check for updates">
-        <RefreshCw size={13} />
+      <button
+        type="button"
+        onClick={() => void onCheckUpdate()}
+        title="Check for updates"
+        className="flex w-full items-center gap-2 rounded-lg px-1 py-0.5 text-[11px] font-medium text-muted-foreground/70 transition-colors hover:text-foreground"
+      >
+        <RefreshCw size={12} className="shrink-0" />
         Check for updates
-      </Button>
+      </button>
     );
   }
 
   return (
-    <Button size="sm" variant="secondary" className="w-full" onClick={() => void onDownloadUpdate()} disabled={isInstalling} title={`Download version ${updateState.availableVersion}`}>
-      <span className="size-1.5 rounded-full bg-primary" />
-      Update available
-    </Button>
+    <div className="rounded-xl border border-primary/40 bg-gradient-to-b from-primary/15 to-primary/5 p-3 shadow-card">
+      <div className="flex items-center gap-2">
+        <span className="size-1.5 shrink-0 animate-pulse rounded-full bg-primary" />
+        <span className="text-sm font-semibold">Update available</span>
+      </div>
+      <VersionTransition current={updateState.currentVersion} next={updateState.availableVersion} />
+      <Button size="sm" className="mt-2.5 w-full" onClick={() => void onDownloadUpdate()} disabled={isInstalling} title={`Download version ${updateState.availableVersion}`}>
+        <Download size={14} />
+        Update now
+      </Button>
+    </div>
+  );
+}
+
+/** 等宽小字展示版本演进：v0.15.0 → v0.16.0，缺失侧用占位符兜底 */
+function VersionTransition({ current, next }: { current: string; next: string }) {
+  const from = current ? `v${current}` : "…";
+  const to = next ? `v${next}` : "…";
+  return (
+    <div className="mt-1 flex items-center gap-1.5 overflow-hidden px-3.5 font-mono text-[11px] text-muted-foreground">
+      <span className="shrink-0">{from}</span>
+      <span className="shrink-0 text-muted-foreground/50">→</span>
+      <span className="min-w-0 truncate font-medium text-foreground/80">{to}</span>
+    </div>
   );
 }
 
