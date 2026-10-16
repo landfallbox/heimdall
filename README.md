@@ -123,10 +123,12 @@ The target file follows VS Code's per-platform user settings directory (`%APPDAT
 - Requests and responses are forwarded unchanged when the client and vendor use the same format, including streaming. For different formats, the Router converts common non-streaming text and function-call payloads. Cross-format streaming and format-specific parameters that cannot be converted safely return `400` instead of being silently discarded.
 - If an upstream fails before streaming starts, another vendor can be tried. Once partial output has reached the client, the router cannot switch vendors without corrupting the stream.
 - Token totals depend on the upstream response's `usage` metadata. Streaming providers that omit final usage are counted as requests but excluded from token and cost totals; the Usage page displays token and price coverage instead of treating missing metadata as zero.
-- Usage events contain request metadata and token counts, not prompts or generated content. They are stored as monthly JSONL files under the platform user-data directory's `usage` folder.
-- Packaged builds store configuration in Electron's platform user-data directory:
-  - Windows: `%APPDATA%\Heimdall\config.json`.
-  - macOS: `~/Library/Application Support/Heimdall/config.json`.
+- Usage events contain request metadata and token counts, not prompts or generated content. They are stored as monthly JSONL files under the data directory's `usage` folder.
+- Packaged builds keep every local file in one data directory: configuration, logs, usage journals, and Electron state. The Windows installer asks where to put it, and the Application settings page can move it later; moving stops the Router, copies the existing files, verifies them, and restarts the app.
+- The chosen directory is recorded in a pointer file that always stays in the default location, so the app can find it on the next start:
+  - Windows: `%APPDATA%\Heimdall\data-location.ini`, with `%APPDATA%\Heimdall` as the default data directory.
+  - macOS: `~/Library/Application Support/Heimdall/data-location.ini`. The drag-to-install disk image has no installer page, so the directory is only changed from settings.
+- If a recorded directory is unavailable at startup (an external drive that is not plugged in, for example) the app reports it and uses the default folder for that session instead of creating a second copy of the configuration. The pointer is kept, so the data is found again once the directory is reachable. A structurally invalid pointer (a relative path, a drive root, or a folder inside the installation directory) can never become valid, so the app resets it on startup and reports the reset.
 
 ## Development
 
@@ -142,6 +144,7 @@ The main runtime boundaries are:
 - `src/usage-store.ts`: monthly JSONL persistence and local-calendar aggregation.
 - `gui/electron/main.ts`: Electron lifecycle, tray, IPC registration, and orchestration.
 - `gui/electron/config-store.ts`: validated, revision-checked, atomic configuration writes.
+- `gui/electron/data-location.ts`: data directory pointer, target validation, and file migration.
 - `gui/electron/log-store.ts`: byte-cursor log pagination.
 - `src/vscode-sync.ts`: builds the model entries from the config and merges them into VS Code's `chatLanguageModels.json` (other providers, secret references, and existing metadata are preserved).
 - `gui/src/config-draft.ts`: lossless conversion between persisted configuration and form state.

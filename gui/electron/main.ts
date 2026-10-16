@@ -1,16 +1,28 @@
-import { app, BrowserWindow, clipboard, ipcMain, nativeImage, nativeTheme, shell, type IpcMainInvokeEvent } from "electron";
+import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, nativeTheme, shell, type IpcMainInvokeEvent, type OpenDialogOptions } from "electron";
 import { spawn, type ChildProcess } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
-import { closeSync, existsSync, openSync, watch, type FSWatcher } from "node:fs";
+import { closeSync, existsSync, openSync, renameSync, watch, type FSWatcher } from "node:fs";
 import fs from "node:fs/promises";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, normalize, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DEFAULT_CONFIG, normalizeConfig } from "../../src/config.ts";
 import { getChatCompletionsUrl, getRouterBaseUrl } from "../../src/router-urls.ts";
 import { loadPricingCache } from "../../src/pricing-updater.ts";
 import { readUsageSummary } from "../../src/usage-store.ts";
 import { readConfigStore, revisionFor, writeConfigStore } from "./config-store.ts";
+import {
+  ensureDataDirUsable,
+  formatDataDirPointer,
+  isWithinDirectory,
+  listMigrationConflicts,
+  migrateDataDirContents,
+  pointerFilePath,
+  readDataDirPointer,
+  sameDirectoryPath,
+  validateDataDirTarget,
+  writeDataDirPointer,
+} from "./data-location.ts";
 import { parseIpcRequest, parseIpcResponse } from "./ipc-contracts.ts";
 import { syncVsCodeModels, type VsCodeSyncResult } from "../../src/vscode-sync.ts";
 import { ensureLogFile, readLogPage, resolveLogPath } from "./log-store.ts";
@@ -102,8 +114,62 @@ function resolveAppDir(): string {
   throw new Error("Could not find the router app directory.");
 }
 
+let defaultUserDataDir = "";
+let dataDirFallbackWarning = "";
+let dataDirRestartScheduled = false;
+
+function resolvePointerDataDir(): string {
+  const pointerPath = pointerFilePath(defaultUserDataDir);
+  const target = readDataDirPointer(pointerPath);
+  if (!target) {
+    return "";
+  }
+
+  const check = validateDataDirTarget({
+    target,
+    currentDataDir: defaultUserDataDir,
+    defaultUserDataDir,
+    installDir: dirname(process.execPath),
+  });
+
+  if (!check.ok) {
+    // A structurally invalid pointer (relative path, drive root, inside the
+    // installation folder, ...) can never become valid, so reset it instead of
+    // falling back on every start.
+    resetDataDirPointer(pointerPath);
+    dataDirFallbackWarning = `The recorded data directory "${target}" is invalid (${check.error}). The pointer was reset and Heimdall is using ${defaultUserDataDir}.`;
+    return "";
+  }
+
+  if (!ensureDataDirUsable(check.path)) {
+    // The path is valid but not reachable right now (an unplugged external
+    // drive, for example). Keep the pointer so the data is found again once the
+    // directory is reachable; falling back silently would let a second
+    // config.json grow in the default folder, so the reason is surfaced in the
+    // settings page and as a notification.
+    dataDirFallbackWarning = `The data directory "${target}" is unavailable (not writable). Heimdall is using ${defaultUserDataDir} for this session.`;
+    return "";
+  }
+
+  return check.path;
+}
+
+/** Synchronous because it runs before app ready, when the pointer was just found invalid. */
+function resetDataDirPointer(pointerPath: string): void {
+  try {
+    mkdirSync(dirname(pointerPath), { recursive: true });
+    const temporaryPath = `${pointerPath}.${randomUUID()}.tmp`;
+    writeFileSync(temporaryPath, formatDataDirPointer(null), "utf8");
+    renameSync(temporaryPath, pointerPath);
+  } catch {
+    // A failed reset leaves the pointer in place; the fallback still applies.
+  }
+}
+
 function getPaths(): Paths {
   const appDir = resolveAppDir();
+  // For packaged builds the data directory is Electron's userData folder, which
+  // configureRuntimeIdentity() redirects to the location stored in the pointer file.
   const dataDir = process.env.HEIMDALL_DATA_DIR || (app.isPackaged ? app.getPath("userData") : appDir);
   const configPath = process.env.ROUTER_CONFIG || join(dataDir, "config.json");
   const serverPath = join(appDir, "src", "server.ts");
@@ -209,7 +275,14 @@ function ensureConfigFile(paths: Paths = getPaths()) {
 }
 
 function configureRuntimeIdentity() {
-  const userDataDir = process.env.HEIMDALL_USER_DATA_DIR;
+  const envUserDataDir = process.env.HEIMDALL_USER_DATA_DIR || "";
+  // The pointer lives in the per-user default folder, and the env override moves
+  // that whole identity so dev runs and tests never touch a real user profile.
+  defaultUserDataDir = envUserDataDir || app.getPath("userData");
+
+  // The env override wins (used by the dev runner and tests); otherwise a
+  // packaged build honors the data directory stored by the installer or settings.
+  const userDataDir = envUserDataDir || (app.isPackaged ? resolvePointerDataDir() : "");
   if (userDataDir) {
     mkdirSync(userDataDir, { recursive: true });
     app.setPath("userData", userDataDir);
@@ -969,6 +1042,148 @@ async function openLogFile(): Promise<string> {
   return shell.openPath(logPath);
 }
 
+async function openDataDir(): Promise<string> {
+  return shell.openPath(getPaths().dataDir);
+}
+
+async function getDataDirState() {
+  const dataDir = getPaths().dataDir;
+  return {
+    dataDir,
+    defaultDataDir: defaultUserDataDir,
+    pointerPath: pointerFilePath(defaultUserDataDir),
+    editable: app.isPackaged,
+    // Computed here because the comparison is platform-aware (case-insensitive
+    // on Windows only); the renderer must not re-implement it.
+    isCustom: !sameDirectoryPath(dataDir, defaultUserDataDir),
+    warning: dataDirFallbackWarning,
+  };
+}
+
+async function pickDataDir(): Promise<{ canceled: boolean; path: string }> {
+  const options: OpenDialogOptions = {
+    title: "Choose where Heimdall stores its data",
+    buttonLabel: "Choose this folder",
+    defaultPath: getPaths().dataDir,
+    properties: ["openDirectory", "createDirectory"],
+  };
+  const result = mainWindow && !mainWindow.isDestroyed()
+    ? await dialog.showOpenDialog(mainWindow, options)
+    : await dialog.showOpenDialog(options);
+
+  return { canceled: result.canceled, path: result.filePaths[0] || "" };
+}
+
+async function changeDataDir(_event: IpcMainInvokeEvent, payload: { target?: string } = {}) {
+  if (!app.isPackaged) {
+    throw new Error("The data directory can only be changed in the installed app.");
+  }
+
+  const paths = getPaths();
+  const check = validateDataDirTarget({
+    target: String(payload?.target || ""),
+    currentDataDir: paths.dataDir,
+    defaultUserDataDir,
+    installDir: dirname(process.execPath),
+  });
+
+  if (!check.ok) {
+    throw new Error(check.error);
+  }
+
+  const backToDefault = sameDirectoryPath(check.path, defaultUserDataDir);
+
+  if (sameDirectoryPath(check.path, paths.dataDir)) {
+    return { ok: true, dataDir: check.path, files: 0, bytes: 0, skipped: 0, restartScheduled: false };
+  }
+
+  if (!ensureDataDirUsable(check.path)) {
+    throw new Error(`Heimdall cannot write to ${check.path}. Choose another folder.`);
+  }
+
+  if (!backToDefault) {
+    // The copy would overwrite whatever the target already holds, so refuse a
+    // non-empty folder. Restoring the default folder is exempt: a config.json
+    // there is the leftover of a fallback session, and overwriting it with the
+    // real data set is exactly the recovery path.
+    const conflicts = await listMigrationConflicts(paths.dataDir, check.path);
+    if (conflicts.length > 0) {
+      throw new Error(`${check.path} already contains ${conflicts.join(", ")}. Choose an empty folder.`);
+    }
+  }
+
+  // Router holds config.json, the log file and the usage journal open, so it has
+  // to release them before the files move.
+  await stopRouter();
+  let migration;
+  try {
+    migration = await migrateDataDirContents({ from: paths.dataDir, to: check.path });
+  } catch (error) {
+    // The migration failed and the old data directory is intact (a failed copy
+    // verification never deletes the source). Bring the Router back up on the
+    // old config so the app is not left degraded.
+    await startRouter().catch(() => null);
+    throw error;
+  }
+
+  // From here the data is committed to the new directory, so every remaining
+  // step must still lead to the relaunch.
+  await writeDataDirPointer(pointerFilePath(defaultUserDataDir), backToDefault ? null : check.path);
+  dataDirFallbackWarning = "";
+
+  // Re-point this session right away: getPaths() still reports the old folder
+  // until the relaunch, and a late loadConfig() would seed a second config.json there.
+  process.env.HEIMDALL_DATA_DIR = check.path;
+
+  if (paths.configPath === join(paths.dataDir, "config.json")) {
+    process.env.ROUTER_CONFIG = join(check.path, "config.json");
+  }
+
+  // A failed log-file relocation must not block the relaunch; the log path is
+  // re-resolved on the next start.
+  await relocateLogFileInsideDataDir(paths.dataDir).catch(() => null);
+  scheduleDataDirRestart();
+
+  return {
+    ok: true,
+    dataDir: check.path,
+    files: migration.files,
+    bytes: migration.bytes,
+    skipped: migration.skipped.length,
+    restartScheduled: true,
+  };
+}
+
+/**
+ * An absolute `router.logFile` inside the directory we just emptied would make
+ * the Router write logs back into the abandoned location.
+ */
+async function relocateLogFileInsideDataDir(previousDataDir: string): Promise<void> {
+  const paths = getPaths();
+  const { config, revision } = await readConfigStore(paths.configPath);
+  const logFile = config.router.logFile;
+
+  if (isAbsolute(logFile) && isWithinDirectory(previousDataDir, logFile)) {
+    const nextLogFile = normalize(join(paths.dataDir, relative(previousDataDir, logFile)));
+    await writeConfigStore(paths.configPath, { ...config, router: { ...config.router, logFile: nextLogFile } }, revision);
+  }
+}
+
+function scheduleDataDirRestart(): void {
+  if (dataDirRestartScheduled) {
+    return;
+  }
+
+  // userData and the Router environment are both fixed before the app is ready,
+  // so the new location only takes effect on a full relaunch.
+  dataDirRestartScheduled = true;
+  trayController.setBusy("Restarting...");
+  setTimeout(() => {
+    app.relaunch();
+    void quitApplication();
+  }, 800);
+}
+
 async function getAppState() {
   const loaded = await loadConfig();
   return {
@@ -1309,6 +1524,10 @@ registerIpcHandler("usage:summary", readUsage);
 registerIpcHandler("pricing:loadCache", readPricingCache);
 registerIpcHandler("file:openConfig", openConfigFile);
 registerIpcHandler("file:openLog", openLogFile);
+registerIpcHandler("dataDir:getState", getDataDirState);
+registerIpcHandler("dataDir:pick", pickDataDir);
+registerIpcHandler("dataDir:change", changeDataDir);
+registerIpcHandler("dataDir:open", openDataDir);
 registerIpcHandler("update:getState", getUpdateState);
 registerIpcHandler("update:check", (_event, options) => checkForUpdates(options));
 registerIpcHandler("update:download", downloadUpdate);
@@ -1340,6 +1559,9 @@ if (!hasSingleInstanceLock) {
       applyPackagedLoginStartup(config.app.startAtLogin);
     } catch (error) {
       trayController.showNotification("Heimdall", `Failed to load startup settings: ${(error as Error).message || String(error)}`);
+    }
+    if (dataDirFallbackWarning) {
+      trayController.showNotification("Heimdall", dataDirFallbackWarning);
     }
 
     startConfigWatcher();

@@ -1,4 +1,4 @@
-import { Code2, Download, RefreshCw, Rocket, RotateCcw, Settings2 } from "lucide-react";
+import { Code2, Download, ExternalLink, FolderOpen, Info, RefreshCw, Rocket, RotateCcw, Settings2 } from "lucide-react";
 
 import { Field } from "../components/field.tsx";
 import { SegmentedControl } from "../components/segmented-control.tsx";
@@ -6,6 +6,7 @@ import { ToggleRow } from "../components/toggle-row.tsx";
 import { Button } from "../components/ui/button.tsx";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "../components/ui/card.tsx";
 import { Separator } from "../components/ui/separator.tsx";
+import type { DataDirState } from "../desktop-api.ts";
 import type { CloseBehavior } from "../config-draft.ts";
 import type { Draft } from "../config-draft.ts";
 import type { UpdateState } from "../types.ts";
@@ -25,6 +26,10 @@ interface AppSettingsPageProps {
   onCheckUpdate: () => void;
   onDownloadUpdate: () => void;
   onInstallUpdate: () => void;
+  dataDirState: DataDirState | null;
+  onChangeDataDir: () => void;
+  onOpenDataDir: () => void;
+  onResetDataDir: () => void;
   busy: string;
 }
 
@@ -37,6 +42,10 @@ export function AppSettingsPage({
   onCheckUpdate,
   onDownloadUpdate,
   onInstallUpdate,
+  dataDirState,
+  onChangeDataDir,
+  onOpenDataDir,
+  onResetDataDir,
   busy,
 }: AppSettingsPageProps) {
   const saving = busy === "saveApp";
@@ -178,6 +187,82 @@ export function AppSettingsPage({
                 style={{ width: `${Math.max(2, Math.round(updateState.progress?.percent || 0))}%` }}
               />
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2.5 text-[15px] font-semibold">
+            <span className="flex size-8 items-center justify-center rounded-lg bg-primary/12 text-primary">
+              <FolderOpen size={16} />
+            </span>
+            Data directory
+            {dataDirState?.isCustom && (
+              <span className="rounded-md border border-border bg-muted/40 px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                Custom
+              </span>
+            )}
+          </CardTitle>
+          <CardAction className="flex items-center gap-2">
+            {dataDirState?.isCustom && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={onResetDataDir}
+                disabled={busy !== "" || dataDirState?.editable !== true}
+                title={`Restore the default location: ${dataDirState.defaultDataDir}`}
+              >
+                <RotateCcw size={14} />
+                Reset
+              </Button>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onChangeDataDir}
+              disabled={busy !== "" || dataDirState?.editable !== true}
+              title={
+                dataDirState?.editable === true
+                  ? "Move config, logs and usage data to another folder."
+                  : "Only the installed app can move its data to another folder."
+              }
+            >
+              <FolderOpen size={14} />
+              {busy === "pickDataDir" ? "Choosing…" : busy === "changeDataDir" ? "Moving…" : "Change…"}
+            </Button>
+          </CardAction>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-2">
+          <div className="flex items-center gap-1.5 rounded-lg border border-border bg-black/25 pl-3 pr-1.5">
+            <span
+              className="min-w-0 flex-1 truncate py-2 font-mono text-[12px] text-muted-foreground"
+              title={dataDirState?.dataDir || ""}
+            >
+              {dataDirState?.dataDir || "Loading…"}
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-7 shrink-0"
+              onClick={onOpenDataDir}
+              disabled={!dataDirState?.dataDir}
+              title="Open the data directory in the file manager"
+            >
+              <ExternalLink size={13} />
+            </Button>
+          </div>
+          {dataDirState?.warning && (
+            <p className="text-[12px] text-amber-500">{dataDirState.warning}</p>
+          )}
+          {dataDirState && dataDirState.editable !== true && (
+            <p className="flex items-center gap-1.5 text-[12px] text-muted-foreground/70">
+              <Info size={12} className="shrink-0" />
+              Only the installed app can move its data to another folder.
+            </p>
           )}
         </CardContent>
       </Card>

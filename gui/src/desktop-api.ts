@@ -41,6 +41,24 @@ export interface PricingCacheResult {
   data: RemotePricingData | null;
 }
 
+export interface DataDirState {
+  dataDir: string;
+  defaultDataDir: string;
+  pointerPath: string;
+  editable: boolean;
+  isCustom: boolean;
+  warning: string;
+}
+
+export interface DataDirChangeResult {
+  ok: boolean;
+  dataDir: string;
+  files: number;
+  bytes: number;
+  skipped: number;
+  restartScheduled: boolean;
+}
+
 export interface HeimdallDesktopApi {
   getState(): Promise<AppState>;
   rendererReady(): Promise<void>;
@@ -59,6 +77,10 @@ export interface HeimdallDesktopApi {
   loadPricingCache(): Promise<PricingCacheResult>;
   openConfig(): Promise<void>;
   openLog(): Promise<void>;
+  getDataDirState(): Promise<DataDirState>;
+  pickDataDir(): Promise<{ canceled: boolean; path: string }>;
+  changeDataDir(target: string): Promise<DataDirChangeResult>;
+  openDataDir(): Promise<void>;
   getUpdateState(): Promise<UpdateState>;
   checkForUpdates(options?: { manual?: boolean }): Promise<UpdateState>;
   downloadUpdate(): Promise<UpdateState>;

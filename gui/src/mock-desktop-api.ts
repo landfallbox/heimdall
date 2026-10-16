@@ -229,6 +229,21 @@ if (!hasRealPreload) {
     loadPricingCache: async () => ({ ok: false, data: null }),
     openConfig: async () => undefined,
     openLog: async () => undefined,
+    getDataDirState: async () => ({
+      dataDir: "C:\\Users\\demo\\AppData\\Roaming\\local.heimdall",
+      defaultDataDir: "C:\\Users\\demo\\AppData\\Roaming\\local.heimdall",
+      pointerPath: "C:\\Users\\demo\\AppData\\Roaming\\local.heimdall\\data-location.ini",
+      editable: false,
+      isCustom: false,
+      warning: "",
+    }),
+    pickDataDir: async () => ({ canceled: true, path: "" }),
+    changeDataDir: async () => {
+      throw new Error("The data directory can only be changed in the installed app.");
+    },
+    openDataDir: async () => {
+      // No file manager in the browser preview.
+    },
     getUpdateState: async () => idleUpdateState(),
     checkForUpdates: async () => idleUpdateState(),
     downloadUpdate: async () => idleUpdateState(),
