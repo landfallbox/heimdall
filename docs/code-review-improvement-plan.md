@@ -100,13 +100,13 @@
 - **怎么做**：`CONTRIBUTING.md` 的 release 检查清单加一条："打包装机版并实际安装使用至少一次（启动、配置、一次真实请求、一次更新检查）"。最低成本版本，不改代码。
 - **决定**：做（2026-10-16）。已在 `CONTRIBUTING.md` Pull Requests 一节的 release 条目后加 dogfood 要求。
 
-#### 项 9：回滚路径文档化（状态：待决策）
+#### 项 9：回滚路径文档化（状态：✅ 已完成）
 
 - **文章依据**：一切可逆——开关、回滚、分阶段发布让大多数错误在几分钟内可撤销。
 - **怎么做**：
   1. `README.md` 加"回退"小节：如何安装旧版本（GitHub Releases 保留所有历史版本）、数据目录不受影响。
   2. 高风险行为变更优先用**配置项**代替 feature flag——本地应用里"开关不用部署就能关"的等价物就是配置热加载（`config-store.ts` 已支持）。
-- **决定**：
+- **决定**：做（2026-10-16）。已在 `README.md` 加 "Updating And Rollback" 小节（渠道切换、回退安装、数据目录不受影响、配置项优先于硬编码）。
 
 #### 项 10：事故 → 评测集（状态：待决策）
 
@@ -173,3 +173,4 @@
 | 2026-10-16 | 项 6 | 做（分两步） | 第 1 步 diff-only 已实施（scripts/security-review.mjs + ci.yml job，本地模型）；第 2 步代理式待历史 PR 评测后决定 |
 | 2026-10-16 | 项 7 | 做 | 双发布渠道 stable/beta 已实施（config + updater + main + GUI + release.yml）；beta 用 `vX.Y.Z-beta.N` tag 触发 |
 | 2026-10-16 | 项 8 | 做 | CONTRIBUTING.md release 条目加 dogfood 要求（纯文档） |
+| 2026-10-16 | 项 9 | 做 | README.md 加 "Updating And Rollback" 小节（渠道切换/回退安装/数据目录不受影响/配置项优先） |

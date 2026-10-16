@@ -130,6 +130,13 @@ The target file follows VS Code's per-platform user settings directory (`%APPDAT
   - macOS: `~/Library/Application Support/Heimdall/data-location.ini`. The drag-to-install disk image has no installer page, so the directory is only changed from settings.
 - If a recorded directory is unavailable at startup (an external drive that is not plugged in, for example) the app reports it and uses the default folder for that session instead of creating a second copy of the configuration. The pointer is kept, so the data is found again once the directory is reachable. A structurally invalid pointer (a relative path, a drive root, or a folder inside the installation directory) can never become valid, so the app resets it on startup and reports the reset.
 
+## Updating And Rollback
+
+- Packaged builds check GitHub Releases for updates. The Application settings page has an **Update channel** toggle: **Stable** receives official releases, **Beta** receives pre-release builds first. Switching channels takes effect on the next update check without a restart.
+- To roll back to an older version, download the installer for that version from [GitHub Releases](https://github.com/landfallbox/heimdall/releases) (every published version is kept) and install it over the current one. Updates are additive, so an older installer can be installed on top of a newer one.
+- Rolling back never touches the data directory. Configuration, logs, usage journals, and Electron state live in the data directory (see Important Boundaries), which is separate from the application files, so downgrading the app leaves your settings and history intact.
+- When a behavior change is risky, prefer a configuration option over a hard-coded change. The Router applies saved configuration to new requests without a restart, so a misbehaving feature can be turned off from settings without redeploying or reinstalling.
+
 ## Development
 
 The main runtime boundaries are:
