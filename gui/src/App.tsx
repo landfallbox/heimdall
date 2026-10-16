@@ -25,7 +25,7 @@ import {
   getVendorModels,
 } from "./config-draft.ts";
 import { useLogsController, usePricingCache, useUpdateController, useUsageController } from "./app-controllers.ts";
-import { getDesktopApi, type SaveConfigResult } from "./desktop-api.ts";
+import { getDesktopApi, type DataDirState, type SaveConfigResult } from "./desktop-api.ts";
 import type { HealthState } from "./types.ts";
 import { Sidebar, type PageId } from "./components/sidebar.tsx";
 import { EndpointRow } from "./components/endpoint-row.tsx";
@@ -50,6 +50,7 @@ type ModalState =
   | { type: "enableThinking"; modelIndex: number }
   | { type: "reloadConfig" }
   | { type: "close" }
+  | { type: "changeDataDir"; target: string }
   | null;
 
 interface StatusView {
@@ -132,6 +133,7 @@ export default function App() {
   const [appVersion, setAppVersion] = useState("");
   const [configRevision, setConfigRevision] = useState("");
   const [configChanged, setConfigChanged] = useState(false);
+  const [dataDirState, setDataDirState] = useState<DataDirState | null>(null);
   const vendorModelsRequestRef = useRef(0);
   const vendorModelsSourceKeyRef = useRef("");
 
@@ -172,6 +174,7 @@ export default function App() {
 
   useEffect(() => {
     void loadState();
+    void refreshDataDirState();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -251,6 +254,56 @@ export default function App() {
     if (configLoaded) {
       void refreshHealth({ silent: true, fast: true });
     }
+  }
+
+  async function refreshDataDirState() {
+    try {
+      setDataDirState(await getDesktopApi().getDataDirState());
+    } catch {
+      setDataDirState(null);
+    }
+  }
+
+  async function requestChangeDataDir() {
+    await run("pickDataDir", async () => {
+      const picked = await getDesktopApi().pickDataDir();
+      if (!picked.canceled && picked.path) {
+        setModal({ type: "changeDataDir", target: picked.path });
+      }
+    });
+  }
+
+  function requestResetDataDir() {
+    if (!dataDirState) {
+      return;
+    }
+    setModal({ type: "changeDataDir", target: dataDirState.defaultDataDir });
+  }
+
+  async function openDataDir() {
+    await run("openDataDir", async () => {
+      await getDesktopApi().openDataDir();
+    });
+  }
+
+  async function confirmChangeDataDir() {
+    if (modal?.type !== "changeDataDir") {
+      return;
+    }
+    const target = modal.target;
+    setModal(null);
+    await run("changeDataDir", async () => {
+      const result = await getDesktopApi().changeDataDir(target);
+      void refreshDataDirState();
+      notify(
+        result.restartScheduled
+          ? `Moved ${result.files} files to ${result.dataDir}. Restarting Heimdall…`
+          : "Data directory is already in use.",
+      );
+      if (result.restartScheduled) {
+        await new Promise((resolve) => setTimeout(resolve, 800));
+      }
+    });
   }
 
   /** 配置文件在外部被修改后：重新从磁盘加载，Router 运行时先重启以应用新配置。 */
@@ -830,6 +883,10 @@ export default function App() {
                   onCheckUpdate={checkAppUpdate}
                   onDownloadUpdate={downloadAppUpdate}
                   onInstallUpdate={installAppUpdate}
+                  dataDirState={dataDirState}
+                  onChangeDataDir={() => void requestChangeDataDir()}
+                  onOpenDataDir={() => void openDataDir()}
+                  onResetDataDir={requestResetDataDir}
                   busy={busy}
                 />
               )}
@@ -998,6 +1055,29 @@ export default function App() {
           <DialogFooter>
             <Button variant="ghost" onClick={() => setModal(null)}>Cancel</Button>
             <Button onClick={() => void confirmReloadConfig()}>Reload</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={modal?.type === "changeDataDir"} onOpenChange={(open) => { if (!open) setModal(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Move the data directory</DialogTitle>
+            <DialogDescription>
+              Heimdall will stop the Router, copy the config, logs and usage data to the new
+              location, then restart from there.
+            </DialogDescription>
+          </DialogHeader>
+          <p className="break-all rounded-md border border-border bg-muted/40 px-3 py-2 font-mono text-[12px]">
+            {modal?.type === "changeDataDir" ? modal.target : ""}
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setModal(null)}>
+              Cancel
+            </Button>
+            <Button onClick={() => void confirmChangeDataDir()}>
+              Move and restart
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

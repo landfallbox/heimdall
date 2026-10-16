@@ -125,6 +125,29 @@ const vscodeSyncResultSchema = z.object({
 const optionalOptionsRequest = (schema: z.ZodType) => z.tuple([schema.optional()]);
 const contract = (request: z.ZodType, response: z.ZodType) => ({ request, response });
 
+const dataDirStateSchema = z.object({
+  dataDir: z.string(),
+  defaultDataDir: z.string(),
+  pointerPath: z.string(),
+  editable: z.boolean(),
+  isCustom: z.boolean(),
+  warning: z.string(),
+}).loose();
+
+const dataDirPickResultSchema = z.object({
+  canceled: z.boolean(),
+  path: z.string(),
+}).loose();
+
+const dataDirChangeResultSchema = z.object({
+  ok: z.boolean(),
+  dataDir: z.string(),
+  files: z.number().int().nonnegative(),
+  bytes: z.number().int().nonnegative(),
+  skipped: z.number().int().nonnegative(),
+  restartScheduled: z.boolean(),
+}).loose();
+
 export const ipcContracts: Record<string, { request: z.ZodType; response: z.ZodType }> = Object.freeze({
   "app:getState": contract(emptyRequest, configResultSchema.extend({ health: healthSchema, appVersion: z.string() })),
   "app:rendererReady": contract(emptyRequest, okResponse),
@@ -158,6 +181,10 @@ export const ipcContracts: Record<string, { request: z.ZodType; response: z.ZodT
   "pricing:loadCache": contract(emptyRequest, z.object({ ok: z.boolean(), data: remotePricingSchema.nullable() })),
   "file:openConfig": contract(emptyRequest, z.string()),
   "file:openLog": contract(emptyRequest, z.string()),
+  "dataDir:getState": contract(emptyRequest, dataDirStateSchema),
+  "dataDir:pick": contract(emptyRequest, dataDirPickResultSchema),
+  "dataDir:change": contract(z.tuple([z.object({ target: z.string() })]), dataDirChangeResultSchema),
+  "dataDir:open": contract(emptyRequest, z.string()),
   "update:getState": contract(emptyRequest, updateStateSchema),
   "update:check": contract(optionalOptionsRequest(z.object({ manual: z.boolean().optional() })), updateStateSchema),
   "update:download": contract(emptyRequest, updateStateSchema),
