@@ -14,7 +14,7 @@
 
 - 做并已完成：项 1、2、3、4、5、6、7、8、9、10、11、13、14
 - 不做：项 12（已有审查条款覆盖）、项 15（纯习惯，不写文档）
-- 待办：① 合并本分支后在仓库 Settings 配置 `SECURITY_REVIEW_API_KEY` secret（项 6）；② 项 6 第 2 步代理式审查待历史 PR 评测后决定。
+- 待办：① 合并本分支后在仓库 Settings 配置 `SECURITY_REVIEW_API_KEY` secret（项 6 第 1 步）；② 在 github.com/coderabbit.ai 用 GitHub 账号登录并授权 heimdall 仓库（项 6 第 3 步 CodeRabbit，OAuth 需手动）；③ 项 6 第 2 步自研代理式审查待历史 PR 评测后决定。
 
 ## 1. 现状对照（文章 7 层检查 vs 本项目）
 
@@ -76,18 +76,25 @@
 
 ### P1 — 中等成本，收益明确
 
-#### 项 6：PR 自动安全审查（状态：diff-only 已完成，代理式待评估）
+#### 项 6：PR 自动安全审查（状态：diff-only 已完成，CodeRabbit 已接入待 OAuth 授权，自研代理式待评估）
 
 - **文章依据**：安全审查独立成层，有未关闭发现时 PR 不能合并；可用开源的 security review GitHub Action 或 `/security-review` 命令实现。
 - **本项目特殊性**：本地 API key 鉴权、上游 vendor key、日志脱敏都在关键路径上，是少见的"个人项目也值得上安全审查"的类型。
 - **怎么做**：在 `ci.yml` 加一个 job 跑安全审查，发现贴到 PR 评论；是否设为 required check 可先观察几周再定。审查引擎**不绑定 Claude**，免费开源替代：
   - **静态扫描（非 LLM，免费开源）**：Semgrep（安全规则）、Gitleaks（密钥泄漏，本项目鉴权关键路径尤其适用）、Trivy（漏洞/密钥）、CodeQL（公开仓库免费）。
   - **开源 agent（可指向本地模型，全免费）**：OpenHands、SWE-agent、Aider 等，或自写最小 agent 循环（读文件/grep/列目录 + N 轮）由本地 Qwen 驱动（即第 2 步设想）。
+  - **厂商托管代理式（用厂商强模型，非本地 27B，免费覆盖公开仓库）**：CodeRabbit（公开仓库免费，低噪声/高精度，混合 linter+SAST）、Greptile（MIT 开源免费，全仓库代码图、高召回/多噪声）。这类方案跑在厂商基础设施上，绕开"27B 跑多轮不可靠"的问题。
   - **Claude Code GitHub Action**：官方现成方案，但需付费 Claude API key、非开源，仅作为"省事"备选。
   - 现状：第 1 步 diff-only 已用本地 Qwen 端点实现，**完全不依赖 Claude**。
 - **决定**：做，分两步。
   - **第 1 步（已完成）**：diff-only 审查。`scripts/security-review.mjs` 拉 PR diff，按 REVIEW.md 失败定义让本地模型（OpenAI 兼容端点，复用 release notes 的 `122.193.22.119:8000/v1` + `Qwen3.8-27B` 模式）输出结构化发现，贴 PR 评论。`ci.yml` 新增 `security-review` job（仅 pull_request 触发，informational，永不阻断）。需要配置仓库 secret `SECURITY_REVIEW_API_KEY`（同 release notes 的 key 即可），可选变量 `SECURITY_REVIEW_BASE_URL` / `SECURITY_REVIEW_MODEL`。
   - **第 2 步（待处理，用户后续处理）**：代理式审查评估。用几个历史 PR 当评测集，对比 diff-only vs 代理式（自写最小 agent 循环：读文件/grep/列目录三工具 + N 轮循环，或开源 agent CLI）的召回/噪声比，代理式明显更好再升级。注意：27B 级模型跑多轮工具调用的可靠性是最大风险，弱模型的幻觉发现可能比单轮 diff 审查噪声更多。
+  - **第 3 步（仓库内配置已完成，待用户 OAuth 授权）**：接入 CodeRabbit 作为厂商托管代理式审查（免费覆盖公开仓库，用厂商强模型、非本地 27B）。
+    - 选型理由：单人项目 + 低噪声偏好 → CodeRabbit（`profile: quiet`，混合 linter+SAST，公开仓库免费、限流不限总量）优于 Greptile（高召回但多噪声、50 credit/月）。
+    - 已落地：仓库根 `.coderabbit.yaml`（`language: zh-CN`、`profile: quiet`、不审草稿、`path_filters` 覆盖 `src/**`+`gui/**`+`.github/**`+`scripts/**` 并排除 `pricing-data.ts`/`gui/dist`/`build`、7 条 `path_instructions` 把 REVIEW.md 6 类失败定义注入 `server.ts`/`vendor-circuit-breaker.ts`/`config.ts`/`logger.ts`/`config-store.ts`/`main.ts`/`updater.ts`）。
+    - 自动增益：CodeRabbit 会自动读取 `AGENTS.md` 作为审查准则（无需配置）；`REVIEW.md` 不在自动识别列表，故靠 `path_instructions` 显式注入。
+    - 待用户手动：在 github.com/coderabbit.ai 用 GitHub 账号登录 → 授权 heimdall 仓库（OAuth 无法由 agent 代替）→ 在 PR 中 `@coderabbitai` 触发或自动审查。
+    - 定位：与第 1 步 diff-only 互补（CodeRabbit 强在跨文件上下文 + linter，diff-only 强在针对 REVIEW.md 失败定义的结构化输出）；观察几周再决定是否把 CodeRabbit 设为 required check。
 
 #### 项 7：双发布渠道 stable/beta（状态：✅ 已完成）
 
@@ -184,7 +191,8 @@
 | 2026-10-16 | 项 3 | 做 | 四段式模板：变更说明 / 如何测试（附证据）/ 风险与回滚 / 配置影响 |
 | 2026-10-16 | 项 4 | 做 | 流程写入 CONTRIBUTING.md PR 一节；架构规则去重到 AGENTS.md；修正 .js→.ts 过期文件名 |
 | 2026-10-17 | 项 5 | 做 | 用 `gh` CLI 配置完成：4 个 CI check 必过 + 1 个批准 + 允许管理员绕过 + 禁止强推/删除 |
-| 2026-10-16 | 项 6 | 做（分两步） | 第 1 步 diff-only 已实施（scripts/security-review.mjs + ci.yml job，本地模型）；第 2 步代理式待历史 PR 评测后决定 |
+| 2026-10-16 | 项 6 | 做（分三步） | 第 1 步 diff-only 已实施（scripts/security-review.mjs + ci.yml job，本地模型）；第 2 步自研代理式待历史 PR 评测后决定；第 3 步 CodeRabbit 仓库内配置已完成（.coderabbit.yaml），待用户 OAuth 授权 |
+| 2026-10-17 | 项 6-3 | 做 | 接入 CodeRabbit（公开仓库免费、厂商强模型、非 27B）：.coderabbit.yaml（quiet + zh-CN + 7 条 path_instructions 注入 REVIEW.md 6 类失败定义）；OAuth 授权需用户手动 |
 | 2026-10-16 | 项 7 | 做 | 双发布渠道 stable/beta 已实施（config + updater + main + GUI + release.yml）；beta 用 `vX.Y.Z-beta.N` tag 触发 |
 | 2026-10-16 | 项 8 | 做 | CONTRIBUTING.md release 条目加 dogfood 要求（纯文档） |
 | 2026-10-16 | 项 9 | 做 | README.md 加 "Updating And Rollback" 小节（渠道切换/回退安装/数据目录不受影响/配置项优先） |

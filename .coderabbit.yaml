@@ -1,0 +1,63 @@
+# CodeRabbit 配置 —— heimdall（本地 OpenAI 兼容模型路由器）
+#
+# 免费资格：公开仓库免费（限流约 4 个 PR 审查/小时、200 文件/小时，无月度总量上限）。
+# 审查准则：CodeRabbit 自动读取 AGENTS.md；REVIEW.md 的 6 类失败定义不在自动识别列表，
+#           故通过下方 path_instructions 显式注入到对应关键路径。
+# 参考：https://docs.coderabbit.ai/getting-started/yaml-configuration
+
+language: zh-CN
+
+reviews:
+  # 最低噪声：只把最重要的意见内联，其余归入摘要，避免单人项目被 nit 刷屏
+  profile: quiet
+  auto_review:
+    enabled: true
+    drafts: false # 不审查草稿 PR，减少 WIP 噪声；转正式 PR 后自动审查
+  # 覆盖核心源码与高风险的 CI 工作流；排除生成文件与构建产物（与 REVIEW.md 审查规则一致）
+  path_filters:
+    - "src/**"
+    - "gui/**"
+    - ".github/**"
+    - "scripts/**"
+    - "!src/pricing-data.ts"
+    - "!gui/dist/**"
+    - "!build/**"
+  path_instructions:
+    - path: "src/server.ts"
+      instructions: |
+        重点审查 failover 边界（REVIEW.md 失败定义 #1）与敏感信息（#2）：
+        - 响应头或 body 字节已发给客户端后，不得再切换供应商。
+        - 该回退时必须回退：可重试状态码、等待响应头超时、供应商处于熔断内。
+        - 不该回退时不得回退：4xx 客户端错误、配置问题。
+        - API key、Authorization 头、上游响应体不得出现在日志、错误信息或返回值中。
+    - path: "src/vendor-circuit-breaker.ts"
+      instructions: |
+        重点审查熔断语义（REVIEW.md 失败定义 #6）：
+        - 熔断状态必须按"供应商 + 模型"隔离，不得跨供应商/模型共享。
+        - Half-open 状态只允许放行单个探针，不得并发放行多个。
+        - 热加载重建熔断器时不得破坏既有状态语义。
+    - path: "src/config.ts"
+      instructions: |
+        重点审查配置一致性（REVIEW.md 失败定义 #3）：
+        - 配置写入必须经 config-store，保留 revision 校验与原子替换。
+        - 无效配置不得破坏最后一份有效配置。
+    - path: "src/logger.ts"
+      instructions: |
+        重点审查敏感信息脱敏（REVIEW.md 失败定义 #2）：
+        - API key、Authorization 头、上游响应体不得出现在日志输出中。
+    - path: "gui/electron/config-store.ts"
+      instructions: |
+        重点审查配置原子落盘（REVIEW.md 失败定义 #3）：
+        - 落盘必须原子：同目录临时文件 + sync + rename。
+        - 保留 revision 校验；无效配置不得覆盖最后一份有效配置。
+    - path: "gui/electron/main.ts"
+      instructions: |
+        重点审查 IPC 契约（REVIEW.md 失败定义 #5）与进程身份（#4）：
+        - 特权 IPC 操作必须走 guarded helper；请求与返回值必须有 schema 校验。
+        - 终止 Router 前必须匹配实例身份，不能只查 PID。
+        - 不得引入 detached / unref() 破坏父子进程生命周期。
+    - path: "gui/electron/updater.ts"
+      instructions: |
+        重点审查更新器安全：
+        - 渠道切换（stable/beta）不得导致半更新或切到错误渠道。
+        - 更新失败时必须保留当前可用版本，不得留下损坏安装。
