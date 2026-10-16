@@ -1,0 +1,37 @@
+name: Security Review
+
+# pull_request_target：在 base 分支上下文中运行、可访问 secrets。
+# 安全要点：只检出 base 分支（受信代码）并运行 scripts/security-review.mjs，
+# PR diff 仅作为数据经 GitHub API 读取，绝不 checkout 或执行 PR head 代码。
+# 这样同仓库恶意 PR 无法通过修改脚本外传 SECURITY_REVIEW_API_KEY。
+on:
+  pull_request_target:
+    branches: [main]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  security-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout base branch (trusted code)
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.base_ref }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Security review (diff-only, informational)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SECURITY_REVIEW_API_KEY: ${{ secrets.SECURITY_REVIEW_API_KEY }}
+          SECURITY_REVIEW_BASE_URL: ${{ vars.SECURITY_REVIEW_BASE_URL }}
+          SECURITY_REVIEW_MODEL: ${{ vars.SECURITY_REVIEW_MODEL }}
+        run: node scripts/security-review.mjs

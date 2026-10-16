@@ -10,8 +10,13 @@
  * This job is informational: it never fails the PR. On any error it posts a
  * short note (when possible) and exits 0.
  *
+ * Run via .github/workflows/security-review.yml (pull_request_target, base
+ * branch checked out). The PR diff is read only as data via the GitHub API;
+ * PR head code is never checked out or executed.
+ *
  * Environment:
- *   GITHUB_REPOSITORY, GITHUB_SERVER_URL, GITHUB_TOKEN, GITHUB_EVENT_PATH
+ *   GITHUB_REPOSITORY, GITHUB_API_URL, GITHUB_EVENT_NAME, GITHUB_TOKEN,
+ *   GITHUB_EVENT_PATH
  *   SECURITY_REVIEW_API_KEY    bearer token for the LLM endpoint
  *   SECURITY_REVIEW_BASE_URL   OpenAI-compatible base URL
  *   SECURITY_REVIEW_MODEL      model id (default: Qwen3.8-27B)
@@ -39,7 +44,8 @@ function env(name, fallback = "") {
 }
 
 function serverUrl() {
-  return env("GITHUB_SERVER_URL", "https://github.com").replace(/\/+$/, "");
+  // REST API 请求需指向 api.github.com（GITHUB_API_URL），而非 GITHUB_SERVER_URL（github.com）。
+  return env("GITHUB_API_URL", "https://api.github.com").replace(/\/+$/, "");
 }
 
 function repository() {
@@ -212,10 +218,15 @@ async function callLlm(prompt, model) {
 }
 
 async function main() {
+  // 事件类型来自 GITHUB_EVENT_NAME 环境变量；webhook 负载本身不含 event_name 字段。
+  if (process.env.GITHUB_EVENT_NAME !== "pull_request") {
+    console.log("Not a pull_request event; skipping security review.");
+    return;
+  }
   const event = readEvent();
   const prNumber = event?.pull_request?.number;
-  if (event?.event_name !== "pull_request" || !prNumber) {
-    console.log("Not a pull_request event; skipping security review.");
+  if (!prNumber) {
+    console.log("No pull_request number in event payload; skipping security review.");
     return;
   }
 

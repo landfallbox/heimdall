@@ -272,7 +272,7 @@ jobs:
           body: ${{ steps.generate-notes.outputs.notes_file != '' && format('file({0})', steps.generate-notes.outputs.notes_file) || '' }}
           fail_on_unmatched_files: true
           prerelease: ${{ steps.channel.outputs.channel == 'beta' }}
-          make_latest: ${{ steps.channel.outputs.channel == 'beta' && false || true }}
+          make_latest: ${{ steps.channel.outputs.channel != 'beta' }}
           files: |
             release-assets/heimdall-Setup-*.exe
             release-assets/heimdall-Setup-*.exe.blockmap

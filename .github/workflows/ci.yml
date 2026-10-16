@@ -43,22 +43,8 @@ jobs:
         shell: pwsh
         run: npm run gui:build
 
-  security-review:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Security review (diff-only, informational)
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SECURITY_REVIEW_API_KEY: ${{ secrets.SECURITY_REVIEW_API_KEY }}
-          SECURITY_REVIEW_BASE_URL: ${{ vars.SECURITY_REVIEW_BASE_URL }}
-          SECURITY_REVIEW_MODEL: ${{ vars.SECURITY_REVIEW_MODEL }}
-        run: node scripts/security-review.mjs
+  # 安全审查已迁至独立 workflow .github/workflows/security-review.yml
+  # （pull_request_target + 检出 base 分支，见该文件头部安全说明）。
 
   electron-lifecycle:
     strategy:
