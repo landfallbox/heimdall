@@ -57,11 +57,12 @@
 - **怎么做**：写入 `CONTRIBUTING.md` 的 PR 流程：合并任何 agent PR 前，跑一次 `/code-review`（或开新会话让 agent 审 diff）；输出逐条回应（修复或注明理由），回应记录在 PR 评论区。
 - **决定**：做。已实施。同时收敛了 CONTRIBUTING.md 与 AGENTS.md 的重复（架构规则只留 AGENTS.md 一份，CONTRIBUTING.md 改为指向），并修正了过期的 `test/electron-lifecycle.test.js` → `.ts` 文件名。
 
-#### 项 5：main 分支保护（状态：待决策）
+#### 项 5：main 分支保护（状态：做，待手动操作）
 
 - **文章依据**：阻断式检查 + 走 PR。
 - **怎么做**：GitHub 仓库 Settings → Branches → 对 `main` 加保护：require status checks（CI 绿）、require PR、禁止直推（maintainer 可保留直推权限，单人项目可放宽为"仅要求 CI + PR"）。
-- **决定**：
+  具体步骤（2026-10-16 确认）：https://github.com/landfallbox/heimdall/settings/branches → Add rule `main` → 勾 "Require a pull request before merging"（review 数 0）→ 勾 "Require status checks to pass before merging" 并选中 4 个 job：`test (windows-latest)`、`test (macos-latest)`、`electron-lifecycle (windows-latest)`、`electron-lifecycle (macos-latest)` → 保持 "Allow administrators to bypass" 勾选 → Create。
+- **决定**：做。单人项目用默认设置（允许 maintainer 绕过），零摩擦，防手滑直推和 CI 红时合并。
 
 ### P1 — 中等成本，收益明确
 
@@ -158,3 +159,4 @@
 | 2026-10-16 | 项 2 | 做 | 失败定义 6 类，按严重度排序；审查规则 5 条 |
 | 2026-10-16 | 项 3 | 做 | 四段式模板：变更说明 / 如何测试（附证据）/ 风险与回滚 / 配置影响 |
 | 2026-10-16 | 项 4 | 做 | 流程写入 CONTRIBUTING.md PR 一节；架构规则去重到 AGENTS.md；修正 .js→.ts 过期文件名 |
+| 2026-10-16 | 项 5 | 做 | 默认设置（允许管理员绕过）；步骤已写入项 5，待手动操作 |
