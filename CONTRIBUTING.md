@@ -23,6 +23,7 @@ The binding architecture rules (config normalization, atomic config writes, Rout
 ## Pull Requests
 
 - Keep changes focused and reviewable.
+- Split large refactors into multiple independently reversible PRs (for example: dependency upgrade, then component migration, then layout changes — each its own PR). Small changes are easier to review, debug, and roll back.
 - Do not commit `config.json`, logs, build output, release artifacts, API keys, or local vendor endpoints.
 - Add or update tests when behavior changes.
 - Keep Router behavior tests in the fast Node test files. Put tests that launch Electron or exercise desktop lifecycle behavior in `test/electron-lifecycle.test.ts`.
