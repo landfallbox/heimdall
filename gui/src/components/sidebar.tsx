@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Check, Copy, Download, Gauge, Info, Loader2, Play, RefreshCw, RotateCcw, Settings2, Server, Square, Terminal, type LucideIcon } from "lucide-react";
 
+import appIcon from "../../../build/icon.svg";
 import { getDesktopApi } from "../desktop-api.ts";
 import { cn } from "../lib/utils.ts";
 import { Button } from "./ui/button.tsx";
@@ -58,9 +59,7 @@ export function Sidebar({
     <aside className="sidebar-root flex h-full w-[264px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar">
       <div className="px-5 pt-6 pb-4">
         <div className="flex items-center gap-3">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-[15px] font-bold text-primary-foreground shadow-sm">
-            H
-          </div>
+          <img src={appIcon} alt="" draggable={false} className="size-9 shrink-0 select-none" />
           <div className="min-w-0 truncate text-[15px] font-bold tracking-tight">{appName}</div>
         </div>
       </div>
