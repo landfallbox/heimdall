@@ -10,12 +10,11 @@
 - `不做`：已确认不做（在"决定"里补一句原因）
 - `已完成`：已实施并验证
 
-## 总览（2026-10-16 全部决策完成）
+## 总览（2026-10-17 全部决策完成）
 
-- 做并已完成：项 1、2、3、4、6、7、8、9、10、11、13、14
-- 做但待手动操作：项 5（main 分支保护，步骤见该项）
+- 做并已完成：项 1、2、3、4、5、6、7、8、9、10、11、13、14
 - 不做：项 12（已有审查条款覆盖）、项 15（纯习惯，不写文档）
-- 待办：① 手动配置 main 分支保护（项 5）；② 合并本分支后在仓库 Settings 配置 `SECURITY_REVIEW_API_KEY` secret（项 6）；③ 项 6 第 2 步代理式审查待历史 PR 评测后决定。
+- 待办：① 合并本分支后在仓库 Settings 配置 `SECURITY_REVIEW_API_KEY` secret（项 6）；② 项 6 第 2 步代理式审查待历史 PR 评测后决定。
 
 ## 1. 现状对照（文章 7 层检查 vs 本项目）
 
@@ -64,12 +63,16 @@
 - **怎么做**：写入 `CONTRIBUTING.md` 的 PR 流程：合并任何 agent PR 前，跑一次 `/code-review`（或开新会话让 agent 审 diff）；输出逐条回应（修复或注明理由），回应记录在 PR 评论区。
 - **决定**：做。已实施。同时收敛了 CONTRIBUTING.md 与 AGENTS.md 的重复（架构规则只留 AGENTS.md 一份，CONTRIBUTING.md 改为指向），并修正了过期的 `test/electron-lifecycle.test.js` → `.ts` 文件名。
 
-#### 项 5：main 分支保护（状态：做，待手动操作）
+#### 项 5：main 分支保护（状态：✅ 已完成）
 
 - **文章依据**：阻断式检查 + 走 PR。
-- **怎么做**：GitHub 仓库 Settings → Branches → 对 `main` 加保护：require status checks（CI 绿）、require PR、禁止直推（maintainer 可保留直推权限，单人项目可放宽为"仅要求 CI + PR"）。
-  具体步骤（2026-10-16 确认）：https://github.com/landfallbox/heimdall/settings/branches → Add rule `main` → 勾 "Require a pull request before merging"（review 数 0）→ 勾 "Require status checks to pass before merging" 并选中 4 个 job：`test (windows-latest)`、`test (macos-latest)`、`electron-lifecycle (windows-latest)`、`electron-lifecycle (macos-latest)` → 保持 "Allow administrators to bypass" 勾选 → Create。
-- **决定**：做。单人项目用默认设置（允许 maintainer 绕过），零摩擦，防手滑直推和 CI 红时合并。
+- **怎么做**：对 `main` 加保护：require status checks（CI 绿）、require PR、允许管理员绕过。
+- **决定**：做（2026-10-17 用 `gh` CLI 直接配置完成）。最终参数：
+  - 要求 4 个 status check 通过：`test (windows-latest)`、`test (macos-latest)`、`electron-lifecycle (windows-latest)`、`electron-lifecycle (macos-latest)`（`strict: false`，不要求分支最新）。
+  - 要求 PR 且 **1 个批准**（`required_approving_review_count: 1`）。
+  - **允许管理员绕过**（`enforce_admins: false`）：自己 merge 时绕过全部要求，不受"1 个批准"限制；该要求仅对未来非 admin 协作者生效。
+  - 禁止强推、禁止删除分支。
+  - 说明：GitHub 不允许作者批准自己的 PR，配合管理员绕过，单人项目日常合并零摩擦。
 
 ### P1 — 中等成本，收益明确
 
@@ -176,7 +179,7 @@
 | 2026-10-16 | 项 2 | 做 | 失败定义 6 类，按严重度排序；审查规则 5 条 |
 | 2026-10-16 | 项 3 | 做 | 四段式模板：变更说明 / 如何测试（附证据）/ 风险与回滚 / 配置影响 |
 | 2026-10-16 | 项 4 | 做 | 流程写入 CONTRIBUTING.md PR 一节；架构规则去重到 AGENTS.md；修正 .js→.ts 过期文件名 |
-| 2026-10-16 | 项 5 | 做 | 默认设置（允许管理员绕过）；步骤已写入项 5，待手动操作 |
+| 2026-10-17 | 项 5 | 做 | 用 `gh` CLI 配置完成：4 个 CI check 必过 + 1 个批准 + 允许管理员绕过 + 禁止强推/删除 |
 | 2026-10-16 | 项 6 | 做（分两步） | 第 1 步 diff-only 已实施（scripts/security-review.mjs + ci.yml job，本地模型）；第 2 步代理式待历史 PR 评测后决定 |
 | 2026-10-16 | 项 7 | 做 | 双发布渠道 stable/beta 已实施（config + updater + main + GUI + release.yml）；beta 用 `vX.Y.Z-beta.N` tag 触发 |
 | 2026-10-16 | 项 8 | 做 | CONTRIBUTING.md release 条目加 dogfood 要求（纯文档） |
