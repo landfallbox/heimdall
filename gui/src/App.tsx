@@ -21,6 +21,7 @@ import {
   type CloseBehavior,
   type ConfigInput,
   type Draft,
+  type UpdateChannel,
   type VendorDraft,
   getVendorModels,
 } from "./config-draft.ts";
@@ -415,7 +416,7 @@ export default function App() {
     }));
   }
 
-  async function setAppSetting(field: "closeBehavior" | "startAtLogin" | "syncVsCodeModels", value: CloseBehavior | boolean) {
+  async function setAppSetting(field: "closeBehavior" | "startAtLogin" | "syncVsCodeModels" | "updateChannel", value: CloseBehavior | boolean | UpdateChannel) {
     if (busy === "saveApp" || value === persistedDraft.app[field]) {
       return;
     }

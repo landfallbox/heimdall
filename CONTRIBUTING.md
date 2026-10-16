@@ -18,21 +18,19 @@ Use `npm run gui` for the desktop development app.
 
 ## Architecture Rules
 
-- Keep persisted configuration normalization in `src/config.ts`; form-only conversion belongs in `gui/src/config-draft.ts`.
-- Write desktop configuration through `gui/electron/config-store.ts` so revision checks and atomic replacement are preserved.
-- Keep Router process ownership in the Electron main process. Desktop-started Router processes must remain attached to Electron and use parent-child IPC for graceful shutdown; do not add `detached` or `unref()`.
-- Treat PID metadata and Router instance identity as abnormal-exit recovery data. Never terminate a recovered PID without matching the Router instance identity.
-- Treat downstream response commitment as the failover boundary. Do not retry another vendor after headers or body bytes have reached the client.
-- Register privileged renderer operations through the guarded IPC helper in `gui/electron/main.ts`.
+The binding architecture rules (config normalization, atomic config writes, Router process ownership, failover boundary, IPC contracts) live in [`AGENTS.md`](./AGENTS.md). Read it before changing behavior; agent sessions load it automatically.
 
 ## Pull Requests
 
 - Keep changes focused and reviewable.
+- Split large refactors into multiple independently reversible PRs (for example: dependency upgrade, then component migration, then layout changes — each its own PR). Small changes are easier to review, debug, and roll back.
 - Do not commit `config.json`, logs, build output, release artifacts, API keys, or local vendor endpoints.
 - Add or update tests when behavior changes.
-- Keep Router behavior tests in the fast Node test files. Put tests that launch Electron or exercise desktop lifecycle behavior in `test/electron-lifecycle.test.js`.
+- Keep Router behavior tests in the fast Node test files. Put tests that launch Electron or exercise desktop lifecycle behavior in `test/electron-lifecycle.test.ts`.
 - Run `npm run check`, `npm test`, `npm run test:electron`, and `npm run gui:build` before opening a PR.
+- Before merging any agent-written PR, run a code review in a fresh context (e.g. `/code-review`, or a new agent session reviewing the diff against `REVIEW.md`). Answer every finding: fix it, or reply in the PR with a reason to dismiss it.
 - For tagged releases, verify the GitHub Release includes the Windows installer `.exe`, `.exe.blockmap`, and `latest.yml` so packaged apps can detect updates.
+- Before publishing a release, dogfood the packaged build at least once: install it, start the app, configure a vendor, send one real request, and run an update check. Heavy use often surfaces regressions before users do.
 
 ## Configuration And Secrets
 

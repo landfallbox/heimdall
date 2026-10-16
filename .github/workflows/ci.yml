@@ -43,6 +43,9 @@ jobs:
         shell: pwsh
         run: npm run gui:build
 
+  # 安全审查已迁至独立 workflow .github/workflows/security-review.yml
+  # （pull_request_target + 检出 base 分支，见该文件头部安全说明）。
+
   electron-lifecycle:
     strategy:
       fail-fast: false

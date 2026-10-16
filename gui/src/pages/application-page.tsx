@@ -9,6 +9,7 @@ import { Separator } from "../components/ui/separator.tsx";
 import type { DataDirState } from "../desktop-api.ts";
 import type { CloseBehavior } from "../config-draft.ts";
 import type { Draft } from "../config-draft.ts";
+import type { UpdateChannel } from "../config-draft.ts";
 import type { UpdateState } from "../types.ts";
 
 const closeBehaviorOptions = [
@@ -17,11 +18,16 @@ const closeBehaviorOptions = [
   { value: "ask" as CloseBehavior, label: "Ask every time" },
 ];
 
+const updateChannelOptions = [
+  { value: "stable" as UpdateChannel, label: "Stable" },
+  { value: "beta" as UpdateChannel, label: "Beta" },
+];
+
 interface AppSettingsPageProps {
   app: Draft["app"];
   appVersion: string;
   updateState: UpdateState;
-  onSetAppSetting: (field: "closeBehavior" | "startAtLogin" | "syncVsCodeModels", value: CloseBehavior | boolean) => Promise<void>;
+  onSetAppSetting: (field: "closeBehavior" | "startAtLogin" | "syncVsCodeModels" | "updateChannel", value: CloseBehavior | boolean | UpdateChannel) => Promise<void>;
   onSyncNow: () => Promise<void>;
   onCheckUpdate: () => void;
   onDownloadUpdate: () => void;
@@ -179,6 +185,20 @@ export function AppSettingsPage({
             {showsNewVersion && <span className="shrink-0 text-[13px] text-muted-foreground/50">→</span>}
             {showsNewVersion && <span className="shrink-0 font-mono text-[13px] font-medium text-foreground">{newVersion}</span>}
             <span className="truncate text-[13px] text-muted-foreground">{statusPhrase}</span>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[13px] font-medium">Update channel</span>
+            <SegmentedControl
+              aria-label="Update channel"
+              value={app.updateChannel}
+              options={updateChannelOptions}
+              onChange={(value) => onSetAppSetting("updateChannel", value as UpdateChannel)}
+            />
+            <p className="text-[12px] leading-relaxed text-muted-foreground">
+              {app.updateChannel === "beta"
+                ? "Beta receives pre-release builds first; switch back to Stable for the latest official release."
+                : "Stable receives official releases. Switch to Beta to try pre-release builds before they reach Stable."}
+            </p>
           </div>
           {downloading && (
             <div className="h-1.5 overflow-hidden rounded-full bg-muted">
