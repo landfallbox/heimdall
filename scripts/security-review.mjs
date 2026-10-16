@@ -219,8 +219,10 @@ async function callLlm(prompt, model) {
 
 async function main() {
   // 事件类型来自 GITHUB_EVENT_NAME 环境变量；webhook 负载本身不含 event_name 字段。
-  if (process.env.GITHUB_EVENT_NAME !== "pull_request") {
-    console.log("Not a pull_request event; skipping security review.");
+  // 工作流用 pull_request_target 触发（见 security-review.yml），故同时接受两种事件名。
+  const eventName = process.env.GITHUB_EVENT_NAME;
+  if (eventName !== "pull_request" && eventName !== "pull_request_target") {
+    console.log(`Event ${eventName} is not a PR event; skipping security review.`);
     return;
   }
   const event = readEvent();
