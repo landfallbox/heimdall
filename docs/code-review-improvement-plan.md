@@ -26,12 +26,12 @@
 
 ### P0 — 低成本，可立即做
 
-#### 项 1：写 `CLAUDE.md`（状态：待决策）
+#### 项 1：写 `AGENTS.md`（状态：已完成）
 
 - **文章依据**：第一层的核心。`CLAUDE.md` 告诉 agent 项目是什么：技术栈、约定、目标与非目标。每次审查都会加载它，所以在大代码库里保持短，指向其他文档。
 - **本项目落点**：`CONTRIBUTING.md` 里已有的 6 条 Architecture Rules（配置归一化放 `src/config.ts`、表单转换放 `gui/src/config-draft.ts`、配置写入必须走 `config-store.ts`、Router 进程所有权、failover 边界 = 响应已提交、IPC 走 guarded helper）正是它该承载的内容。
-- **怎么做**：新建根目录 `CLAUDE.md`，内容 = 项目一句话定位 + 技术栈 + 上述架构规则（精简版）+ 验证命令（`npm run check` / `npm test` / `npm run test:electron` / `npm run gui:build`）+ 指向 `CONTRIBUTING.md` 和 `docs/`。控制在 50 行内。
-- **决定**：
+- **怎么做**：新建根目录 `AGENTS.md`（通用名，考虑跨工具通用性，不用 `CLAUDE.md`），内容 = 项目一句话定位 + 技术栈 + 上述架构规则（精简版）+ 验证命令（`npm run check` / `npm test` / `npm run test:electron` / `npm run gui:build`）+ 指向 `CONTRIBUTING.md` 和 `docs/`。控制在 50 行内。
+- **决定**：做。文件名用 `AGENTS.md` 而非 `CLAUDE.md`，保证对各类 agent 工具通用。
 
 #### 项 2：写 `REVIEW.md`（状态：待决策）
 
@@ -154,4 +154,4 @@
 
 | 日期 | 项 | 决定 | 备注 |
 | --- | --- | --- | --- |
-| | | | |
+| 2026-10-16 | 项 1 | 做 | 文件名用 `AGENTS.md`（通用），不用 `CLAUDE.md` |
