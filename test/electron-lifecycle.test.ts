@@ -19,6 +19,7 @@ function createConfig(port: number) {
     app: {
       closeBehavior: "tray",
       startAtLogin: false,
+      updateChannel: "stable",
     },
     router: {
       host: "127.0.0.1",

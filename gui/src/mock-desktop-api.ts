@@ -21,7 +21,7 @@ const hasRealPreload = Boolean(
 );
 
 interface MockConfig {
-  app: { closeBehavior: string; startAtLogin: boolean; syncVsCodeModels: boolean };
+  app: { closeBehavior: string; startAtLogin: boolean; syncVsCodeModels: boolean; updateChannel: string };
   router: {
     host: string;
     port: number;
@@ -49,7 +49,7 @@ let revision = `mock-${Date.now().toString(16)}`;
 let running = false;
 
 const config: MockConfig = {
-  app: { closeBehavior: "tray", startAtLogin: false, syncVsCodeModels: false },
+  app: { closeBehavior: "tray", startAtLogin: false, syncVsCodeModels: false, updateChannel: "stable" },
   router: {
     host: "127.0.0.1",
     port: 4000,

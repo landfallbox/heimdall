@@ -1,7 +1,8 @@
 {
   "app": {
     "closeBehavior": "tray",
-    "startAtLogin": false
+    "startAtLogin": false,
+    "updateChannel": "stable"
   },
   "router": {
     "host": "127.0.0.1",

@@ -35,6 +35,7 @@ import {
   installUpdate,
   onUpdateState,
   openReleasePage,
+  setUpdateChannel,
 } from "./updater.ts";
 import type { HealthBody, HealthState, RouterActionResult, UpdateState } from "../src/types.ts";
 
@@ -480,6 +481,7 @@ async function saveConfig(_event: IpcMainInvokeEvent, payload: unknown) {
   const saved = await writeConfigStore(paths.configPath, config as NormalizedConfig, revision);
   lastKnownConfigRevision = saved.revision;
   applyPackagedLoginStartup(saved.config.app.startAtLogin);
+  setUpdateChannel(saved.config.app.updateChannel);
   const reload = await reloadManagedRouterAfterSave(paths);
   const vsCodeSync = await maybeSyncVsCodeModels(saved.config);
   return { ...saved, paths, endpoint: getEndpoint(saved.config), ...reload, vsCodeSync };
@@ -1557,6 +1559,7 @@ if (!hasSingleInstanceLock) {
     try {
       const { config } = await loadConfig();
       applyPackagedLoginStartup(config.app.startAtLogin);
+      setUpdateChannel(config.app.updateChannel);
     } catch (error) {
       trayController.showNotification("Heimdall", `Failed to load startup settings: ${(error as Error).message || String(error)}`);
     }

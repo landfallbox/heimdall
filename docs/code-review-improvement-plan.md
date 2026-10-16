@@ -75,16 +75,24 @@
   - **第 1 步（已完成）**：diff-only 审查。`scripts/security-review.mjs` 拉 PR diff，按 REVIEW.md 失败定义让本地模型（OpenAI 兼容端点，复用 release notes 的 `122.193.22.119:8000/v1` + `Qwen3.8-27B` 模式）输出结构化发现，贴 PR 评论。`ci.yml` 新增 `security-review` job（仅 pull_request 触发，informational，永不阻断）。需要配置仓库 secret `SECURITY_REVIEW_API_KEY`（同 release notes 的 key 即可），可选变量 `SECURITY_REVIEW_BASE_URL` / `SECURITY_REVIEW_MODEL`。
   - **第 2 步（待处理，用户后续处理）**：代理式审查评估。用几个历史 PR 当评测集，对比 diff-only vs 代理式（自写最小 agent 循环：读文件/grep/列目录三工具 + N 轮循环，或开源 agent CLI）的召回/噪声比，代理式明显更好再升级。注意：27B 级模型跑多轮工具调用的可靠性是最大风险，弱模型的幻觉发现可能比单轮 diff 审查噪声更多。
 
-#### 项 7：双发布渠道 stable/beta（状态：待决策）
+#### 项 7：双发布渠道 stable/beta（状态：✅ 已完成）
 
 - **文章依据**：`latest` 渠道先走，`stable` 渠道滞后；内部员工先用。
-- **本项目落点**：electron-updater 原生支持多 channel（`latest.yml` vs `beta.yml`）。
+- **本项目落点**：electron-updater 原生支持多 channel（`latest.yml` vs `latest-beta.yml`）。
 - **怎么做**：
-  1. `release.yml` 增加 beta 发布路径（如 tag 带 `-beta` 后缀时发布 `beta.yml`，stable tag 发布 `latest.yml`）。
+  1. `release.yml` 增加 beta 发布路径（tag 带 `-beta` 后缀时构建加 `--channel beta`、发布 `latest-beta.yml`/`latest-beta-mac.yml`、发 prerelease 且 `make_latest=false`；stable tag 发布 `latest.yml`/`latest-mac.yml`）。
   2. `updater.ts` 支持渠道选择（配置项 `updateChannel: "stable" | "beta"`，默认 stable）。
   3. 高风险新功能（failover 规则、updater 本身）先发 beta，自己用几天再进 stable。
-- **成本提示**：涉及发布流程改动，是 P1 里工作量最大的一项。
-- **决定**：
+- **决定**：做，现在实施（2026-10-16）。
+- **实施记录**：
+  - `src/config.ts`：`UpdateChannel` 类型、schema 默认 stable、normalize、DEFAULT_CONFIG。
+  - `gui/electron/updater.ts`：`setUpdateChannel()`（stable→`channel="latest"`+`allowPrerelease=false`；beta→`channel="beta"`+`allowPrerelease=true`），`initializeUpdater` 按当前渠道初始化。
+  - `gui/electron/main.ts`：启动时与 `config:save` 后调用 `setUpdateChannel`，渠道变更无需重启即生效。
+  - `gui/src/config-draft.ts`：类型/默认值/normalize/toDraft/toConfig。
+  - `gui/src/App.tsx`、`application-page.tsx`、`mock-desktop-api.ts`：设置页 Updates 卡片加渠道 SegmentedControl（Stable/Beta）+ 说明文案。
+  - `config.example.json`、`test/electron-lifecycle.test.ts`：补字段。
+  - 验证：`npm run check`、`npm test`（全通过）、`npm run gui:build`、YAML 校验均通过。
+- **发布侧注意**：beta 版本用 `vX.Y.Z-beta.N` tag 触发；stable 用 `vX.Y.Z`。
 
 #### 项 8：发布前 dogfood（状态：待决策）
 
@@ -163,3 +171,4 @@
 | 2026-10-16 | 项 4 | 做 | 流程写入 CONTRIBUTING.md PR 一节；架构规则去重到 AGENTS.md；修正 .js→.ts 过期文件名 |
 | 2026-10-16 | 项 5 | 做 | 默认设置（允许管理员绕过）；步骤已写入项 5，待手动操作 |
 | 2026-10-16 | 项 6 | 做（分两步） | 第 1 步 diff-only 已实施（scripts/security-review.mjs + ci.yml job，本地模型）；第 2 步代理式待历史 PR 评测后决定 |
+| 2026-10-16 | 项 7 | 做 | 双发布渠道 stable/beta 已实施（config + updater + main + GUI + release.yml）；beta 用 `vX.Y.Z-beta.N` tag 触发 |

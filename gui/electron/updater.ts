@@ -7,6 +7,10 @@ import { z } from "zod";
 
 const { app, BrowserWindow, shell } = electron;
 const RELEASES_URL = "https://github.com/landfallbox/heimdall/releases/latest";
+
+export type UpdateChannel = "stable" | "beta";
+const CHANNEL_TO_UPDATER: Record<UpdateChannel, string> = { stable: "latest", beta: "beta" };
+let currentChannel: UpdateChannel = "stable";
 const mockUpdateMode = String(process.env.HEIMDALL_MOCK_UPDATE || "").trim().toLowerCase();
 const isMockUpdateEnabled = Boolean(!app?.isPackaged && mockUpdateMode);
 const isRealUpdaterSupported = Boolean(app?.isPackaged && ["darwin", "win32"].includes(process.platform));
@@ -30,6 +34,13 @@ function getAutoUpdater(): AutoUpdater {
   }
 
   return updater;
+}
+
+export function setUpdateChannel(channel: UpdateChannel): void {
+  currentChannel = channel;
+  const autoUpdater = getAutoUpdater();
+  autoUpdater.channel = CHANNEL_TO_UPDATER[channel];
+  autoUpdater.allowPrerelease = channel === "beta";
 }
 
 function getCurrentVersion(): string {
@@ -124,7 +135,8 @@ export function initializeUpdater(): UpdateState {
   const autoUpdater = getAutoUpdater();
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;
-  autoUpdater.allowPrerelease = false;
+  autoUpdater.channel = CHANNEL_TO_UPDATER[currentChannel];
+  autoUpdater.allowPrerelease = currentChannel === "beta";
   autoUpdater.logger = null;
 
   autoUpdater.on("checking-for-update", () => {
