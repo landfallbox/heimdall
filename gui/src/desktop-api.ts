@@ -69,6 +69,8 @@ export interface HeimdallDesktopApi {
   onOpenSettings(callback: () => void): (() => void) | undefined;
   onConfirmClose(callback: () => void): (() => void) | undefined;
   onUpdateState(callback: (state: UpdateState) => void): (() => void) | undefined;
+  /** 配置文件在应用外部被修改时触发（主进程文件监听）。 */
+  onConfigChanged(callback: (payload: { revision: string }) => void): (() => void) | undefined;
 }
 
 declare global {

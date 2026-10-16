@@ -1,0 +1,496 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --radius: 0.625rem;
+
+  /* 外层底壳（Electron 下透出系统材质），比画布暗一档 */
+  --background: oklch(0.945 0.008 258);
+  /* 内嵌画布：页面内容的实际承载面 */
+  --canvas: oklch(0.973 0.005 258);
+  --foreground: oklch(0.205 0.02 262);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.205 0.02 262);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.205 0.02 262);
+  --primary: oklch(0.545 0.19 257);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.945 0.008 258);
+  --secondary-foreground: oklch(0.28 0.02 260);
+  --muted: oklch(0.945 0.008 258);
+  --muted-foreground: oklch(0.5 0.02 258);
+  --accent: oklch(0.93 0.035 258);
+  --accent-foreground: oklch(0.35 0.08 258);
+  --destructive: oklch(0.55 0.2 25);
+  --destructive-foreground: oklch(0.985 0 0);
+  --success: oklch(0.58 0.13 165);
+  --success-soft: oklch(0.95 0.04 165);
+  --warning: oklch(0.68 0.14 65);
+  --warning-soft: oklch(0.95 0.05 75);
+  --border: oklch(0.9 0.01 258);
+  --input: oklch(0.88 0.012 258);
+  --ring: oklch(0.545 0.19 257);
+
+  --sidebar: oklch(0.945 0.008 258);
+  --sidebar-border: oklch(0.9 0.01 258);
+  --console: oklch(0.958 0.008 258);
+  --console-foreground: oklch(0.3 0.02 260);
+  --console-muted: oklch(0.52 0.02 258);
+  --console-entry: oklch(1 0 0);
+  --console-entry-border: oklch(0.9 0.01 258);
+
+  --chart-1: oklch(0.58 0.17 255);
+  --chart-2: oklch(0.65 0.14 185);
+  --chart-3: oklch(0.75 0.15 80);
+  --chart-4: oklch(0.6 0.19 15);
+  --chart-5: oklch(0.58 0.19 300);
+  --chart-6: oklch(0.7 0.18 130);
+  --chart-other: oklch(0.58 0.02 258);
+
+  --shadow-card: 0 1px 2px oklch(0.2 0.02 260 / 0.04), 0 1px 3px oklch(0.2 0.02 260 / 0.06);
+  --shadow-float: 0 8px 24px oklch(0.2 0.02 260 / 0.12);
+}
+
+.dark {
+  /* 外层底壳：最暗一档，Electron 下透出 mica/vibrancy 材质 */
+  --background: oklch(0.148 0.026 262);
+  /* 内嵌画布：比底壳提亮一档 */
+  --canvas: oklch(0.175 0.028 262);
+  --foreground: oklch(0.92 0.01 258);
+  --card: oklch(0.215 0.032 262);
+  --card-foreground: oklch(0.92 0.01 258);
+  --popover: oklch(0.215 0.032 262);
+  --popover-foreground: oklch(0.92 0.01 258);
+  --primary: oklch(0.66 0.155 255);
+  --primary-foreground: oklch(0.16 0.02 260);
+  --secondary: oklch(0.26 0.03 262);
+  --secondary-foreground: oklch(0.9 0.01 258);
+  --muted: oklch(0.26 0.03 262);
+  --muted-foreground: oklch(0.68 0.02 258);
+  --accent: oklch(0.29 0.045 260);
+  --accent-foreground: oklch(0.9 0.02 255);
+  --destructive: oklch(0.63 0.19 25);
+  --destructive-foreground: oklch(0.985 0 0);
+  --success: oklch(0.72 0.14 165);
+  --success-soft: oklch(0.25 0.04 165);
+  --warning: oklch(0.78 0.13 80);
+  --warning-soft: oklch(0.26 0.05 80);
+  --border: oklch(1 0 0 / 0.1);
+  --input: oklch(1 0 0 / 0.12);
+  --ring: oklch(0.66 0.155 255);
+
+  --sidebar: oklch(0.148 0.026 262);
+  --sidebar-border: oklch(1 0 0 / 0.08);
+  --console: oklch(0.13 0.022 262);
+  --console-foreground: oklch(0.85 0.01 258);
+  --console-muted: oklch(0.62 0.02 258);
+  --console-entry: oklch(0.19 0.028 262);
+  --console-entry-border: oklch(1 0 0 / 0.1);
+
+  --chart-1: oklch(0.68 0.15 255);
+  --chart-2: oklch(0.72 0.13 185);
+  --chart-3: oklch(0.8 0.13 80);
+  --chart-4: oklch(0.68 0.17 15);
+  --chart-5: oklch(0.68 0.16 300);
+  --chart-6: oklch(0.75 0.15 130);
+  --chart-other: oklch(0.65 0.02 258);
+
+  --shadow-card: 0 1px 2px oklch(0 0 0 / 0.3);
+  --shadow-float: 0 12px 32px oklch(0 0 0 / 0.5);
+}
+
+@theme inline {
+  --font-sans: "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "Cascadia Mono", Consolas, "SF Mono", monospace;
+
+  --color-background: var(--background);
+  --color-canvas: var(--canvas);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-console: var(--console);
+  --color-console-foreground: var(--console-foreground);
+  --color-console-muted: var(--console-muted);
+  --color-console-entry: var(--console-entry);
+  --color-console-entry-border: var(--console-entry-border);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+  --color-chart-other: var(--chart-other);
+
+  --shadow-card: var(--shadow-card);
+  --shadow-float: var(--shadow-float);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 10px);
+
+  --animate-status-pulse: status-pulse 2s ease-in-out infinite;
+
+  @keyframes status-pulse {
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.55;
+      transform: scale(0.82);
+    }
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    /* 外层壳不滚动：只保留内嵌画布的细滚动条，
+       避免视口边缘出现原生滚动条轨道与画布滚动条并排的“双轨” */
+    @apply overflow-hidden;
+  }
+
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+    min-width: 1040px;
+    min-height: 700px;
+    font-size: 14px;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  ::selection {
+    @apply bg-primary/25;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklch, var(--muted-foreground) 38%, transparent) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  *::-webkit-scrollbar-track,
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    min-height: 32px;
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background: color-mix(in oklch, var(--muted-foreground) 38%, transparent);
+    background-clip: padding-box;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in oklch, var(--muted-foreground) 58%, transparent);
+    background-clip: padding-box;
+  }
+}
+
+/* Radix Popover 入场动画（transform-origin 由 Radix 通过 CSS 变量提供） */
+.popover-panel {
+  transform-origin: var(--radix-popover-content-transform-origin);
+  animation: popover-in 0.14s ease-out;
+}
+
+@keyframes popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ============ sonner 通知（toast）覆盖（暗色模式） ============
+   sonner 在运行时把默认样式注入 <head> 末尾，同优先级会压过本文件，
+   因此这里统一用 .dark [data-sonner-toaster] 前缀抬高特异性覆盖：
+   - 底色改为比画布微亮的深灰蓝 + 毛玻璃 + 深投影，替代纯黑 / 满铺暗红
+   - 宽度随内容伸缩（240–420px）并在容器内右对齐
+   - 关闭按钮从左上角外挂移入卡片内部右侧，默认半透明、悬停提亮
+   - 语义色只出现在图标、边框微光与左侧细条上，不再整块染色
+   亮色模式不覆盖，沿用 sonner 默认外观。 */
+.dark [data-sonner-toaster] {
+  /* 容器加宽到最大 toast 宽度，保证变宽的 toast 不超出右对齐锚点 */
+  width: 420px;
+}
+
+.dark [data-sonner-toaster] [data-sonner-toast][data-styled="true"] {
+  width: fit-content;
+  min-width: 240px;
+  max-width: 420px;
+  margin-left: auto;
+  padding: 10px 10px 10px 14px;
+  background: rgba(22, 29, 42, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
+  box-shadow:
+    0 12px 28px -6px rgba(0, 0, 0, 0.65),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+  color: #f1f5f9;
+  font-size: 13.5px;
+  gap: 10px;
+}
+
+/* 错误态：底色保持深色，仅边框微光、图标与左侧细条转红 */
+.dark [data-sonner-toaster] [data-sonner-toast][data-styled="true"][data-type="error"] {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: linear-gradient(90deg, rgba(239, 68, 68, 0.12) 0%, rgba(22, 29, 42, 0.95) 45%);
+  box-shadow:
+    0 12px 28px -6px rgba(0, 0, 0, 0.65),
+    inset 2px 0 0 rgba(239, 68, 68, 0.45),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+
+/* 语义图标色：info 灰蓝 / error 珊瑚红 / success 绿 / warning 琥珀 */
+.dark [data-sonner-toaster] [data-sonner-toast][data-type="info"] [data-icon] {
+  color: #94a3b8;
+}
+.dark [data-sonner-toaster] [data-sonner-toast][data-type="error"] [data-icon] {
+  color: #f87171;
+}
+.dark [data-sonner-toaster] [data-sonner-toast][data-type="success"] [data-icon] {
+  color: #34d399;
+}
+.dark [data-sonner-toaster] [data-sonner-toast][data-type="warning"] [data-icon] {
+  color: #fbbf24;
+}
+
+/* 关闭按钮：移入卡片内部右侧，与图标、文字同一水平线 */
+.dark [data-sonner-toaster] [data-sonner-toast][data-styled="true"] [data-close-button] {
+  position: static;
+  order: 10;
+  width: 22px;
+  height: 22px;
+  transform: none;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #64748b;
+  opacity: 0.5;
+  transition:
+    opacity 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.dark [data-sonner-toaster] [data-sonner-toast][data-styled="true"]:hover [data-close-button],
+.dark [data-sonner-toaster] [data-sonner-toast][data-styled="true"] [data-close-button]:hover {
+  opacity: 1;
+}
+.dark [data-sonner-toaster] [data-sonner-toast][data-styled="true"] [data-close-button]:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+}
+.dark [data-sonner-toaster] [data-sonner-toast][data-styled="true"] [data-close-button]:focus-visible {
+  box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.4);
+}
+
+/* 表单校验错误：对应输入框就地红色高亮闪烁（由 App.tsx 的 flashInputError 触发） */
+@keyframes input-error-flash {
+  0% {
+    border-color: rgba(239, 68, 68, 0.9);
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
+  }
+  100% {
+    border-color: var(--input);
+    box-shadow: none;
+  }
+}
+.input-error-flash {
+  animation: input-error-flash 1.4s ease-out;
+}
+
+/* ============ vLLM Thinking 胶囊切换器（模型卡片头部） ============
+   四态：默认关闭（暗灰内敛）/ 激活（青蓝微光）/ 从属禁用（模型 Off 时降透明度）
+   / 悬停 0.3s 后弹出纯 CSS 气泡提示。 */
+.vllm-thinking-pill {
+  position: relative;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  color: #64748b;
+}
+
+.vllm-thinking-pill:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #94a3b8;
+}
+
+.vllm-thinking-pill.is-active {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.45);
+  color: #38bdf8;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.08);
+}
+
+.vllm-thinking-pill.is-active:hover:not(:disabled) {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: rgba(56, 189, 248, 0.6);
+}
+
+.vllm-thinking-pill:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.vllm-thinking-pill-icon {
+  opacity: 0.75;
+  transition: opacity 0.2s ease;
+}
+.vllm-thinking-pill.is-active .vllm-thinking-pill-icon {
+  opacity: 1;
+}
+
+/* 悬停气泡提示：悬停 0.3s 后淡入，移开立即淡出 */
+.vllm-thinking-pill::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: #1e2638;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+  color: #e2e8f0;
+  font-size: 11.5px;
+  font-weight: 400;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 50;
+}
+.vllm-thinking-pill:hover::after {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.3s;
+}
+
+/* ============ Electron 无边框外壳 ============
+   仅在 Electron 渲染进程内生效（main.tsx 检测到 preload 标记后
+   给 <html> 加 .electron-shell 类）：外层底壳半透明以透出
+   mica / vibrancy 系统材质，内嵌画布保持不透明。
+   顶部 34px 为专属系统条：Windows titleBarOverlay 控制按钮
+   （height: 34）与 macOS 红绿灯都落在这一条里，边栏和画布
+   从其下方开始布局，互不重叠。浏览器中预览时这些规则不生效。 */
+.electron-shell {
+  background: transparent;
+  overflow: hidden;
+}
+
+.electron-shell body {
+  background: transparent;
+  overflow: hidden;
+}
+
+.electron-shell .app-shell {
+  background: color-mix(in oklch, var(--background) 82%, transparent);
+  -webkit-app-region: drag;
+  /* 顶部 34px 系统条：整条可拖拽，系统按钮独占右上角 */
+  padding-top: 34px;
+}
+
+/* 画布整体恢复普通鼠标行为，内部内容可点击可选中 */
+.electron-shell .app-shell > main {
+  -webkit-app-region: no-drag;
+}
+
+.electron-shell .sidebar-root {
+  border-right: 0;
+  background-color: transparent;
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.electron-shell .sidebar-root button,
+.electron-shell .sidebar-root a,
+.electron-shell .sidebar-root input {
+  -webkit-app-region: no-drag;
+}
+
+/* macOS 红绿灯已落在顶部系统条内，边栏只需少量呼吸间距 */
+.electron-shell.platform-mac .sidebar-root {
+  padding-top: 4px;
+}
+
+/* 画布标题栏可拖动窗口，右侧按钮除外 */
+.electron-shell .canvas-header {
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.electron-shell .canvas-header button,
+.electron-shell .canvas-header a {
+  -webkit-app-region: no-drag;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
