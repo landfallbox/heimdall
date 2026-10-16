@@ -29,6 +29,7 @@ The binding architecture rules (config normalization, atomic config writes, Rout
 - Run `npm run check`, `npm test`, `npm run test:electron`, and `npm run gui:build` before opening a PR.
 - Before merging any agent-written PR, run a code review in a fresh context (e.g. `/code-review`, or a new agent session reviewing the diff against `REVIEW.md`). Answer every finding: fix it, or reply in the PR with a reason to dismiss it.
 - For tagged releases, verify the GitHub Release includes the Windows installer `.exe`, `.exe.blockmap`, and `latest.yml` so packaged apps can detect updates.
+- Before publishing a release, dogfood the packaged build at least once: install it, start the app, configure a vendor, send one real request, and run an update check. Heavy use often surfaces regressions before users do.
 
 ## Configuration And Secrets
 

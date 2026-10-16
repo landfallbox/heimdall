@@ -94,11 +94,11 @@
   - 验证：`npm run check`、`npm test`（全通过）、`npm run gui:build`、YAML 校验均通过。
 - **发布侧注意**：beta 版本用 `vX.Y.Z-beta.N` tag 触发；stable 用 `vX.Y.Z`。
 
-#### 项 8：发布前 dogfood（状态：待决策）
+#### 项 8：发布前 dogfood（状态：✅ 已完成）
 
 - **文章依据**：新功能先给内部员工用，重度使用往往在用户之前暴露回归。
 - **怎么做**：`CONTRIBUTING.md` 的 release 检查清单加一条："打包装机版并实际安装使用至少一次（启动、配置、一次真实请求、一次更新检查）"。最低成本版本，不改代码。
-- **决定**：
+- **决定**：做（2026-10-16）。已在 `CONTRIBUTING.md` Pull Requests 一节的 release 条目后加 dogfood 要求。
 
 #### 项 9：回滚路径文档化（状态：待决策）
 
@@ -172,3 +172,4 @@
 | 2026-10-16 | 项 5 | 做 | 默认设置（允许管理员绕过）；步骤已写入项 5，待手动操作 |
 | 2026-10-16 | 项 6 | 做（分两步） | 第 1 步 diff-only 已实施（scripts/security-review.mjs + ci.yml job，本地模型）；第 2 步代理式待历史 PR 评测后决定 |
 | 2026-10-16 | 项 7 | 做 | 双发布渠道 stable/beta 已实施（config + updater + main + GUI + release.yml）；beta 用 `vX.Y.Z-beta.N` tag 触发 |
+| 2026-10-16 | 项 8 | 做 | CONTRIBUTING.md release 条目加 dogfood 要求（纯文档） |
