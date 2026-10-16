@@ -31,5 +31,6 @@ npm run gui:build    # GUI 构建
 ## 其他文档
 
 - 贡献流程、PR 要求、密钥管理：`CONTRIBUTING.md`
+- 审查标准（什么算失败、审查规则）：`REVIEW.md`
 - 安全漏洞报告：`SECURITY.md`
 - 代码结构与行为说明：`README.md`、`docs/`
