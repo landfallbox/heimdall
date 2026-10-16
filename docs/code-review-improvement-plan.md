@@ -80,7 +80,11 @@
 
 - **文章依据**：安全审查独立成层，有未关闭发现时 PR 不能合并；可用开源的 security review GitHub Action 或 `/security-review` 命令实现。
 - **本项目特殊性**：本地 API key 鉴权、上游 vendor key、日志脱敏都在关键路径上，是少见的"个人项目也值得上安全审查"的类型。
-- **怎么做**：在 `ci.yml` 加一个 job，用 Claude Code GitHub Action 跑 `/security-review`（或对应开源 Action），发现贴到 PR 评论；是否设为 required check 可先观察几周再定。
+- **怎么做**：在 `ci.yml` 加一个 job 跑安全审查，发现贴到 PR 评论；是否设为 required check 可先观察几周再定。审查引擎**不绑定 Claude**，免费开源替代：
+  - **静态扫描（非 LLM，免费开源）**：Semgrep（安全规则）、Gitleaks（密钥泄漏，本项目鉴权关键路径尤其适用）、Trivy（漏洞/密钥）、CodeQL（公开仓库免费）。
+  - **开源 agent（可指向本地模型，全免费）**：OpenHands、SWE-agent、Aider 等，或自写最小 agent 循环（读文件/grep/列目录 + N 轮）由本地 Qwen 驱动（即第 2 步设想）。
+  - **Claude Code GitHub Action**：官方现成方案，但需付费 Claude API key、非开源，仅作为"省事"备选。
+  - 现状：第 1 步 diff-only 已用本地 Qwen 端点实现，**完全不依赖 Claude**。
 - **决定**：做，分两步。
   - **第 1 步（已完成）**：diff-only 审查。`scripts/security-review.mjs` 拉 PR diff，按 REVIEW.md 失败定义让本地模型（OpenAI 兼容端点，复用 release notes 的 `122.193.22.119:8000/v1` + `Qwen3.8-27B` 模式）输出结构化发现，贴 PR 评论。`ci.yml` 新增 `security-review` job（仅 pull_request 触发，informational，永不阻断）。需要配置仓库 secret `SECURITY_REVIEW_API_KEY`（同 release notes 的 key 即可），可选变量 `SECURITY_REVIEW_BASE_URL` / `SECURITY_REVIEW_MODEL`。
   - **第 2 步（待处理，用户后续处理）**：代理式审查评估。用几个历史 PR 当评测集，对比 diff-only vs 代理式（自写最小 agent 循环：读文件/grep/列目录三工具 + N 轮循环，或开源 agent CLI）的召回/噪声比，代理式明显更好再升级。注意：27B 级模型跑多轮工具调用的可靠性是最大风险，弱模型的幻觉发现可能比单轮 diff 审查噪声更多。
