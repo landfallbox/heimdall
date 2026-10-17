@@ -1,10 +1,6 @@
 ; 数据目录指针：NSIS 与应用约定的唯一入口。指针始终固定在默认 userData 目录，
 ; 里面记录真正的数据目录；electron-builder 会在安装包与卸载程序中各包含一次本文件，
 ; 因此宏定义需要防重复。
-; 移除 allowToChangeInstallationDirectory 后模板不再引入 StrContains.nsh，
-; 而本文件的安装位置消毒逻辑依赖它，需自行引入（模板 include/ 目录在 NSIS
-; 搜索路径中，可直接按文件名包含）。
-!include "StrContains.nsh"
 
 !ifndef HEIMDALL_DATA_LOCATION_DEFINED
   !define HEIMDALL_DEFAULT_DATA_DIR "$APPDATA\Heimdall"
@@ -14,6 +10,13 @@
 !endif
 
 !ifndef BUILD_UNINSTALLER
+
+  ; 移除 allowToChangeInstallationDirectory 后模板不再引入 StrContains.nsh，
+  ; 而下方安装位置消毒逻辑依赖它，需自行引入（模板 include/ 目录在 NSIS
+  ; 搜索路径中，可直接按文件名包含）。必须放在本块内：卸载器构建时
+  ; BUILD_UNINSTALLER 已定义、不会调用 StrContains，若在顶层引入会触发
+  ; "function not referenced" 警告（electron-builder 将警告视为错误）。
+  !include "StrContains.nsh"
 
   ; === 安装期位置选择（安装位置 + 数据目录合并页）===
   ; 用一个自定义页同时让用户指定 Heimdall 的安装位置和数据目录
