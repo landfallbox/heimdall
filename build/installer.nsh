@@ -1,6 +1,11 @@
 ; 数据目录指针：NSIS 与应用约定的唯一入口。指针始终固定在默认 userData 目录，
 ; 里面记录真正的数据目录；electron-builder 会在安装包与卸载程序中各包含一次本文件，
 ; 因此宏定义需要防重复。
+; 移除 allowToChangeInstallationDirectory 后模板不再引入 StrContains.nsh，
+; 而本文件的安装位置消毒逻辑依赖它，需自行引入（模板 include/ 目录在 NSIS
+; 搜索路径中，可直接按文件名包含）。
+!include "StrContains.nsh"
+
 !ifndef HEIMDALL_DATA_LOCATION_DEFINED
   !define HEIMDALL_DEFAULT_DATA_DIR "$APPDATA\Heimdall"
   !define HEIMDALL_DATA_POINTER "${HEIMDALL_DEFAULT_DATA_DIR}\data-location.ini"
@@ -10,24 +15,36 @@
 
 !ifndef BUILD_UNINSTALLER
 
-  ; === 安装期数据目录选择 ===
-  ; 在“选择安装位置”页之后插入一个自定义页，让用户指定 Heimdall 的数据目录
-  ; （config / 日志 / 用量统计等）。选择结果写进指针文件，应用启动时读取并据此
-  ; 重定向 Electron 的 userData，从而把数据从 C 盘迁到用户指定的目录。
+  ; === 安装期位置选择（安装位置 + 数据目录合并页）===
+  ; 用一个自定义页同时让用户指定 Heimdall 的安装位置和数据目录
+  ; （config / 日志 / 用量统计等）。安装位置直接写入 $INSTDIR；数据目录选择结果
+  ; 写进指针文件，应用启动时读取并据此重定向 Electron 的 userData，从而把数据
+  ; 从 C 盘迁到用户指定的目录。
+  ; 该页替代了模板默认的“选择安装位置”页（通过移除 allowToChangeInstallationDirectory
+  ; 关闭），并把原本独立的数据目录页合并进来，减少安装步骤。
 
   Var DataDirDialog
   Var DataDirText
   Var DataDirEdit
+  Var InstDirEdit
+
+  ; 跳过“为所有用户 / 仅为我”安装模式页：本应用固定为 per-user 安装
+  ; （perMachine: false），该页只会多一步无意义的选择。customInstallMode 在安装
+  ; 模式页的 Pre 回调里被模板调用，置 $isForceCurrentInstall=1 后模板会强制
+  ; per-user 并 Abort 跳过该页（静默安装时同样生效，行为保持一致）。
+  !macro customInstallMode
+    StrCpy $isForceCurrentInstall "1"
+  !macroend
 
   !macro customPageAfterChangeDir
     !insertmacro MUI_PAGE_INIT
 
     PageEx custom
-      PageCallbacks lmrDataDirPre lmrDataDirLeave
+      PageCallbacks lmrCombinedPre lmrCombinedLeave
       Caption " "
     PageExEnd
 
-    Function lmrDataDirPre
+    Function lmrCombinedPre
       ${IfNot} ${Silent}
         nsDialogs::Create 1018
         Pop $DataDirDialog
@@ -35,13 +52,29 @@
           Abort
         ${EndIf}
 
-        ${NSD_CreateLabel} 0u 0u 280u 16u "Choose where Heimdall stores its data (config, logs, usage):"
+        ${NSD_CreateLabel} 0u 0u 434u 16u "Choose where Heimdall is installed and where it stores its data:"
         Pop $0
 
-        ${NSD_CreateText} 0u 18u 240u 12u ""
+        ${NSD_CreateLabel} 0u 24u 90u 12u "Install location:"
+        Pop $0
+
+        ${NSD_CreateText} 95u 22u 285u 14u ""
+        Pop $InstDirEdit
+        ; 预填当前安装位置（升级时为上次安装目录，全新安装时为 per-user 默认目录）。
+        ${NSD_SetText} $InstDirEdit "$INSTDIR"
+
+        ${NSD_CreateButton} 384u 22u 30u 14u "..."
+        Pop $0
+        ${NSD_OnClick} $0 lmrInstDirBrowse
+        Pop $0
+
+        ${NSD_CreateLabel} 0u 48u 90u 12u "Data directory:"
+        Pop $0
+
+        ${NSD_CreateText} 95u 46u 285u 14u ""
         Pop $DataDirEdit
 
-        ${NSD_CreateButton} 248u 18u 30u 12u "..."
+        ${NSD_CreateButton} 384u 46u 30u 14u "..."
         Pop $0
         ${NSD_OnClick} $0 lmrDataDirBrowse
         Pop $0
@@ -56,18 +89,41 @@
       ${EndIf}
     FunctionEnd
 
-    Function lmrDataDirLeave
+    Function lmrCombinedLeave
       ${IfNot} ${Silent}
+        ; --- 安装位置：空值保留默认；相对路径拒绝；绝对路径（含盘根）接受 ---
+        ${NSD_GetText} $InstDirEdit $0
+        ${If} $0 != ""
+          ; StrCpy 的起始偏移从 0 计数：第 0 位是盘符/UNC 反斜杠，第 1 位是冒号。
+          StrCpy $1 "$0" 1 0
+          StrCpy $2 "$0" 1 1
+          ${If} $2 == ":"
+            StrCpy $INSTDIR "$0"
+          ${ElseIf} $1 == "\\"
+            StrCpy $INSTDIR "$0"
+          ${Else}
+            MessageBox MB_ICONSTOP "That is not a valid folder path. Heimdall will use the default install location."
+          ${EndIf}
+          ; 消毒（等价于模板 instFilesPre）：$INSTDIR 必须落在 ${APP_FILENAME}
+          ; 子目录内。用户选了盘根或未含 Heimdall 的目录时自动补上子目录，
+          ; 防止把文件直接铺到 D:\ 或用户主目录等位置。
+          ${StrContains} $R1 "${APP_FILENAME}" $INSTDIR
+          ${If} $R1 == ""
+            StrCpy $INSTDIR "$INSTDIR\${APP_FILENAME}"
+          ${EndIf}
+        ${EndIf}
+
+        ; --- 数据目录：空值跳过（静默升级不写指针）；相对路径和盘根在此拦下 ---
         ${NSD_GetText} $DataDirEdit $DataDirText
         ; 轻量校验：应用启动时会执行完整规则，但相对路径和盘根永远无效，
         ; 在这里就拦下，避免写进一个应用不得不修复的指针。
         ${If} $DataDirText != ""
-          ; StrCpy 的起始偏移从 1 计数：第 1 位是盘符/UNC 反斜杠，第 2 位是冒号。
-          StrCpy $1 "$DataDirText" 1 1
-          StrCpy $2 "$DataDirText" 1 2
+          ; StrCpy 的起始偏移从 0 计数：第 0 位是盘符/UNC 反斜杠，第 1 位是冒号。
+          StrCpy $1 "$DataDirText" 1 0
+          StrCpy $2 "$DataDirText" 1 1
           ${If} $2 == ":"
-            StrCpy $3 "$DataDirText" 1 3
-            StrCpy $4 "$DataDirText" 1 4
+            StrCpy $3 "$DataDirText" 1 2
+            StrCpy $4 "$DataDirText" 1 3
             ${If} $3 == "\"
               ${If} $4 == ""
                 MessageBox MB_ICONSTOP "Choose a folder instead of a drive root. Heimdall will use the default data directory:$\r$\n$APPDATA\Heimdall"
@@ -79,6 +135,16 @@
             StrCpy $DataDirText ""
           ${EndIf}
         ${EndIf}
+      ${EndIf}
+    FunctionEnd
+
+    Function lmrInstDirBrowse
+      Pop $0
+      ${NSD_GetText} $InstDirEdit $0
+      nsDialogs::SelectFolderDialog "Select Heimdall install location" $0
+      Pop $0
+      ${If} $0 != error
+        ${NSD_SetText} $InstDirEdit "$0"
       ${EndIf}
     FunctionEnd
 
@@ -121,12 +187,12 @@
 
   ; 指针可能由旧版安装器写入或被手工改坏（相对路径、盘根）。RMDir /r 这类值
   ; 会误删无关内容，因此仅当它是绝对路径且不是盘根时才执行删除。
-  ; StrCpy 的起始偏移从 1 计数：第 1 位是盘符/UNC 反斜杠，第 2 位是冒号。
-  StrCpy $1 "$0" 1 1
-  StrCpy $2 "$0" 1 2
+  ; StrCpy 的起始偏移从 0 计数：第 0 位是盘符/UNC 反斜杠，第 1 位是冒号。
+  StrCpy $1 "$0" 1 0
+  StrCpy $2 "$0" 1 1
   ${If} $2 == ":"
-    StrCpy $3 "$0" 1 3
-    StrCpy $4 "$0" 1 4
+    StrCpy $3 "$0" 1 2
+    StrCpy $4 "$0" 1 3
     ${If} $3 == "\"
       ${If} $4 == ""
         StrCpy $0 ""
