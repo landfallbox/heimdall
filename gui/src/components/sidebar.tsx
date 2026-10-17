@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Check, Copy, Download, Gauge, Info, Loader2, Play, RefreshCw, RotateCcw, Settings2, Server, Square, Terminal, type LucideIcon } from "lucide-react";
 
 import appIcon from "../../../build/icon.svg";
@@ -167,8 +167,10 @@ function SidebarUpdateCard({
     return null;
   }
 
+  let card: ReactNode;
+
   if (updateState.status === "downloaded") {
-    return (
+    card = (
       <div className="rounded-xl border border-primary/40 bg-gradient-to-b from-primary/15 to-primary/5 p-3 shadow-card">
         <div className="flex items-center gap-2">
           <span className="size-1.5 shrink-0 animate-pulse rounded-full bg-primary" />
@@ -184,7 +186,7 @@ function SidebarUpdateCard({
   }
 
   if (isDownloading) {
-    return (
+    card = (
       <div className="rounded-xl border border-primary/30 bg-primary/5 p-3" aria-label={`Downloading update ${percent}%`}>
         <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
           <Loader2 className="animate-spin size-3.5 shrink-0" />
@@ -198,7 +200,7 @@ function SidebarUpdateCard({
   }
 
   if (isChecking) {
-    return (
+    card = (
       <div className="rounded-xl border border-primary/30 bg-primary/5 p-3" aria-label="Checking for updates">
         <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
           <Loader2 className="animate-spin size-3.5 shrink-0" />
@@ -209,7 +211,7 @@ function SidebarUpdateCard({
   }
 
   if (downloadFailed) {
-    return (
+    card = (
       <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3">
         <div className="flex items-center gap-2">
           <span className="size-1.5 shrink-0 rounded-full bg-destructive" />
@@ -226,7 +228,7 @@ function SidebarUpdateCard({
   }
 
   if (updateState.status === "error") {
-    return (
+    card = (
       <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3">
         <div className="flex items-center gap-2">
           <span className="size-1.5 shrink-0 rounded-full bg-destructive" />
@@ -242,22 +244,37 @@ function SidebarUpdateCard({
     );
   }
 
-  if (updateState.status !== "available") {
-    return null;
+  if (updateState.status === "available") {
+    card = (
+      <div className="rounded-xl border border-primary/40 bg-gradient-to-b from-primary/15 to-primary/5 p-3 shadow-card">
+        <div className="flex items-center gap-2">
+          <span className="size-1.5 shrink-0 animate-pulse rounded-full bg-primary" />
+          <span className="text-sm font-semibold">Update available</span>
+        </div>
+        <VersionTransition current={updateState.currentVersion} next={updateState.availableVersion} />
+        <Button size="sm" className="mt-2.5 w-full" onClick={() => void onDownloadUpdate()} disabled={isInstalling} title={`Download version ${updateState.availableVersion}`}>
+          <Download size={14} />
+          Update now
+        </Button>
+      </div>
+    );
   }
 
+  const liveMessage = isChecking
+    ? "Checking for updates..."
+    : downloadFailed
+      ? "Update download failed"
+      : updateState.status === "error"
+        ? "Update check failed"
+        : "";
+
   return (
-    <div className="rounded-xl border border-primary/40 bg-gradient-to-b from-primary/15 to-primary/5 p-3 shadow-card">
-      <div className="flex items-center gap-2">
-        <span className="size-1.5 shrink-0 animate-pulse rounded-full bg-primary" />
-        <span className="text-sm font-semibold">Update available</span>
+    <>
+      {card}
+      <div aria-live="polite" className="sr-only">
+        {liveMessage}
       </div>
-      <VersionTransition current={updateState.currentVersion} next={updateState.availableVersion} />
-      <Button size="sm" className="mt-2.5 w-full" onClick={() => void onDownloadUpdate()} disabled={isInstalling} title={`Download version ${updateState.availableVersion}`}>
-        <Download size={14} />
-        Update now
-      </Button>
-    </div>
+    </>
   );
 }
 
