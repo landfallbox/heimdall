@@ -56,7 +56,7 @@ type ModalState =
 interface StatusView {
   label: string;
   tone: "neutral" | "success" | "warning";
-  /** 非运行态的原始错误信息，侧栏状态卡以摘要 + Popover 展示 */
+  /** 非运行态的原始错误信息，侧栏状态卡以 Popover 展示 */
   detail?: string;
 }
 
