@@ -11,12 +11,9 @@
 
 !ifndef BUILD_UNINSTALLER
 
-  ; 移除 allowToChangeInstallationDirectory 后模板不再引入 StrContains.nsh，
-  ; 而下方安装位置消毒逻辑依赖它，需自行引入（模板 include/ 目录在 NSIS
-  ; 搜索路径中，可直接按文件名包含）。必须放在本块内：卸载器构建时
-  ; BUILD_UNINSTALLER 已定义、不会调用 StrContains，若在顶层引入会触发
-  ; "function not referenced" 警告（electron-builder 将警告视为错误）。
-  !include "StrContains.nsh"
+  ; 安装位置消毒逻辑改用 StrLen + StrCpy 手动做末尾组件判定（见 lmrCombinedLeave），
+  ; 不再引入 StrContains.nsh：electron-builder 的 NSIS 不含 StrLib.nsh，无法用
+  ; ${EndsWith}；而 StrContains 的子串匹配会误接受 C:\HeimdallBackup 这类目录。
 
   ; === 安装期位置选择（安装位置 + 数据目录合并页）===
   ; 用一个自定义页同时让用户指定 Heimdall 的安装位置和数据目录
@@ -97,11 +94,18 @@
         ; --- 安装位置：空值保留默认；相对路径拒绝；绝对路径（含盘根）接受 ---
         ${NSD_GetText} $InstDirEdit $0
         ${If} $0 != ""
-          ; StrCpy 的起始偏移从 0 计数：第 0 位是盘符/UNC 反斜杠，第 1 位是冒号。
-          StrCpy $1 "$0" 1 0
+          ; 取前 2 个字符判断 UNC（NSIS 中 "\\" 是字面 2 个反斜杠，
+          ; 取 1 个字符永远不等于 "\\"，会漏判 \\server\share 路径）
+          StrCpy $1 "$0" 2 0
           StrCpy $2 "$0" 1 1
           ${If} $2 == ":"
-            StrCpy $INSTDIR "$0"
+            ; 盘符路径必须形如 X:\...（排除 D:relative 这类盘符相对路径）
+            StrCpy $3 "$0" 1 2
+            ${If} $3 == "\"
+              StrCpy $INSTDIR "$0"
+            ${Else}
+              MessageBox MB_ICONSTOP "That is not a valid folder path. Heimdall will use the default install location."
+            ${EndIf}
           ${ElseIf} $1 == "\\"
             StrCpy $INSTDIR "$0"
           ${Else}
@@ -110,8 +114,37 @@
           ; 消毒（等价于模板 instFilesPre）：$INSTDIR 必须落在 ${APP_FILENAME}
           ; 子目录内。用户选了盘根或未含 Heimdall 的目录时自动补上子目录，
           ; 防止把文件直接铺到 D:\ 或用户主目录等位置。
-          ${StrContains} $R1 "${APP_FILENAME}" $INSTDIR
-          ${If} $R1 == ""
+          ; 末尾组件判定：仅当 $INSTDIR 的最后一个路径组件恰好是
+          ; ${APP_FILENAME}（或为空）时才不追加，避免子串匹配误接受
+          ; C:\HeimdallBackup 这类目录。StrCpy 用法参照模板
+          ; installUtil.nsh 的 GetFileParent：`StrCpy $d $s 1 -K` 取从末尾
+          ; 第 K 个字符起的 1 字符；`StrCpy $d $s N` 取前 N 字符。
+          StrCpy $R1 "$INSTDIR" 1 -1
+          ${If} $R1 == "\"
+            StrLen $R2 "$INSTDIR"
+            IntOp $R2 $R2 - 1
+            StrCpy $INSTDIR "$INSTDIR" $R2
+          ${EndIf}
+          StrLen $R1 "${APP_FILENAME}"
+          StrCpy $R3 ""
+          StrLen $R4 "$INSTDIR"
+          ${If} $R4 >= $R1
+            StrCpy $R3 "$INSTDIR" $R1 -$R1
+            ${If} $R3 == "${APP_FILENAME}"
+              ${If} $R4 > $R1
+                ; 末尾组件前必须还有路径分隔符（\）或盘符（:，即盘根直下），
+                ; 否则说明是 XHeimdall 这类更长组件的尾部，仍需追加
+                IntOp $R5 $R1 + 1
+                StrCpy $R4 "$INSTDIR" 1 -$R5
+                ${If} $R4 != "\"
+                  ${If} $R4 != ":"
+                    StrCpy $R3 ""
+                  ${EndIf}
+                ${EndIf}
+              ${EndIf}
+            ${EndIf}
+          ${EndIf}
+          ${If} $R3 != "${APP_FILENAME}"
             StrCpy $INSTDIR "$INSTDIR\${APP_FILENAME}"
           ${EndIf}
         ${EndIf}
@@ -121,17 +154,20 @@
         ; 轻量校验：应用启动时会执行完整规则，但相对路径和盘根永远无效，
         ; 在这里就拦下，避免写进一个应用不得不修复的指针。
         ${If} $DataDirText != ""
-          ; StrCpy 的起始偏移从 0 计数：第 0 位是盘符/UNC 反斜杠，第 1 位是冒号。
-          StrCpy $1 "$DataDirText" 1 0
+          ; 取前 2 个字符判断 UNC（NSIS 中 "\\" 是字面 2 个反斜杠，
+          ; 取 1 个字符永远不等于 "\\"，会漏判 \\server\share 路径）
+          StrCpy $1 "$DataDirText" 2 0
           StrCpy $2 "$DataDirText" 1 1
           ${If} $2 == ":"
             StrCpy $3 "$DataDirText" 1 2
             StrCpy $4 "$DataDirText" 1 3
-            ${If} $3 == "\"
-              ${If} $4 == ""
-                MessageBox MB_ICONSTOP "Choose a folder instead of a drive root. Heimdall will use the default data directory:$\r$\n$APPDATA\Heimdall"
-                StrCpy $DataDirText ""
-              ${EndIf}
+            ; 盘符相对路径（D:relative）不是绝对路径，按无效处理
+            ${If} $3 != "\"
+              MessageBox MB_ICONSTOP "That is not a valid folder path. Heimdall will use the default data directory:$\r$\n$APPDATA\Heimdall"
+              StrCpy $DataDirText ""
+            ${ElseIf} $4 == ""
+              MessageBox MB_ICONSTOP "Choose a folder instead of a drive root. Heimdall will use the default data directory:$\r$\n$APPDATA\Heimdall"
+              StrCpy $DataDirText ""
             ${EndIf}
           ${ElseIf} $1 != "\\"
             MessageBox MB_ICONSTOP "That is not a valid folder path. Heimdall will use the default data directory:$\r$\n$APPDATA\Heimdall"
@@ -191,15 +227,18 @@
   ; 指针可能由旧版安装器写入或被手工改坏（相对路径、盘根）。RMDir /r 这类值
   ; 会误删无关内容，因此仅当它是绝对路径且不是盘根时才执行删除。
   ; StrCpy 的起始偏移从 0 计数：第 0 位是盘符/UNC 反斜杠，第 1 位是冒号。
-  StrCpy $1 "$0" 1 0
+  ; 取前 2 个字符判断 UNC（NSIS 中 "\\" 是字面 2 个反斜杠，
+  ; 取 1 个字符永远不等于 "\\"，会漏判 \\server\share 路径）
+  StrCpy $1 "$0" 2 0
   StrCpy $2 "$0" 1 1
   ${If} $2 == ":"
     StrCpy $3 "$0" 1 2
     StrCpy $4 "$0" 1 3
-    ${If} $3 == "\"
-      ${If} $4 == ""
-        StrCpy $0 ""
-      ${EndIf}
+    ; 盘符相对路径不是绝对路径，按无效处理
+    ${If} $3 != "\"
+      StrCpy $0 ""
+    ${ElseIf} $4 == ""
+      StrCpy $0 ""
     ${EndIf}
   ${ElseIf} $1 != "\\"
     StrCpy $0 ""
