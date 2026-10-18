@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Check, Copy, Download, Gauge, Info, Loader2, Play, RefreshCw, RotateCcw, Settings2, Server, Square, Terminal, type LucideIcon } from "lucide-react";
 
 import appIcon from "../../../build/icon.svg";
@@ -98,12 +98,7 @@ export function Sidebar({
         <div className="rounded-xl border border-border bg-card p-3.5 shadow-card">
           <div className="flex items-center gap-2">
             <StatusDot tone={status.tone} pulse={status.tone === "success"} />
-            <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-              {status.label}
-              {status.detail && (
-                <span className="font-normal text-muted-foreground"> · {summarizeStatusDetail(status.detail)}</span>
-              )}
-            </span>
+            <span className="min-w-0 flex-1 truncate text-sm font-semibold">{status.label}</span>
             {status.detail && <StatusDetailPopover detail={status.detail} />}
           </div>
           {restartRequired && (
@@ -148,7 +143,7 @@ export function Sidebar({
   );
 }
 
-/** 侧边栏底部更新通知卡片：有更新时高亮提醒，平时仅保留一行低调的“检查更新”入口 */
+/** 侧边栏底部更新通知卡片：检查中、检查失败或有更新时显示，平时不占位 */
 function SidebarUpdateCard({
   updateState,
   onCheckUpdate,
@@ -172,8 +167,10 @@ function SidebarUpdateCard({
     return null;
   }
 
+  let card: ReactNode;
+
   if (updateState.status === "downloaded") {
-    return (
+    card = (
       <div className="rounded-xl border border-primary/40 bg-gradient-to-b from-primary/15 to-primary/5 p-3 shadow-card">
         <div className="flex items-center gap-2">
           <span className="size-1.5 shrink-0 animate-pulse rounded-full bg-primary" />
@@ -186,10 +183,8 @@ function SidebarUpdateCard({
         </Button>
       </div>
     );
-  }
-
-  if (isDownloading) {
-    return (
+  } else if (isDownloading) {
+    card = (
       <div className="rounded-xl border border-primary/30 bg-primary/5 p-3" aria-label={`Downloading update ${percent}%`}>
         <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
           <Loader2 className="animate-spin size-3.5 shrink-0" />
@@ -200,19 +195,17 @@ function SidebarUpdateCard({
         </div>
       </div>
     );
-  }
-
-  if (isChecking) {
-    return (
-      <div className="flex items-center gap-2 px-1 text-[11px] font-medium text-muted-foreground/70" aria-label="Checking for updates">
-        <Loader2 className="animate-spin size-3 shrink-0" />
-        Checking for updates...
+  } else if (isChecking) {
+    card = (
+      <div className="rounded-xl border border-primary/30 bg-primary/5 p-3" aria-label="Checking for updates">
+        <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+          <Loader2 className="animate-spin size-3.5 shrink-0" />
+          <span className="min-w-0 truncate">Checking for updates...</span>
+        </div>
       </div>
     );
-  }
-
-  if (downloadFailed) {
-    return (
+  } else if (downloadFailed) {
+    card = (
       <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3">
         <div className="flex items-center gap-2">
           <span className="size-1.5 shrink-0 rounded-full bg-destructive" />
@@ -226,48 +219,59 @@ function SidebarUpdateCard({
         </Button>
       </div>
     );
-  }
-
-  if (updateState.status === "error") {
-    return (
-      <button
-        type="button"
-        onClick={() => void onCheckUpdate()}
-        title={updateState.error || "Update check failed"}
-        className="flex w-full items-center gap-2 rounded-lg px-1 py-0.5 text-[11px] font-medium text-muted-foreground/70 transition-colors hover:text-foreground"
-      >
-        <RefreshCw size={12} className="shrink-0" />
-        <span className="min-w-0 truncate">Update check failed · Retry</span>
-      </button>
+  } else if (updateState.status === "error") {
+    card = (
+      <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3">
+        <div className="flex items-center gap-2">
+          <span className="size-1.5 shrink-0 rounded-full bg-destructive" />
+          <span className="min-w-0 truncate text-sm font-semibold" title={updateState.error || "Update check failed"}>
+            Update check failed
+          </span>
+        </div>
+        <Button size="sm" variant="outline" className="mt-2.5 w-full text-destructive" onClick={() => void onCheckUpdate()} title={updateState.error || "Update check failed"}>
+          <RefreshCw size={14} />
+          Retry check
+        </Button>
+      </div>
+    );
+  } else if (updateState.status === "available") {
+    card = (
+      <div className="rounded-xl border border-primary/40 bg-gradient-to-b from-primary/15 to-primary/5 p-3 shadow-card">
+        <div className="flex items-center gap-2">
+          <span className="size-1.5 shrink-0 animate-pulse rounded-full bg-primary" />
+          <span className="text-sm font-semibold">Update available</span>
+        </div>
+        <VersionTransition current={updateState.currentVersion} next={updateState.availableVersion} />
+        <Button size="sm" className="mt-2.5 w-full" onClick={() => void onDownloadUpdate()} disabled={isInstalling} title={`Download version ${updateState.availableVersion}`}>
+          <Download size={14} />
+          Update now
+        </Button>
+      </div>
     );
   }
 
-  if (updateState.status !== "available") {
-    return (
-      <button
-        type="button"
-        onClick={() => void onCheckUpdate()}
-        title="Check for updates"
-        className="flex w-full items-center gap-2 rounded-lg px-1 py-0.5 text-[11px] font-medium text-muted-foreground/70 transition-colors hover:text-foreground"
-      >
-        <RefreshCw size={12} className="shrink-0" />
-        Check for updates
-      </button>
-    );
-  }
+  // 读屏播报与卡片分支同序；下载中保持静默（进度持续变化，避免噪音）
+  const liveMessage = updateState.status === "downloaded"
+    ? "Update ready"
+    : isDownloading
+      ? ""
+      : isChecking
+        ? "Checking for updates..."
+        : downloadFailed
+          ? "Update download failed"
+          : updateState.status === "error"
+            ? "Update check failed"
+            : updateState.status === "available"
+              ? "Update available"
+              : "";
 
   return (
-    <div className="rounded-xl border border-primary/40 bg-gradient-to-b from-primary/15 to-primary/5 p-3 shadow-card">
-      <div className="flex items-center gap-2">
-        <span className="size-1.5 shrink-0 animate-pulse rounded-full bg-primary" />
-        <span className="text-sm font-semibold">Update available</span>
+    <>
+      {card}
+      <div aria-live="polite" className="sr-only">
+        {liveMessage}
       </div>
-      <VersionTransition current={updateState.currentVersion} next={updateState.availableVersion} />
-      <Button size="sm" className="mt-2.5 w-full" onClick={() => void onDownloadUpdate()} disabled={isInstalling} title={`Download version ${updateState.availableVersion}`}>
-        <Download size={14} />
-        Update now
-      </Button>
-    </div>
+    </>
   );
 }
 
@@ -282,17 +286,6 @@ function VersionTransition({ current, next }: { current: string; next: string })
       <span className="min-w-0 truncate font-medium text-foreground/80">{to}</span>
     </div>
   );
-}
-
-/** 把原始错误压缩成一行摘要，完整内容由 Popover 展示 */
-function summarizeStatusDetail(detail: string): string {
-  if (/ECONNREFUSED/i.test(detail)) return "Connection refused";
-  if (/ECONNRESET/i.test(detail)) return "Connection reset";
-  if (/ECONNABORTED/i.test(detail)) return "Connection aborted";
-  if (/ETIMEDOUT|timed out/i.test(detail)) return "Timed out";
-  if (/EADDRINUSE/i.test(detail)) return "Port in use";
-  const trimmed = detail.trim();
-  return trimmed.length > 32 ? `${trimmed.slice(0, 32)}…` : trimmed;
 }
 
 function StatusDetailPopover({ detail }: { detail: string }) {
