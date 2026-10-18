@@ -183,9 +183,7 @@ function SidebarUpdateCard({
         </Button>
       </div>
     );
-  }
-
-  if (isDownloading) {
+  } else if (isDownloading) {
     card = (
       <div className="rounded-xl border border-primary/30 bg-primary/5 p-3" aria-label={`Downloading update ${percent}%`}>
         <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
@@ -197,9 +195,7 @@ function SidebarUpdateCard({
         </div>
       </div>
     );
-  }
-
-  if (isChecking) {
+  } else if (isChecking) {
     card = (
       <div className="rounded-xl border border-primary/30 bg-primary/5 p-3" aria-label="Checking for updates">
         <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
@@ -208,9 +204,7 @@ function SidebarUpdateCard({
         </div>
       </div>
     );
-  }
-
-  if (downloadFailed) {
+  } else if (downloadFailed) {
     card = (
       <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3">
         <div className="flex items-center gap-2">
@@ -225,9 +219,7 @@ function SidebarUpdateCard({
         </Button>
       </div>
     );
-  }
-
-  if (updateState.status === "error") {
+  } else if (updateState.status === "error") {
     card = (
       <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3">
         <div className="flex items-center gap-2">
@@ -242,9 +234,7 @@ function SidebarUpdateCard({
         </Button>
       </div>
     );
-  }
-
-  if (updateState.status === "available") {
+  } else if (updateState.status === "available") {
     card = (
       <div className="rounded-xl border border-primary/40 bg-gradient-to-b from-primary/15 to-primary/5 p-3 shadow-card">
         <div className="flex items-center gap-2">
@@ -260,13 +250,20 @@ function SidebarUpdateCard({
     );
   }
 
-  const liveMessage = isChecking
-    ? "Checking for updates..."
-    : downloadFailed
-      ? "Update download failed"
-      : updateState.status === "error"
-        ? "Update check failed"
-        : "";
+  // 读屏播报与卡片分支同序；下载中保持静默（进度持续变化，避免噪音）
+  const liveMessage = updateState.status === "downloaded"
+    ? "Update ready"
+    : isDownloading
+      ? ""
+      : isChecking
+        ? "Checking for updates..."
+        : downloadFailed
+          ? "Update download failed"
+          : updateState.status === "error"
+            ? "Update check failed"
+            : updateState.status === "available"
+              ? "Update available"
+              : "";
 
   return (
     <>
