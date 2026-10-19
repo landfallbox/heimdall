@@ -35,7 +35,7 @@
     "gui:preview": "npm run gui:build && electron .",
     "electron:install": "install-electron",
     "icons:build": "node scripts/build-icons.mjs",
-    "dist:windows": "npm run electron:install && npm run icons:build && npm run gui:build && node scripts/prepare-electron-builder.mjs && electron-builder --win nsis --x64 --config.electronDist=node_modules/electron/dist",
+    "dist:windows": "npm run electron:install && npm run icons:build && npm run gui:build && node scripts/prepare-electron-builder.mjs && electron-builder --win dir --x64 --publish never --config.electronDist=node_modules/electron/dist && node scripts/build-inno-installer.mjs",
     "dist:windows:dir": "npm run electron:install && npm run icons:build && npm run gui:build && node scripts/prepare-electron-builder.mjs && electron-builder --win dir --x64 --config.electronDist=node_modules/electron/dist",
     "dist:mac": "npm run icons:build && npm run gui:build && electron-builder --mac dmg zip --universal",
     "dist:mac:dir": "npm run icons:build && npm run gui:build && electron-builder --mac dir --universal"
@@ -123,13 +123,12 @@
       ],
       "target": [
         {
-          "target": "nsis",
+          "target": "dir",
           "arch": [
             "x64"
           ]
         }
-      ],
-      "artifactName": "${name}-Setup-${version}.${ext}"
+      ]
     },
     "mac": {
       "icon": "build/icon.png",
@@ -168,17 +167,6 @@
     },
     "dmg": {
       "title": "Heimdall ${version}"
-    },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": false,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "Heimdall",
-      "include": "build/installer.nsh",
-      "installerIcon": "build/installerIcon.ico",
-      "uninstallerIcon": "build/uninstallerIcon.ico",
-      "uninstallDisplayName": "Heimdall"
     }
   }
 }

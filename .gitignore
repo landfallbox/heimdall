@@ -7,4 +7,6 @@ release/
 build/bin/
 build/*.ico
 build/*.png
+# Stock Inno Setup sample script, not part of the project.
+build/CodeClasses.iss
 *.local.json
