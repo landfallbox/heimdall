@@ -55,12 +55,40 @@ jobs:
         shell: pwsh
         run: npm run dist:windows
 
+      - name: Generate transitional latest.yml for legacy NSIS installs
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $exePath = "release/heimdall-Setup-$version.exe"
+          $sha512 = [System.Security.Cryptography.SHA512]::Create()
+          $stream = [System.IO.File]::OpenRead($exePath)
+          try {
+            $hashBytes = $sha512.ComputeHash($stream)
+          } finally {
+            $stream.Dispose()
+          }
+          $sha512Base64 = [Convert]::ToBase64String($hashBytes)
+          $size = (Get-Item $exePath).Length
+          $releaseDate = [DateTime]::UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'")
+          $yml = @(
+            "version: $version",
+            "files:",
+            "  - url: heimdall-Setup-$version.exe",
+            "    sha512: $sha512Base64",
+            "    size: $size",
+            "path: heimdall-Setup-$version.exe",
+            "sha512: $sha512Base64",
+            "releaseDate: '$releaseDate'"
+          ) -join "`n"
+          Set-Content -Path "release/latest.yml" -Value $yml -Encoding UTF8
+
       - name: Validate Windows release assets
         shell: pwsh
         run: |
           $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
           $assets = @(
-            "release/heimdall-Setup-$version.exe"
+            "release/heimdall-Setup-$version.exe",
+            "release/latest.yml"
           )
           foreach ($asset in $assets) {
             if (-not (Test-Path $asset -PathType Leaf)) {
@@ -75,6 +103,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path $staging | Out-Null
           Get-ChildItem -Path "release/heimdall-Setup-*.exe" -ErrorAction Stop |
             Copy-Item -Destination $staging
+          Copy-Item -Path "release/latest.yml" -Destination $staging -ErrorAction Stop
 
       - name: Upload Windows release assets
         uses: actions/upload-artifact@v5
@@ -231,6 +260,7 @@ jobs:
           fail_on_unmatched_files: true
           files: |
             release-assets/heimdall-Setup-*.exe
+            release-assets/latest.yml
             release-assets/heimdall-*-mac-universal.dmg
             release-assets/heimdall-*-mac-universal.dmg.blockmap
             release-assets/heimdall-*-mac-universal.zip
