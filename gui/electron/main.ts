@@ -1227,7 +1227,7 @@ async function installDownloadedUpdate(): Promise<UpdateState> {
 
   let result: UpdateState;
   try {
-    result = installUpdate();
+    result = await installUpdate();
   } catch (error) {
     isQuitting = false;
     trayController.setBusy("");

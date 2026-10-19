@@ -239,9 +239,15 @@ begin
       Exit;
     DataDir := Trim(DataDirEdit.Text);
     // The field is prefilled with the default (or the previous custom) path.
-    // Only a user-chosen path that differs from it is recorded in the pointer
-    // file; the default location needs no pointer at all.
-    if (DataDir <> '') and (DataDir <> InitialDataDir) then
+    // An unchanged field keeps the pointer exactly as it was.
+    if DataDir = InitialDataDir then
+      Exit;
+    // An empty or default path means "use the default location": a stale
+    // custom pointer must be deleted, or the app would keep using the old
+    // directory the user just cleared.
+    if (DataDir = '') or (CompareText(DataDir, DefaultDataDir) = 0) then
+      DeleteIniEntry(DataPointerSection, DataPointerKey, DataPointerFile)
+    else
     begin
       CreateDir(DataDir);
       CreateDir(DefaultDataDir);
@@ -302,9 +308,17 @@ begin
   OldUninstallExe := OldInstallDir + '\Uninstall Heimdall.exe';
   if FileExists(OldUninstallExe) then
   begin
-    Exec(OldUninstallExe, '/S', '', 0, ewWaitUntilTerminated, ResultCode);
-    // A failed old-uninstaller can leave a mix of old and new files behind.
-    if ResultCode <> 0 then
+    // _?= (must be last, unquoted) keeps NSIS from re-spawning a temporary
+    // copy: without it, ewWaitUntilTerminated would wait only for the
+    // launcher while the temp copy keeps deleting OldInstallDir in the
+    // background — the same folder the new install copies files into.
+    if Exec(OldUninstallExe, '/S _?=' + OldInstallDir, OldInstallDir, SW_HIDE,
+         ewWaitUntilTerminated, ResultCode) and (ResultCode = 0) then
+      // The in-place uninstaller cannot delete its own exe; remove the
+      // orphan so it does not linger in the new installation directory.
+      DeleteFile(OldUninstallExe)
+    else
+      // A failed old-uninstaller can leave a mix of old and new files behind.
       MsgBox('The previous Heimdall version could not be fully uninstalled (code ' +
         IntToStr(ResultCode) + '). Some old files may remain.' + #13#10 + #13#10 +
         'The new version will still be installed.', mbInformation, MB_OK);

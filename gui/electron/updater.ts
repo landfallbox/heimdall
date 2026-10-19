@@ -612,7 +612,7 @@ function emitDownloadProgress(transferred: number, total: number, startedAt: num
   });
 }
 
-export function installUpdate(): UpdateState {
+export async function installUpdate(): Promise<UpdateState> {
   initializeUpdater();
 
   if (isMockUpdateEnabled) {
@@ -655,21 +655,33 @@ export function installUpdate(): UpdateState {
     });
   }
 
-  update({ status: "installed", error: "", progress: null });
   // The installer is per-user (no elevation) and closes the running app
-  // itself (CloseApplications=yes + /CLOSEAPPLICATIONS). Quit shortly after
-  // so the IPC response is delivered and the app releases its files first.
-  const childProcess = spawn(
-    windowsInstallerPath,
-    ["/VERYSILENT", "/SUPPRESSMSGBOXES", "/CLOSEAPPLICATIONS", "/NORESTART"],
-    { detached: true, stdio: "ignore" },
-  );
-  childProcess.unref();
-  setTimeout(() => {
-    app.quit();
-  }, 500);
-
-  return updateState;
+  // itself (CloseApplications=yes + /CLOSEAPPLICATIONS). Wait for the process
+  // to actually start before marking the update installed and quitting:
+  // launch failures (antivirus/SmartScreen EACCES, a cleaned-up temp file)
+  // arrive asynchronously through the "error" event, and quitting on top of
+  // them would lose the app and the Router without installing anything.
+  return new Promise<UpdateState>((resolveInstall) => {
+    const childProcess = spawn(
+      windowsInstallerPath,
+      ["/VERYSILENT", "/SUPPRESSMSGBOXES", "/CLOSEAPPLICATIONS", "/NORESTART"],
+      { detached: true, stdio: "ignore" },
+    );
+    childProcess.once("error", (error: Error) => {
+      resolveInstall(
+        update({ status: "error", error: `Failed to start the installer: ${error.message}`, progress: null }),
+      );
+    });
+    childProcess.once("spawn", () => {
+      childProcess.unref();
+      resolveInstall(update({ status: "installed", error: "", progress: null }));
+      // Quit shortly after so the IPC response is delivered and the app
+      // releases its files first.
+      setTimeout(() => {
+        app.quit();
+      }, 500);
+    });
+  });
 }
 
 async function checkForMockUpdate(): Promise<UpdateState> {
