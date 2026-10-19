@@ -53,16 +53,14 @@ jobs:
 
       - name: Build Windows installer
         shell: pwsh
-        run: npm run dist:windows -- --publish never
+        run: npm run dist:windows
 
       - name: Validate Windows release assets
         shell: pwsh
         run: |
           $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
           $assets = @(
-            "release/heimdall-Setup-$version.exe",
-            "release/heimdall-Setup-$version.exe.blockmap",
-            "release/latest.yml"
+            "release/heimdall-Setup-$version.exe"
           )
           foreach ($asset in $assets) {
             if (-not (Test-Path $asset -PathType Leaf)) {
@@ -77,9 +75,6 @@ jobs:
           New-Item -ItemType Directory -Force -Path $staging | Out-Null
           Get-ChildItem -Path "release/heimdall-Setup-*.exe" -ErrorAction Stop |
             Copy-Item -Destination $staging
-          Get-ChildItem -Path "release/heimdall-Setup-*.exe.blockmap" -ErrorAction Stop |
-            Copy-Item -Destination $staging
-          Copy-Item -Path "release/latest.yml" -Destination $staging -ErrorAction Stop
 
       - name: Upload Windows release assets
         uses: actions/upload-artifact@v5
@@ -236,8 +231,6 @@ jobs:
           fail_on_unmatched_files: true
           files: |
             release-assets/heimdall-Setup-*.exe
-            release-assets/heimdall-Setup-*.exe.blockmap
-            release-assets/latest.yml
             release-assets/heimdall-*-mac-universal.dmg
             release-assets/heimdall-*-mac-universal.dmg.blockmap
             release-assets/heimdall-*-mac-universal.zip

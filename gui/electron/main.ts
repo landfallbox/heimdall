@@ -1225,12 +1225,37 @@ async function installDownloadedUpdate(): Promise<UpdateState> {
     throw error;
   }
 
+  let result: UpdateState;
   try {
-    return installUpdate();
+    result = await installUpdate();
   } catch (error) {
     isQuitting = false;
     trayController.setBusy("");
+    void recoverRouterAfterFailedUpdate();
     throw error;
+  }
+
+  // installUpdate() can also fail without throwing (e.g. the temp installer
+  // was cleaned up). In that case the Router is already stopped, so restart it.
+  if (result.status === "error") {
+    isQuitting = false;
+    trayController.setBusy("");
+    void recoverRouterAfterFailedUpdate();
+  }
+
+  return result;
+}
+
+async function recoverRouterAfterFailedUpdate(): Promise<void> {
+  try {
+    const result = await startRouter();
+    if (!result.health.ok) {
+      trayController.showNotification("Heimdall", `Update install failed and Router did not recover: ${healthDetail(result.health)}`);
+      return;
+    }
+    trayController.showNotification("Heimdall", "The update install failed, but the Router was restarted.");
+  } catch (error) {
+    trayController.showNotification("Heimdall", `Update install failed and Router could not be restarted: ${(error as Error).message || String(error)}`);
   }
 }
 

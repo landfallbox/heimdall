@@ -12,8 +12,6 @@ const iconPath = join(buildDir, "icon.ico");
 const macIconPath = join(buildDir, "icon.png");
 const trayIconPath = join(buildDir, "trayTemplate.png");
 const trayIcon2xPath = join(buildDir, "trayTemplate@2x.png");
-const installerIconPath = join(buildDir, "installerIcon.ico");
-const uninstallerIconPath = join(buildDir, "uninstallerIcon.ico");
 const sizes = [16, 24, 32, 48, 64, 128, 256];
 
 await mkdir(pngDir, { recursive: true });
@@ -27,8 +25,6 @@ for (const size of sizes) {
 
 const ico = await createIco(pngFiles);
 await writeFile(iconPath, ico);
-await writeFile(installerIconPath, ico);
-await writeFile(uninstallerIconPath, ico);
 await renderSvgToPng(1024, macIconPath);
 await renderTrayIcon(16, trayIconPath);
 await renderTrayIcon(32, trayIcon2xPath);

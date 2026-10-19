@@ -163,7 +163,7 @@ Build an unpacked Windows app:
 npm run dist:windows:dir
 ```
 
-Build the Windows NSIS installer:
+Build the Windows Inno Setup installer (requires Inno Setup 6; `ISCC` is picked up from PATH or the standard install locations):
 
 ```powershell
 npm run dist:windows
@@ -183,7 +183,9 @@ npm run dist:mac
 
 Packaged Windows and macOS builds check GitHub Releases for updates after startup. The app only checks for a newer version automatically; users click the update button before the update is downloaded.
 
-For auto-update to work, each GitHub Release must include the Windows installer `.exe`, its `.exe.blockmap`, and `latest.yml`, plus the macOS `.dmg`, `.zip`, `.zip.blockmap`, and `latest-mac.yml` from the `release` directory.
+For auto-update to work, each GitHub Release must include the Windows installer `.exe` and the macOS `.dmg`, `.zip`, `.zip.blockmap`, and `latest-mac.yml` from the `release` directory. Windows downloads the installer asset directly from the release (no `latest.yml` or blockmap needed); macOS uses the standard `electron-updater` feed.
+
+Windows installations made with the old NSIS installer (releases up to 0.16.1) check updates through the `latest.yml` feed, which Inno-based releases no longer publish, so they cannot discover newer versions on their own. Upgrade them once manually: download the first Inno-based installer from the release page and run it — it upgrades in place and keeps the data directory. From that version on, auto-update works normally.
 
 Tag pushes matching `v*` build both platforms and publish their artifacts in one GitHub Release. macOS builds are Universal binaries for Intel and Apple Silicon. To produce signed and notarized public macOS releases, configure these repository secrets:
 
