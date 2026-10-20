@@ -89,6 +89,10 @@ const
   // handles the install path and the NSIS migration below must not run.
   InnoUninstallSubKey =
     'Software\Microsoft\Windows\CurrentVersion\Uninstall\DE9625C4-291A-4F4F-BCD6-229A655A370E_is1';
+  // Win32 constants for reparse-point detection (see IsReparsePoint below).
+  // Not exposed by Inno's built-in functions.
+  WinInvalidFileAttributes = $FFFFFFFF;
+  WinFileAttributeReparsePoint = $400;
 
 var
   DataDirPage: TWizardPage;
@@ -109,6 +113,34 @@ end;
 function DataPointerFile: String;
 begin
   Result := ExpandConstant('{userappdata}\Heimdall\data-location.ini');
+end;
+
+// ---------------------------------------------------------------------------
+// Win32 declaration for reparse-point detection.
+//
+// ExpandFileName only performs *syntactic* normalization (absolute path,
+// relative-to-absolute, ".." segment folding); it does NOT resolve
+// junctions or reparse points. A junction whose target lies inside the
+// data directory would therefore pass the containment check while the
+// actual write lands inside the data directory, causing a self-nesting
+// copy. The usual resolution (GetFinalPathNameByHandleW) cannot be used
+// from Inno's Pascal Script: its String output parameter is unsupported
+// by the external-call mechanism, so reparse-point data directories are
+// rejected instead of resolved (see IsReparsePoint below).
+// ---------------------------------------------------------------------------
+function WinGetFileAttributesW(const lpFileName: String): Cardinal;
+  external 'GetFileAttributesW@kernel32.dll stdcall';
+
+// True when APath exists and is a junction or symlink (directory reparse
+// point). GetFileAttributesW reads the reparse-point attribute of the path
+// itself, without following it, so no handle is needed.
+function IsReparsePoint(APath: String): Boolean;
+var
+  Attr: Cardinal;
+begin
+  Attr := WinGetFileAttributesW(ExpandFileName(Trim(APath)));
+  Result := (Attr <> WinInvalidFileAttributes) and
+    ((Attr and WinFileAttributeReparsePoint) <> 0);
 end;
 
 // Mirrors the data-directory rules from the old installer.nsh:
@@ -165,8 +197,9 @@ begin
 end;
 
 // True when AChild is the same as, or located inside, AParent. Paths are
-// resolved (.. segments, environment variables) and compared
-// case-insensitively without trailing separators.
+// normalized (.. segments, environment variables) and compared
+// case-insensitively without trailing separators. Reparse points are not
+// resolved here; they are rejected at input (see IsReparsePoint).
 function IsPathWithin(AParent, AChild: String): Boolean;
 var
   Parent, Child: String;
@@ -201,6 +234,17 @@ begin
     // fall back to the default location and continue (matches the old installer)
     DataDirEdit.Text := '';
     Exit;
+  end;
+  // A junction or symlink cannot be resolved here (ExpandFileName is
+  // syntactic only), so it could pass the containment checks below while
+  // physically pointing inside the current data directory; reject it.
+  if IsReparsePoint(DataDir) then
+  begin
+    MsgBox('The data directory must be a real folder, not a junction or symlink.' + #13#10 +
+      'Choose a different folder to continue.', mbError, MB_OK);
+    // Keep the user on this page with the known-good directory restored.
+    DataDirEdit.Text := InitialDataDir;
+    Result := False;
   end;
   // The in-app data location change refuses directories that contain each
   // other; the installer must too, or the data copy would nest itself.
@@ -390,6 +434,11 @@ begin
   // output; a source inside the destination mirrors the in-app rule that the
   // two directories may not contain each other.
   if IsPathWithin(FromDir, ToDir) or IsPathWithin(ToDir, FromDir) then
+    Exit;
+  // Reparse points cannot be resolved here, so a junction as source or
+  // destination could physically nest the copy; refuse to migrate and let
+  // the caller keep the data where it is.
+  if IsReparsePoint(FromDir) or IsReparsePoint(ToDir) then
     Exit;
   if not DirExists(FromDir) then
   begin
