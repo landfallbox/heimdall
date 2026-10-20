@@ -11,6 +11,8 @@
 ;   * per-user install (no elevation), x64 only
 ;   * a "data directory" page lets the user move config/logs off the C drive;
 ;     the choice is persisted to a pointer file the app reads at startup
+;   * moving the data directory copies the existing user data (config, logs,
+;     usage) into the new folder, so nothing has to be reconfigured
 ;   * silent installs never touch the pointer (so upgrades keep the choice)
 ;   * uninstall asks whether to also delete user data
 ;   * first-run migration removes the old NSIS install's registry entries and
@@ -72,6 +74,14 @@ Filename: "{app}\Heimdall.exe"; Description: "Launch Heimdall"; Flags: nowait po
 const
   DataPointerSection = 'Heimdall';
   DataPointerKey = 'DataDirectory';
+  // Runtime artifacts, not user data. Kept in sync with MIGRATION_SKIP_ENTRIES
+  // in gui/electron/data-location.ts.
+  DataMigrationSkipList =
+    'data-location.ini;router.pid;Cache;Code Cache;GPUCache;DawnGraphiteCache;' +
+    'DawnWebGPUCache;Crashpad;Crash Reports;blob_storage;Local Storage;Session ' +
+    'Storage;IndexedDB;Network;Partitions;DIPS;DIPS-wal;SharedStorage;' +
+    'SharedStorage-wal;Shared Dictionary;Preferences;lockfile;Local State;' +
+    '.updaterId';
   // Old electron-builder NSIS install identifiers (UUIDv5 of "local.heimdall").
   OldNsGuid = '5f1af358-1741-5d1a-99a6-6c4880522cb8';
   // Uninstall key Inno Setup 6 writes for this AppId. Its presence means an
@@ -79,6 +89,10 @@ const
   // handles the install path and the NSIS migration below must not run.
   InnoUninstallSubKey =
     'Software\Microsoft\Windows\CurrentVersion\Uninstall\DE9625C4-291A-4F4F-BCD6-229A655A370E_is1';
+  // Win32 constants for reparse-point detection (see IsReparsePoint below).
+  // Not exposed by Inno's built-in functions.
+  WinInvalidFileAttributes = $FFFFFFFF;
+  WinFileAttributeReparsePoint = $400;
 
 var
   DataDirPage: TWizardPage;
@@ -99,6 +113,52 @@ end;
 function DataPointerFile: String;
 begin
   Result := ExpandConstant('{userappdata}\Heimdall\data-location.ini');
+end;
+
+// ---------------------------------------------------------------------------
+// Win32 declaration for reparse-point detection.
+//
+// ExpandFileName only performs *syntactic* normalization (absolute path,
+// relative-to-absolute, ".." segment folding); it does NOT resolve
+// junctions or reparse points. A junction whose target lies inside the
+// data directory would therefore pass the containment check while the
+// actual write lands inside the data directory, causing a self-nesting
+// copy. The usual resolution (GetFinalPathNameByHandleW) cannot be used
+// from Inno's Pascal Script: its String output parameter is unsupported
+// by the external-call mechanism, so reparse-point data directories are
+// rejected instead of resolved (see IsReparsePoint below).
+// ---------------------------------------------------------------------------
+function WinGetFileAttributesW(const lpFileName: String): Cardinal;
+  external 'GetFileAttributesW@kernel32.dll stdcall';
+
+// True when APath exists and is a junction or symlink (directory reparse
+// point), or when any of its ancestors is one: a plain folder under a
+// junction still physically resolves through it. GetFileAttributesW reads
+// the reparse-point attribute without following the path, so no handle is
+// needed.
+function IsReparsePoint(APath: String): Boolean;
+var
+  CurrentPath, ParentPath: String;
+  Attr: Cardinal;
+begin
+  Result := False;
+  CurrentPath := ExpandFileName(Trim(APath));
+  while CurrentPath <> '' do
+  begin
+    Attr := WinGetFileAttributesW(CurrentPath);
+    if (Attr <> WinInvalidFileAttributes) and
+       ((Attr and WinFileAttributeReparsePoint) <> 0) then
+    begin
+      Result := True;
+      Exit;
+    end;
+    ParentPath := ExtractFileDir(CurrentPath);
+    // ExtractFileDir returns the path itself at a drive root, so the
+    // comparison guards against walking forever.
+    if CompareText(ParentPath, CurrentPath) = 0 then
+      Break;
+    CurrentPath := ParentPath;
+  end;
 end;
 
 // Mirrors the data-directory rules from the old installer.nsh:
@@ -154,9 +214,32 @@ begin
     DataDirEdit.Text := Dir;
 end;
 
+// True when AChild is the same as, or located inside, AParent. Paths are
+// normalized (.. segments, environment variables) and compared
+// case-insensitively without trailing separators. Reparse points are not
+// resolved here; they are rejected at input (see IsReparsePoint).
+function IsPathWithin(AParent, AChild: String): Boolean;
+var
+  Parent, Child: String;
+begin
+  Parent := LowerCase(ExpandFileName(Trim(AParent)));
+  Child := LowerCase(ExpandFileName(Trim(AChild)));
+  while (Length(Parent) > 1) and (Copy(Parent, Length(Parent), 1) = '\') do
+    Delete(Parent, Length(Parent), 1);
+  while (Length(Child) > 1) and (Copy(Child, Length(Child), 1) = '\') do
+    Delete(Child, Length(Child), 1);
+  if Parent = Child then
+  begin
+    Result := True;
+    Exit;
+  end;
+  Result := Pos(Parent + '\', Child) = 1;
+end;
+
 function DataDirNextButtonClick(Sender: TWizardPage): Boolean;
 var
-  DataDir: String;
+  DataDir, EffectiveDir: String;
+  SameDir: Boolean;
 begin
   Result := True;
   DataDir := Trim(DataDirEdit.Text);
@@ -168,6 +251,37 @@ begin
       DefaultDataDir, mbError, MB_OK);
     // fall back to the default location and continue (matches the old installer)
     DataDirEdit.Text := '';
+    Exit;
+  end;
+  // A junction or symlink cannot be resolved here (ExpandFileName is
+  // syntactic only), so it could pass the containment checks below while
+  // physically pointing inside the current data directory; reject it.
+  if IsReparsePoint(DataDir) then
+  begin
+    MsgBox('The data directory must be a real folder, not a junction or symlink.' + #13#10 +
+      'Choose a different folder to continue.', mbError, MB_OK);
+    // Keep the user on this page with the known-good directory restored.
+    DataDirEdit.Text := InitialDataDir;
+    Result := False;
+  end;
+  // The in-app data location change refuses directories that contain each
+  // other; the installer must too, or the data copy would nest itself.
+  EffectiveDir := DataDir;
+  if CompareText(DataDir, DefaultDataDir) = 0 then
+    EffectiveDir := DefaultDataDir;
+  if InitialDataDir = '' then
+    Exit;
+  // Normalized equality: the same directory (case, trailing separator, or
+  // .. segments aside) is not a containment conflict.
+  SameDir := IsPathWithin(InitialDataDir, EffectiveDir) and IsPathWithin(EffectiveDir, InitialDataDir);
+  if not SameDir and
+      (IsPathWithin(InitialDataDir, EffectiveDir) or IsPathWithin(EffectiveDir, InitialDataDir)) then
+  begin
+    MsgBox('The new data directory must not be inside the current one or contain it.' + #13#10 +
+      'Current data directory:' + #13#10 + InitialDataDir, mbError, MB_OK);
+    // Keep the user on this page with the known-good directory restored.
+    DataDirEdit.Text := InitialDataDir;
+    Result := False;
   end;
 end;
 
@@ -254,9 +368,153 @@ begin
   DataDirPage.OnNextButtonClick := @DataDirNextButtonClick;
 end;
 
+function IsDataMigrationSkipEntry(AName: String): Boolean;
+begin
+  // Transient config-store files are never migrated.
+  if Pos('.config-', AName) = 1 then
+  begin
+    Result := True;
+    Exit;
+  end;
+  // Exact-match lookup in the ';'-delimited skip list.
+  Result := Pos(';' + AName + ';', ';' + DataMigrationSkipList + ';') > 0;
+end;
+
+// Recursively copies everything from ASrcDir into ADestDir, creating
+// directories as needed. Existing files in ADestDir are never overwritten, so
+// a target that already holds data stays intact; existing directories are
+// still traversed so files missing from them are filled in. Returns False
+// when a directory could not be created or a file could not be copied.
+function CopyDataTree(ASrcDir, ADestDir: String): Boolean;
+var
+  FindRec: TFindRec;
+  SrcPath, DestPath: String;
+begin
+  if not ForceDirectories(ADestDir) then
+  begin
+    Result := False;
+    Exit;
+  end;
+  if not FindFirst(ASrcDir + '\*', FindRec) then
+  begin
+    // The directory exists (ForceDirectories succeeded), so a failed
+    // enumeration means it could not be read, not that it is empty.
+    Result := False;
+    Exit;
+  end;
+  Result := True;
+  repeat
+    if (FindRec.Name = '.') or (FindRec.Name = '..') then
+      Continue;
+    SrcPath := ASrcDir + '\' + FindRec.Name;
+    DestPath := ADestDir + '\' + FindRec.Name;
+    if FindRec.Attributes and FILE_ATTRIBUTE_DIRECTORY <> 0 then
+    begin
+      // A directory junction inside the source tree could point back at an
+      // ancestor of itself, making the recursive copy self-nesting; never
+      // descend into one.
+      if FindRec.Attributes and WinFileAttributeReparsePoint <> 0 then
+        Continue;
+      if not CopyDataTree(SrcPath, DestPath) then
+      begin
+        Result := False;
+        Break;
+      end;
+    end
+    else if not FileExists(DestPath) then
+    begin
+      if not CopyFile(SrcPath, DestPath, False) then
+      begin
+        Result := False;
+        Break;
+      end;
+    end;
+  until not FindNext(FindRec);
+  FindClose(FindRec);
+end;
+
+// Copies the user data (config, logs, usage) from the previously effective
+// data directory into the new one, so a directory change does not lose the
+// existing configuration. Mirrors the in-app changeDataDir migration: only
+// top-level runtime artifacts are skipped, nested files are copied as-is.
+// Returns False when the copy could not be completed.
+function MigrateDataFiles(FromDir, ToDir: String): Boolean;
+var
+  FindRec: TFindRec;
+  SrcPath, DestPath: String;
+begin
+  Result := False;
+  if (FromDir = '') or (ToDir = '') then
+    Exit;
+  // Normalized equality: the same directory (case, trailing separator, or
+  // .. segments aside) means there is nothing to migrate.
+  if IsPathWithin(FromDir, ToDir) and IsPathWithin(ToDir, FromDir) then
+  begin
+    Result := True;
+    Exit;
+  end;
+  // A destination inside the source would make the copy enumerate its own
+  // output; a source inside the destination mirrors the in-app rule that the
+  // two directories may not contain each other.
+  if IsPathWithin(FromDir, ToDir) or IsPathWithin(ToDir, FromDir) then
+    Exit;
+  // Reparse points cannot be resolved here, so a junction as source or
+  // destination could physically nest the copy; refuse to migrate and let
+  // the caller keep the data where it is.
+  if IsReparsePoint(FromDir) or IsReparsePoint(ToDir) then
+    Exit;
+  if not DirExists(FromDir) then
+  begin
+    Result := True; // nothing to migrate
+    Exit;
+  end;
+  if not ForceDirectories(ToDir) then
+    Exit;
+  if not FindFirst(FromDir + '\*', FindRec) then
+  begin
+    // DirExists just succeeded, so a failed enumeration means the source
+    // could not be read, not that it is empty.
+    Result := False;
+    Exit;
+  end;
+  Result := True;
+  repeat
+    if (FindRec.Name = '.') or (FindRec.Name = '..') then
+      Continue;
+    // Only top-level runtime artifacts are excluded, mirroring
+    // MIGRATION_SKIP_ENTRIES in gui/electron/data-location.ts.
+    if IsDataMigrationSkipEntry(FindRec.Name) then
+      Continue;
+    SrcPath := FromDir + '\' + FindRec.Name;
+    DestPath := ToDir + '\' + FindRec.Name;
+    if FindRec.Attributes and FILE_ATTRIBUTE_DIRECTORY <> 0 then
+    begin
+      // A directory junction inside the source tree could point back at an
+      // ancestor of itself, making the recursive copy self-nesting; never
+      // descend into one.
+      if FindRec.Attributes and WinFileAttributeReparsePoint <> 0 then
+        Continue;
+      if not CopyDataTree(SrcPath, DestPath) then
+      begin
+        Result := False;
+        Break;
+      end;
+    end
+    else if not FileExists(DestPath) then
+    begin
+      if not CopyFile(SrcPath, DestPath, False) then
+      begin
+        Result := False;
+        Break;
+      end;
+    end;
+  until not FindNext(FindRec);
+  FindClose(FindRec);
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 var
-  DataDir: String;
+  DataDir, NewEffectiveDir: String;
 begin
   if CurStep = ssPostInstall then
   begin
@@ -269,10 +527,24 @@ begin
     // An unchanged field keeps the pointer exactly as it was.
     if DataDir = InitialDataDir then
       Exit;
-    // An empty or default path means "use the default location": a stale
-    // custom pointer must be deleted, or the app would keep using the old
-    // directory the user just cleared.
-    if (DataDir = '') or (CompareText(DataDir, DefaultDataDir) = 0) then
+    // An empty or default path means "use the default location".
+    NewEffectiveDir := DefaultDataDir;
+    if (DataDir <> '') and (CompareText(DataDir, DefaultDataDir) <> 0) then
+      NewEffectiveDir := DataDir;
+    // Carry the existing user data over to the new location before the
+    // pointer is rewritten, so the app does not start with an empty config.
+    // The pointer only moves once the copy has fully succeeded; a failed
+    // migration leaves Heimdall reading from its original location.
+    if not MigrateDataFiles(InitialDataDir, NewEffectiveDir) then
+    begin
+      MsgBox('Copying the existing Heimdall data to the new data directory failed.' + #13#10 +
+        'The data directory was not changed; your data remains in its original location.' + #13#10 +
+        'Copy the files manually and start Heimdall again.', mbError, MB_OK);
+      Exit;
+    end;
+    if NewEffectiveDir = DefaultDataDir then
+      // A stale custom pointer must be deleted, or the app would keep using
+      // the old directory the user just cleared.
       DeleteIniEntry(DataPointerSection, DataPointerKey, DataPointerFile)
     else
     begin
