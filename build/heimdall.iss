@@ -165,13 +165,14 @@ begin
 end;
 
 // True when AChild is the same as, or located inside, AParent. Paths are
-// compared case-insensitively without trailing separators.
+// resolved (.. segments, environment variables) and compared
+// case-insensitively without trailing separators.
 function IsPathWithin(AParent, AChild: String): Boolean;
 var
   Parent, Child: String;
 begin
-  Parent := LowerCase(Trim(AParent));
-  Child := LowerCase(Trim(AChild));
+  Parent := LowerCase(ExpandFileName(Trim(AParent)));
+  Child := LowerCase(ExpandFileName(Trim(AChild)));
   while (Length(Parent) > 1) and (Copy(Parent, Length(Parent), 1) = '\') do
     Delete(Parent, Length(Parent), 1);
   while (Length(Child) > 1) and (Copy(Child, Length(Child), 1) = '\') do
@@ -187,6 +188,7 @@ end;
 function DataDirNextButtonClick(Sender: TWizardPage): Boolean;
 var
   DataDir, EffectiveDir: String;
+  SameDir: Boolean;
 begin
   Result := True;
   DataDir := Trim(DataDirEdit.Text);
@@ -205,12 +207,19 @@ begin
   EffectiveDir := DataDir;
   if CompareText(DataDir, DefaultDataDir) = 0 then
     EffectiveDir := DefaultDataDir;
-  if (InitialDataDir <> '') and (CompareText(EffectiveDir, InitialDataDir) <> 0) and
+  if InitialDataDir = '' then
+    Exit;
+  // Normalized equality: the same directory (case, trailing separator, or
+  // .. segments aside) is not a containment conflict.
+  SameDir := IsPathWithin(InitialDataDir, EffectiveDir) and IsPathWithin(EffectiveDir, InitialDataDir);
+  if not SameDir and
       (IsPathWithin(InitialDataDir, EffectiveDir) or IsPathWithin(EffectiveDir, InitialDataDir)) then
   begin
     MsgBox('The new data directory must not be inside the current one or contain it.' + #13#10 +
       'Current data directory:' + #13#10 + InitialDataDir, mbError, MB_OK);
-    DataDirEdit.Text := '';
+    // Keep the user on this page with the known-good directory restored.
+    DataDirEdit.Text := InitialDataDir;
+    Result := False;
   end;
 end;
 
@@ -326,7 +335,9 @@ begin
   end;
   if not FindFirst(ASrcDir + '\*', FindRec) then
   begin
-    Result := True; // nothing to copy
+    // The directory exists (ForceDirectories succeeded), so a failed
+    // enumeration means it could not be read, not that it is empty.
+    Result := False;
     Exit;
   end;
   Result := True;
@@ -368,7 +379,9 @@ begin
   Result := False;
   if (FromDir = '') or (ToDir = '') then
     Exit;
-  if SameText(FromDir, ToDir) then
+  // Normalized equality: the same directory (case, trailing separator, or
+  // .. segments aside) means there is nothing to migrate.
+  if IsPathWithin(FromDir, ToDir) and IsPathWithin(ToDir, FromDir) then
   begin
     Result := True;
     Exit;
@@ -387,7 +400,9 @@ begin
     Exit;
   if not FindFirst(FromDir + '\*', FindRec) then
   begin
-    Result := True; // empty source
+    // DirExists just succeeded, so a failed enumeration means the source
+    // could not be read, not that it is empty.
+    Result := False;
     Exit;
   end;
   Result := True;
