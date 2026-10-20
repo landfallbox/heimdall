@@ -106,6 +106,7 @@ The merge is conservative:
 - A model's existing metadata is kept; Heimdall only overrides the fields it explicitly provides.
 - The merge is additive only: models you disable or remove in heimdall stay in the `Heimdall` provider (as do models you add by hand). VS Code does not hot-reload this file, so a dropped entry would only disappear after a manual window reload — while risking the loss of entries heimdall does not manage.
 - If VS Code already stores the provider's `apiKey` as a secret reference (`${input:chat.lm.secret.…}`), that reference is never replaced — opaque secrets can only be managed inside VS Code.
+- Heimdall only manages the provider-level `apiKey` (the router key) and each model's `url` (the router's `/v1` endpoint). A model you add by hand under the `Heimdall` provider that points to a different `url` will still be called with the provider-level key — if such a model needs its own key, keep it under a separate provider.
 
 Per-model VS Code metadata (display name, tool calling, vision, thinking, context window, max output tokens, supported reasoning effort) is optional. Expand **VS Code metadata** on a model row in Vendor Settings to fill it in; only the fields you set are written, so a partial entry never clobbers richer metadata you already have in the file.
 

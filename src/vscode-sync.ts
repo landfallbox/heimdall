@@ -134,6 +134,9 @@ function toModelEntry(model: NormalizedVendorModel, url: string): VsCodeModelEnt
  *   would only take effect after a manual window reload while risking the loss
  *   of entries heimdall does not manage.
  * - A VS Code secret reference for apiKey (`${input:...}`) is never replaced.
+ * - The provider-level apiKey is the router key and is sent to every model
+ *   under the provider, including manually added ones with a different url;
+ *   models needing their own key must live under a separate provider.
  */
 export function mergeVsCodeModelsFile(
   existing: unknown,

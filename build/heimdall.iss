@@ -164,9 +164,29 @@ begin
     DataDirEdit.Text := Dir;
 end;
 
+// True when AChild is the same as, or located inside, AParent. Paths are
+// compared case-insensitively without trailing separators.
+function IsPathWithin(AParent, AChild: String): Boolean;
+var
+  Parent, Child: String;
+begin
+  Parent := LowerCase(Trim(AParent));
+  Child := LowerCase(Trim(AChild));
+  while (Length(Parent) > 1) and (Copy(Parent, Length(Parent), 1) = '\') do
+    Delete(Parent, Length(Parent), 1);
+  while (Length(Child) > 1) and (Copy(Child, Length(Child), 1) = '\') do
+    Delete(Child, Length(Child), 1);
+  if Parent = Child then
+  begin
+    Result := True;
+    Exit;
+  end;
+  Result := Pos(Parent + '\', Child) = 1;
+end;
+
 function DataDirNextButtonClick(Sender: TWizardPage): Boolean;
 var
-  DataDir: String;
+  DataDir, EffectiveDir: String;
 begin
   Result := True;
   DataDir := Trim(DataDirEdit.Text);
@@ -177,6 +197,19 @@ begin
     MsgBox('That is not a valid folder path. Heimdall will use the default data directory:' + #13#10 +
       DefaultDataDir, mbError, MB_OK);
     // fall back to the default location and continue (matches the old installer)
+    DataDirEdit.Text := '';
+    Exit;
+  end;
+  // The in-app data location change refuses directories that contain each
+  // other; the installer must too, or the data copy would nest itself.
+  EffectiveDir := DataDir;
+  if CompareText(DataDir, DefaultDataDir) = 0 then
+    EffectiveDir := DefaultDataDir;
+  if (InitialDataDir <> '') and (CompareText(EffectiveDir, InitialDataDir) <> 0) and
+      (IsPathWithin(InitialDataDir, EffectiveDir) or IsPathWithin(EffectiveDir, InitialDataDir)) then
+  begin
+    MsgBox('The new data directory must not be inside the current one or contain it.' + #13#10 +
+      'Current data directory:' + #13#10 + InitialDataDir, mbError, MB_OK);
     DataDirEdit.Text := '';
   end;
 end;
@@ -276,49 +309,115 @@ begin
   Result := Pos(';' + AName + ';', ';' + DataMigrationSkipList + ';') > 0;
 end;
 
-// Recursively copies files from ASrcDir into ADestDir, creating directories as
-// needed. Existing entries in ADestDir are never overwritten, so a target that
-// already holds data stays intact.
-procedure CopyDataTree(ASrcDir, ADestDir: String);
+// Recursively copies everything from ASrcDir into ADestDir, creating
+// directories as needed. Existing files in ADestDir are never overwritten, so
+// a target that already holds data stays intact; existing directories are
+// still traversed so files missing from them are filled in. Returns False
+// when a directory could not be created or a file could not be copied.
+function CopyDataTree(ASrcDir, ADestDir: String): Boolean;
 var
   FindRec: TFindRec;
   SrcPath, DestPath: String;
 begin
-  if not DirExists(ADestDir) then
-    if not CreateDir(ADestDir) then
-      Exit;
-  if not FindFirst(ASrcDir + '\*', FindRec) then
+  if not ForceDirectories(ADestDir) then
+  begin
+    Result := False;
     Exit;
+  end;
+  if not FindFirst(ASrcDir + '\*', FindRec) then
+  begin
+    Result := True; // nothing to copy
+    Exit;
+  end;
+  Result := True;
   repeat
-    if (FindRec.Name = '.') or (FindRec.Name = '..') or
-        IsDataMigrationSkipEntry(FindRec.Name) then
+    if (FindRec.Name = '.') or (FindRec.Name = '..') then
       Continue;
     SrcPath := ASrcDir + '\' + FindRec.Name;
     DestPath := ADestDir + '\' + FindRec.Name;
     if FindRec.Attributes and FILE_ATTRIBUTE_DIRECTORY <> 0 then
     begin
-      if not DirExists(DestPath) then
-        CopyDataTree(SrcPath, DestPath);
+      if not CopyDataTree(SrcPath, DestPath) then
+      begin
+        Result := False;
+        Break;
+      end;
     end
     else if not FileExists(DestPath) then
-      CopyFile(SrcPath, DestPath, False);
+    begin
+      if not CopyFile(SrcPath, DestPath, False) then
+      begin
+        Result := False;
+        Break;
+      end;
+    end;
   until not FindNext(FindRec);
   FindClose(FindRec);
 end;
 
 // Copies the user data (config, logs, usage) from the previously effective
 // data directory into the new one, so a directory change does not lose the
-// existing configuration. Mirrors the in-app changeDataDir migration.
-procedure MigrateDataFiles(FromDir, ToDir: String);
+// existing configuration. Mirrors the in-app changeDataDir migration: only
+// top-level runtime artifacts are skipped, nested files are copied as-is.
+// Returns False when the copy could not be completed.
+function MigrateDataFiles(FromDir, ToDir: String): Boolean;
+var
+  FindRec: TFindRec;
+  SrcPath, DestPath: String;
 begin
+  Result := False;
   if (FromDir = '') or (ToDir = '') then
     Exit;
   if SameText(FromDir, ToDir) then
+  begin
+    Result := True;
+    Exit;
+  end;
+  // A destination inside the source would make the copy enumerate its own
+  // output; a source inside the destination mirrors the in-app rule that the
+  // two directories may not contain each other.
+  if IsPathWithin(FromDir, ToDir) or IsPathWithin(ToDir, FromDir) then
     Exit;
   if not DirExists(FromDir) then
+  begin
+    Result := True; // nothing to migrate
     Exit;
-  CreateDir(ToDir);
-  CopyDataTree(FromDir, ToDir);
+  end;
+  if not ForceDirectories(ToDir) then
+    Exit;
+  if not FindFirst(FromDir + '\*', FindRec) then
+  begin
+    Result := True; // empty source
+    Exit;
+  end;
+  Result := True;
+  repeat
+    if (FindRec.Name = '.') or (FindRec.Name = '..') then
+      Continue;
+    // Only top-level runtime artifacts are excluded, mirroring
+    // MIGRATION_SKIP_ENTRIES in gui/electron/data-location.ts.
+    if IsDataMigrationSkipEntry(FindRec.Name) then
+      Continue;
+    SrcPath := FromDir + '\' + FindRec.Name;
+    DestPath := ToDir + '\' + FindRec.Name;
+    if FindRec.Attributes and FILE_ATTRIBUTE_DIRECTORY <> 0 then
+    begin
+      if not CopyDataTree(SrcPath, DestPath) then
+      begin
+        Result := False;
+        Break;
+      end;
+    end
+    else if not FileExists(DestPath) then
+    begin
+      if not CopyFile(SrcPath, DestPath, False) then
+      begin
+        Result := False;
+        Break;
+      end;
+    end;
+  until not FindNext(FindRec);
+  FindClose(FindRec);
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
@@ -342,7 +441,15 @@ begin
       NewEffectiveDir := DataDir;
     // Carry the existing user data over to the new location before the
     // pointer is rewritten, so the app does not start with an empty config.
-    MigrateDataFiles(InitialDataDir, NewEffectiveDir);
+    // The pointer only moves once the copy has fully succeeded; a failed
+    // migration leaves Heimdall reading from its original location.
+    if not MigrateDataFiles(InitialDataDir, NewEffectiveDir) then
+    begin
+      MsgBox('Copying the existing Heimdall data to the new data directory failed.' + #13#10 +
+        'The data directory was not changed; your data remains in its original location.' + #13#10 +
+        'Copy the files manually and start Heimdall again.', mbError, MB_OK);
+      Exit;
+    end;
     if NewEffectiveDir = DefaultDataDir then
       // A stale custom pointer must be deleted, or the app would keep using
       // the old directory the user just cleared.
