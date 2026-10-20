@@ -74,6 +74,11 @@ const
   DataPointerKey = 'DataDirectory';
   // Old electron-builder NSIS install identifiers (UUIDv5 of "local.heimdall").
   OldNsGuid = '5f1af358-1741-5d1a-99a6-6c4880522cb8';
+  // Uninstall key Inno Setup 6 writes for this AppId. Its presence means an
+  // Inno install already exists, so the built-in UsePreviousAppDir already
+  // handles the install path and the NSIS migration below must not run.
+  InnoUninstallSubKey =
+    'Software\Microsoft\Windows\CurrentVersion\Uninstall\DE9625C4-291A-4F4F-BCD6-229A655A370E_is1';
 
 var
   DataDirPage: TWizardPage;
@@ -166,11 +171,33 @@ begin
   end;
 end;
 
+// One-time NSIS -> Inno migration. When an Inno install does not exist yet but
+// an old electron-builder NSIS install does, carry its install path over so the
+// wizard pre-fills the directory the user already chose instead of the default.
+// The old NSIS key is only removed in PrepareToInstall (after the wizard), so it
+// is still readable here. Guarded by the absence of the Inno uninstall key, so
+// an Inno -> Inno upgrade is left to the built-in UsePreviousAppDir.
+procedure PrefillInstallDirFromOldNsInstall;
+var
+  OldDir: String;
+begin
+  if RegKeyExists(HKCU, InnoUninstallSubKey) then
+    Exit; // an Inno install exists: built-in behavior already handles the path
+  if RegQueryStringValue(HKCU, 'Software\' + OldNsGuid, 'InstallLocation', OldDir) then
+  begin
+    OldDir := Trim(OldDir);
+    if (OldDir <> '') and (Length(OldDir) >= 3) and (Copy(OldDir, 2, 1) = ':') then
+      WizardForm.DirEdit.Text := OldDir;
+  end;
+end;
+
 procedure InitializeWizard;
 var
   PrevDataDir: String;
   IconWidth: Integer;
 begin
+  PrefillInstallDirFromOldNsInstall;
+
   DataDirPage := CreateCustomPage(wpSelectDir, 'Choose the data directory', '');
 
   // Mirror the built-in Select Destination Location page so the two pages
