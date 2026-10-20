@@ -11,6 +11,8 @@
 ;   * per-user install (no elevation), x64 only
 ;   * a "data directory" page lets the user move config/logs off the C drive;
 ;     the choice is persisted to a pointer file the app reads at startup
+;   * moving the data directory copies the existing user data (config, logs,
+;     usage) into the new folder, so nothing has to be reconfigured
 ;   * silent installs never touch the pointer (so upgrades keep the choice)
 ;   * uninstall asks whether to also delete user data
 ;   * first-run migration removes the old NSIS install's registry entries and
@@ -72,6 +74,14 @@ Filename: "{app}\Heimdall.exe"; Description: "Launch Heimdall"; Flags: nowait po
 const
   DataPointerSection = 'Heimdall';
   DataPointerKey = 'DataDirectory';
+  // Runtime artifacts, not user data. Kept in sync with MIGRATION_SKIP_ENTRIES
+  // in gui/electron/data-location.ts.
+  DataMigrationSkipList =
+    'data-location.ini;router.pid;Cache;Code Cache;GPUCache;DawnGraphiteCache;' +
+    'DawnWebGPUCache;Crashpad;Crash Reports;blob_storage;Local Storage;Session ' +
+    'Storage;IndexedDB;Network;Partitions;DIPS;DIPS-wal;SharedStorage;' +
+    'SharedStorage-wal;Shared Dictionary;Preferences;lockfile;Local State;' +
+    '.updaterId';
   // Old electron-builder NSIS install identifiers (UUIDv5 of "local.heimdall").
   OldNsGuid = '5f1af358-1741-5d1a-99a6-6c4880522cb8';
   // Uninstall key Inno Setup 6 writes for this AppId. Its presence means an
@@ -254,9 +264,66 @@ begin
   DataDirPage.OnNextButtonClick := @DataDirNextButtonClick;
 end;
 
+function IsDataMigrationSkipEntry(AName: String): Boolean;
+begin
+  // Transient config-store files are never migrated.
+  if Pos('.config-', AName) = 1 then
+  begin
+    Result := True;
+    Exit;
+  end;
+  // Exact-match lookup in the ';'-delimited skip list.
+  Result := Pos(';' + AName + ';', ';' + DataMigrationSkipList + ';') > 0;
+end;
+
+// Recursively copies files from ASrcDir into ADestDir, creating directories as
+// needed. Existing entries in ADestDir are never overwritten, so a target that
+// already holds data stays intact.
+procedure CopyDataTree(ASrcDir, ADestDir: String);
+var
+  FindRec: TFindRec;
+  SrcPath, DestPath: String;
+begin
+  if not DirExists(ADestDir) then
+    if not CreateDir(ADestDir) then
+      Exit;
+  if not FindFirst(ASrcDir + '\*', FindRec) then
+    Exit;
+  repeat
+    if (FindRec.Name = '.') or (FindRec.Name = '..') or
+        IsDataMigrationSkipEntry(FindRec.Name) then
+      Continue;
+    SrcPath := ASrcDir + '\' + FindRec.Name;
+    DestPath := ADestDir + '\' + FindRec.Name;
+    if FindRec.Attributes and FILE_ATTRIBUTE_DIRECTORY <> 0 then
+    begin
+      if not DirExists(DestPath) then
+        CopyDataTree(SrcPath, DestPath);
+    end
+    else if not FileExists(DestPath) then
+      CopyFile(SrcPath, DestPath, False);
+  until not FindNext(FindRec);
+  FindClose(FindRec);
+end;
+
+// Copies the user data (config, logs, usage) from the previously effective
+// data directory into the new one, so a directory change does not lose the
+// existing configuration. Mirrors the in-app changeDataDir migration.
+procedure MigrateDataFiles(FromDir, ToDir: String);
+begin
+  if (FromDir = '') or (ToDir = '') then
+    Exit;
+  if SameText(FromDir, ToDir) then
+    Exit;
+  if not DirExists(FromDir) then
+    Exit;
+  CreateDir(ToDir);
+  CopyDataTree(FromDir, ToDir);
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 var
-  DataDir: String;
+  DataDir, NewEffectiveDir: String;
 begin
   if CurStep = ssPostInstall then
   begin
@@ -269,10 +336,16 @@ begin
     // An unchanged field keeps the pointer exactly as it was.
     if DataDir = InitialDataDir then
       Exit;
-    // An empty or default path means "use the default location": a stale
-    // custom pointer must be deleted, or the app would keep using the old
-    // directory the user just cleared.
-    if (DataDir = '') or (CompareText(DataDir, DefaultDataDir) = 0) then
+    // An empty or default path means "use the default location".
+    NewEffectiveDir := DefaultDataDir;
+    if (DataDir <> '') and (CompareText(DataDir, DefaultDataDir) <> 0) then
+      NewEffectiveDir := DataDir;
+    // Carry the existing user data over to the new location before the
+    // pointer is rewritten, so the app does not start with an empty config.
+    MigrateDataFiles(InitialDataDir, NewEffectiveDir);
+    if NewEffectiveDir = DefaultDataDir then
+      // A stale custom pointer must be deleted, or the app would keep using
+      // the old directory the user just cleared.
       DeleteIniEntry(DataPointerSection, DataPointerKey, DataPointerFile)
     else
     begin
