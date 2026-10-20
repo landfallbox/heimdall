@@ -109,9 +109,15 @@ assert.equal(heimdall.apiKey, "${input:chat.lm.secret.abc123}");
 // Provider-level settings are preserved.
 assert.deepEqual(heimdall.settings, { "customendpoint/Heimdall/model-a": { thinkingLevel: "high" } });
 const mergedModels = heimdall.models as any[];
-assert.equal(mergedModels.length, 2, "stale model is dropped");
+// Additive-only merge: model-b (updated in place, order kept) and the stale
+// model (not enabled in heimdall, preserved) remain; model-a is appended.
+assert.deepEqual(
+  mergedModels.map((m) => m.id),
+  ["model-b", "stale-model", "model-a"],
+);
 const mergedA = mergedModels.find((m) => m.id === "model-a")!;
 const mergedB = mergedModels.find((m) => m.id === "model-b")!;
+const mergedStale = mergedModels.find((m) => m.id === "stale-model")!;
 // model-a is new in this run: name falls back to id.
 assert.equal(mergedA.name, "model-a");
 assert.equal(mergedA.url, "http://127.0.0.1:4000/v1");
@@ -119,6 +125,8 @@ assert.equal(mergedA.url, "http://127.0.0.1:4000/v1");
 assert.equal(mergedB.name, "Model B", "heimdall-provided name wins");
 assert.equal(mergedB.contextWindow, 128000, "heimdall-provided contextWindow wins");
 assert.equal(mergedB.extra, "keep-me", "unknown fields are preserved");
+// The stale model is preserved untouched.
+assert.deepEqual(mergedStale, { id: "stale-model", name: "Stale" });
 
 // 3. A plain (non-secret) apiKey is updated, but a secret reference is not.
 const plainKey = mergeVsCodeModelsFile([

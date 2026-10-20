@@ -128,7 +128,11 @@ function toModelEntry(model: NormalizedVendorModel, url: string): VsCodeModelEnt
  * - The Heimdall provider is created if missing.
  * - Existing per-model metadata is kept; heimdall only overrides the fields it
  *   explicitly provides.
- * - Models that are no longer enabled in heimdall are dropped from the provider.
+ * - The merge is additive only: entries heimdall does not update in this run
+ *   (disabled models, removed models, manually added ones) are preserved.
+ *   VS Code does not hot-reload chatLanguageModels.json, so dropping entries
+ *   would only take effect after a manual window reload while risking the loss
+ *   of entries heimdall does not manage.
  * - A VS Code secret reference for apiKey (`${input:...}`) is never replaced.
  */
 export function mergeVsCodeModelsFile(
@@ -166,25 +170,28 @@ export function mergeVsCodeModelsFile(
   const existingModels = Array.isArray(provider.models)
     ? (provider.models as unknown[]).filter((item): item is Record<string, unknown> => isPlainObject(item))
     : [];
-  const byId = new Map<string, Record<string, unknown>>();
-  for (const model of existingModels) {
-    if (typeof model.id === "string" && model.id) {
-      byId.set(model.id, model);
+  // Additive-only merge: keep every existing model (disabled in heimdall,
+  // removed from the config, or added by hand) and update the ones this run
+  // provides in place; new entries are appended. Existing order is preserved.
+  const mergedModels: Record<string, unknown>[] = [...existingModels];
+  const byId = new Map<string, number>();
+  mergedModels.forEach((model, index) => {
+    if (typeof model.id === "string" && model.id && !byId.has(model.id)) {
+      byId.set(model.id, index);
     }
-  }
-
-  const mergedModels: Record<string, unknown>[] = [];
+  });
   for (const entry of entries) {
-    const current = byId.get(entry.id);
-    if (current) {
-      mergedModels.push({ ...current, ...entry });
-    } else {
-      const fresh: Record<string, unknown> = { ...entry };
-      if (typeof fresh.name !== "string" || !fresh.name) {
-        fresh.name = entry.id;
-      }
-      mergedModels.push(fresh);
+    const index = byId.get(entry.id);
+    if (index !== undefined) {
+      mergedModels[index] = { ...mergedModels[index], ...entry };
+      continue;
     }
+    const fresh: Record<string, unknown> = { ...entry };
+    if (typeof fresh.name !== "string" || !fresh.name) {
+      fresh.name = entry.id;
+    }
+    byId.set(entry.id, mergedModels.length);
+    mergedModels.push(fresh);
   }
 
   provider.models = mergedModels;

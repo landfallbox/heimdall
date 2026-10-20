@@ -104,7 +104,7 @@ The merge is conservative:
 
 - Other providers in the file (for example VS Code's own `Copilot` provider) and their settings are left untouched.
 - A model's existing metadata is kept; Heimdall only overrides the fields it explicitly provides.
-- Models you disable or remove are dropped from the `Heimdall` provider on the next save.
+- The merge is additive only: models you disable or remove in heimdall stay in the `Heimdall` provider (as do models you add by hand). VS Code does not hot-reload this file, so a dropped entry would only disappear after a manual window reload — while risking the loss of entries heimdall does not manage.
 - If VS Code already stores the provider's `apiKey` as a secret reference (`${input:chat.lm.secret.…}`), that reference is never replaced — opaque secrets can only be managed inside VS Code.
 
 Per-model VS Code metadata (display name, tool calling, vision, thinking, context window, max output tokens, supported reasoning effort) is optional. Expand **VS Code metadata** on a model row in Vendor Settings to fill it in; only the fields you set are written, so a partial entry never clobbers richer metadata you already have in the file.
