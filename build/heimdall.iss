@@ -132,15 +132,33 @@ function WinGetFileAttributesW(const lpFileName: String): Cardinal;
   external 'GetFileAttributesW@kernel32.dll stdcall';
 
 // True when APath exists and is a junction or symlink (directory reparse
-// point). GetFileAttributesW reads the reparse-point attribute of the path
-// itself, without following it, so no handle is needed.
+// point), or when any of its ancestors is one: a plain folder under a
+// junction still physically resolves through it. GetFileAttributesW reads
+// the reparse-point attribute without following the path, so no handle is
+// needed.
 function IsReparsePoint(APath: String): Boolean;
 var
+  CurrentPath, ParentPath: String;
   Attr: Cardinal;
 begin
-  Attr := WinGetFileAttributesW(ExpandFileName(Trim(APath)));
-  Result := (Attr <> WinInvalidFileAttributes) and
-    ((Attr and WinFileAttributeReparsePoint) <> 0);
+  Result := False;
+  CurrentPath := ExpandFileName(Trim(APath));
+  while CurrentPath <> '' do
+  begin
+    Attr := WinGetFileAttributesW(CurrentPath);
+    if (Attr <> WinInvalidFileAttributes) and
+       ((Attr and WinFileAttributeReparsePoint) <> 0) then
+    begin
+      Result := True;
+      Exit;
+    end;
+    ParentPath := ExtractFileDir(CurrentPath);
+    // ExtractFileDir returns the path itself at a drive root, so the
+    // comparison guards against walking forever.
+    if CompareText(ParentPath, CurrentPath) = 0 then
+      Break;
+    CurrentPath := ParentPath;
+  end;
 end;
 
 // Mirrors the data-directory rules from the old installer.nsh:
@@ -392,6 +410,11 @@ begin
     DestPath := ADestDir + '\' + FindRec.Name;
     if FindRec.Attributes and FILE_ATTRIBUTE_DIRECTORY <> 0 then
     begin
+      // A directory junction inside the source tree could point back at an
+      // ancestor of itself, making the recursive copy self-nesting; never
+      // descend into one.
+      if FindRec.Attributes and WinFileAttributeReparsePoint <> 0 then
+        Continue;
       if not CopyDataTree(SrcPath, DestPath) then
       begin
         Result := False;
@@ -466,6 +489,11 @@ begin
     DestPath := ToDir + '\' + FindRec.Name;
     if FindRec.Attributes and FILE_ATTRIBUTE_DIRECTORY <> 0 then
     begin
+      // A directory junction inside the source tree could point back at an
+      // ancestor of itself, making the recursive copy self-nesting; never
+      // descend into one.
+      if FindRec.Attributes and WinFileAttributeReparsePoint <> 0 then
+        Continue;
       if not CopyDataTree(SrcPath, DestPath) then
       begin
         Result := False;
