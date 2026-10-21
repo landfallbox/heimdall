@@ -179,7 +179,7 @@ function SortableVendorRow({ vendor, index, selected, onEnableChange, onRemove, 
         aria-hidden="true"
       />
 
-      <span className="min-w-0 flex-1 truncate font-medium">{vendor.name || "New vendor"}</span>
+      <span className="min-w-0 flex-1 truncate font-medium" title={vendor.name || "New vendor"}>{vendor.name || "New vendor"}</span>
 
       <span className="flex shrink-0 items-center gap-0.5" onClick={(event) => event.stopPropagation()}>
         <Switch

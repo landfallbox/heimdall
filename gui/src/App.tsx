@@ -41,6 +41,13 @@ import { LogsPage } from "./pages/logs-page.tsx";
 
 const defaultAppName = "Heimdall";
 
+const RAIL_STORAGE_KEY = "heimdall-rail-width";
+const RAIL_MIN_WIDTH = 200;
+const RAIL_MAX_WIDTH = 500;
+const RAIL_DEFAULT_WIDTH = 280;
+const RAIL_SEPARATOR_WIDTH = 4;
+const EDITOR_MIN_WIDTH = 480;
+
 type Page = PageId;
 
 type ModalState =
@@ -136,6 +143,43 @@ export default function App() {
   const [dataDirState, setDataDirState] = useState<DataDirState | null>(null);
   const vendorModelsRequestRef = useRef(0);
   const vendorModelsSourceKeyRef = useRef("");
+  const [railWidth, setRailWidth] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem(RAIL_STORAGE_KEY);
+      const parsed = saved ? parseInt(saved, 10) : NaN;
+      return Number.isFinite(parsed) ? Math.max(RAIL_MIN_WIDTH, Math.min(RAIL_MAX_WIDTH, parsed)) : RAIL_DEFAULT_WIDTH;
+    } catch {
+      return RAIL_DEFAULT_WIDTH;
+    }
+  });
+  const vendorsSectionRef = useRef<HTMLElement>(null);
+  const railWidthRef = useRef(railWidth);
+  railWidthRef.current = railWidth;
+
+  const commitRailWidth = useCallback((width: number) => {
+    setRailWidth(width);
+    try {
+      localStorage.setItem(RAIL_STORAGE_KEY, String(width));
+    } catch {
+      // 存储不可用时仅保留内存宽度，跳过持久化
+    }
+  }, []);
+
+  // 窗口变窄时把已保存的宽度收回容器可容纳范围，保证编辑区最小宽度
+  useEffect(() => {
+    const container = vendorsSectionRef.current;
+    if (!container || page !== "router") return;
+    const clampToContainer = () => {
+      const max = container.clientWidth - RAIL_SEPARATOR_WIDTH - EDITOR_MIN_WIDTH;
+      if (max < railWidthRef.current) {
+        setRailWidth(Math.max(RAIL_MIN_WIDTH, Math.round(max)));
+      }
+    };
+    clampToContainer();
+    const observer = new ResizeObserver(clampToContainer);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [page]);
 
   const notify = useCallback((message: string, kind: "info" | "error" = "info") => {
     if (!message) {
@@ -161,6 +205,49 @@ export default function App() {
       }
     },
     [notify],
+  );
+
+  const handleRailDragStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const container = vendorsSectionRef.current;
+    if (!container) return;
+    const containerRect = container.getBoundingClientRect();
+    const minW = RAIL_MIN_WIDTH;
+    const maxW = Math.min(RAIL_MAX_WIDTH, Math.max(minW, containerRect.width - RAIL_SEPARATOR_WIDTH - EDITOR_MIN_WIDTH));
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    const onMove = (ev: MouseEvent) => {
+      const w = Math.max(minW, Math.min(maxW, ev.clientX - containerRect.left));
+      setRailWidth(w);
+    };
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      commitRailWidth(railWidthRef.current);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }, [commitRailWidth]);
+
+  const handleRailSeparatorKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      const step = e.shiftKey ? 20 : 5;
+      let next: number | null = null;
+      if (e.key === "ArrowLeft") next = railWidthRef.current - step;
+      else if (e.key === "ArrowRight") next = railWidthRef.current + step;
+      else if (e.key === "Home") next = RAIL_MIN_WIDTH;
+      else if (e.key === "End") next = RAIL_MAX_WIDTH;
+      if (next === null) return;
+      e.preventDefault();
+      const container = vendorsSectionRef.current;
+      const max = container
+        ? Math.min(RAIL_MAX_WIDTH, Math.max(RAIL_MIN_WIDTH, container.clientWidth - RAIL_SEPARATOR_WIDTH - EDITOR_MIN_WIDTH))
+        : RAIL_MAX_WIDTH;
+      commitRailWidth(Math.max(RAIL_MIN_WIDTH, Math.min(max, next)));
+    },
+    [commitRailWidth],
   );
 
   const endpoints = useMemo(() => endpointsFromDraft(draft), [draft]);
@@ -851,7 +938,7 @@ export default function App() {
         </header>
 
         <div className="flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-[1100px] px-8 py-6">
+          <div className="mx-auto w-full max-w-[1280px] px-8 py-6">
           {page === "router" && (
             <motion.section
               aria-label="Router endpoints"
@@ -903,10 +990,12 @@ export default function App() {
                     validation={routerValidation}
                   />
                   <section
+                    ref={vendorsSectionRef}
                     aria-label="Vendors"
-                    className="grid grid-cols-1 overflow-hidden rounded-xl border border-border bg-card/40 xl:grid-cols-[230px_minmax(0,1fr)]"
+                    style={{ "--rail-width": `${railWidth}px` } as React.CSSProperties}
+                    className="grid grid-cols-1 overflow-hidden rounded-xl border border-border bg-card/40 xl:grid-cols-[var(--rail-width)_4px_minmax(0,1fr)]"
                   >
-                    <div className="border-b border-border bg-muted/20 xl:border-b-0 xl:border-r">
+                    <div className="border-b border-border bg-muted/20 xl:border-b-0">
                       <VendorsRail
                         vendors={draft.vendors}
                         selectedIndex={vendorEditorIndex}
@@ -920,6 +1009,19 @@ export default function App() {
                         busy={busy === "vendors"}
                       />
                     </div>
+                    <div
+                      className="hidden w-1 cursor-col-resize bg-border transition-colors hover:bg-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 xl:block"
+                      onMouseDown={handleRailDragStart}
+                      onKeyDown={handleRailSeparatorKeyDown}
+                      role="separator"
+                      aria-orientation="vertical"
+                      aria-label="Resize vendor list"
+                      aria-valuemin={RAIL_MIN_WIDTH}
+                      aria-valuemax={RAIL_MAX_WIDTH}
+                      aria-valuenow={railWidth}
+                      aria-valuetext={`${railWidth}px`}
+                      tabIndex={0}
+                    />
                     <div className="min-w-0 p-5">
                       {vendorEditorDraft ? (
                         <VendorEditorPage
