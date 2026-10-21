@@ -244,6 +244,45 @@
   }
 }
 
+/* Radix Select 开合动画
+   Radix Presence 靠计算样式 animation-name 决定是否等待退场：
+   open / closed 两态 animation-name 必须不同，关闭时才会等 animationend 再卸载。
+   transform-origin 由 Radix 按 popper 实际方位注入（翻转到上方时自动变 bottom center）。 */
+[data-slot="select-content"] {
+  transform-origin: var(--radix-select-content-transform-origin, top center);
+  will-change: transform, opacity;
+}
+
+[data-slot="select-content"][data-state="open"] {
+  animation: select-in 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-slot="select-content"][data-state="closed"] {
+  animation: select-out 120ms ease-in forwards;
+}
+
+@keyframes select-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes select-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+
 /* ============ sonner 通知（toast）覆盖（暗色模式） ============
    sonner 在运行时把默认样式注入 <head> 末尾，同优先级会压过本文件，
    因此这里统一用 .dark [data-sonner-toaster] 前缀抬高特异性覆盖：
