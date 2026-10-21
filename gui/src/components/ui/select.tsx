@@ -58,6 +58,15 @@ function SelectContent({
         data-slot="select-content"
         className={cn(
           "relative z-50 max-h-[var(--radix-select-content-available-height)] min-w-[8rem] overflow-x-hidden overflow-y-auto rounded-xl border border-border bg-popover text-popover-foreground shadow-float",
+          // tw-animate-css：开=淡入+微缩放+顶部 -6px 微移（180ms 减速曲线），
+          // 收=淡出+微缩放+上移（120ms ease-in）；transform-origin 由 index.css
+          // 按 Radix 侧边变量提供（上翻时自动变底部锚点）
+          "data-[state=open]:animate-in data-[state=closed]:animate-out",
+          "data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0",
+          "data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95",
+          "data-[state=open]:slide-in-from-top-[6px] data-[state=closed]:slide-out-to-top-[4px]",
+          "data-[state=open]:duration-180 data-[state=open]:ease-[cubic-bezier(0.16,1,0.3,1)]",
+          "data-[state=closed]:duration-120 data-[state=closed]:ease-in",
           position === "popper" &&
             "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
           className,
