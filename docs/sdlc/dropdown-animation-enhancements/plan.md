@@ -50,9 +50,12 @@ Select 下拉框点开/收起完全没有动画，很硬。
    - `SelectContent`：既有 tw-animate-css 类补全为完整参数——
      `data-[state=open]:animate-in` / `data-[state=closed]:animate-out`、
      `fade-in-0` / `fade-out-0`、`zoom-in-95` / `zoom-out-95`、
-     `slide-in-from-top-[6px]` / `slide-out-to-top-[4px]`、
      `duration-180 ease-[cubic-bezier(0.16,1,0.3,1)]`（开）/
      `duration-120 ease-in`（收）。
+     slide 微移方向随 popper 方位（`data-side`）条件化，始终朝向触发器：
+     向下展开（side=bottom）用 `slide-in-from-top-[6px]` / `slide-out-to-top-[4px]`，
+     翻转到上方（side=top）用 `slide-in-from-bottom-[6px]` / `slide-out-to-bottom-[4px]`，
+     通过 `data-[side=...]:data-[state=...]:` 组合变体实现。
      注意：`slide-in-from-top-*` 的整数分支只匹配整数，-6px 微移必须用
      任意值 `slide-in-from-top-[6px]`（库内取反为 translateY(-6px)）。
    - `SelectTrigger`：加 `group`；Chevron 加
