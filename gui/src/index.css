@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -242,6 +243,19 @@
     opacity: 1;
     transform: translateY(0) scale(1);
   }
+}
+
+/* Radix Select 开合动画
+   开合动画由 tw-animate-css 工具类驱动（select.tsx SelectContent 上的
+   animate-in / fade-in-0 / zoom-in-95 / slide-in-from-top-[6px] 等，
+   时长与缓动由 duration-* / ease-* 类注入 --tw-duration / --tw-ease）。
+   tw-animate-css 的 enter/exit 是两个不同 animation-name，Radix Presence 据此
+   等待退场播完再卸载，收起不会闪退。
+   transform-origin 由 Radix 按 popper 实际方位注入（翻转到上方时自动变 bottom
+   center），tw-animate-css 不提供该属性，故在此补充。 */
+[data-slot="select-content"] {
+  transform-origin: var(--radix-select-content-transform-origin, top center);
+  will-change: transform, opacity;
 }
 
 /* ============ sonner 通知（toast）覆盖（暗色模式） ============
