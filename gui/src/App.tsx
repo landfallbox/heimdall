@@ -136,6 +136,14 @@ export default function App() {
   const [dataDirState, setDataDirState] = useState<DataDirState | null>(null);
   const vendorModelsRequestRef = useRef(0);
   const vendorModelsSourceKeyRef = useRef("");
+  const [railWidth, setRailWidth] = useState<number>(() => {
+    const saved = localStorage.getItem("heimdall-rail-width");
+    const parsed = saved ? parseInt(saved, 10) : NaN;
+    return Number.isFinite(parsed) ? Math.max(200, Math.min(500, parsed)) : 280;
+  });
+  const vendorsSectionRef = useRef<HTMLElement>(null);
+  const railWidthRef = useRef(railWidth);
+  railWidthRef.current = railWidth;
 
   const notify = useCallback((message: string, kind: "info" | "error" = "info") => {
     if (!message) {
@@ -162,6 +170,30 @@ export default function App() {
     },
     [notify],
   );
+
+  const handleRailDragStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const container = vendorsSectionRef.current;
+    if (!container) return;
+    const containerRect = container.getBoundingClientRect();
+    const minW = 200;
+    const maxW = Math.max(minW, containerRect.width - 480);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    const onMove = (ev: MouseEvent) => {
+      const w = Math.max(minW, Math.min(maxW, ev.clientX - containerRect.left));
+      setRailWidth(w);
+    };
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      localStorage.setItem("heimdall-rail-width", String(railWidthRef.current));
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }, []);
 
   const endpoints = useMemo(() => endpointsFromDraft(draft), [draft]);
   const status = useMemo(() => getStatus(health), [health]);
@@ -851,7 +883,7 @@ export default function App() {
         </header>
 
         <div className="flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-[1100px] px-8 py-6">
+          <div className="mx-auto w-full max-w-[1280px] px-8 py-6">
           {page === "router" && (
             <motion.section
               aria-label="Router endpoints"
@@ -903,10 +935,12 @@ export default function App() {
                     validation={routerValidation}
                   />
                   <section
+                    ref={vendorsSectionRef}
                     aria-label="Vendors"
-                    className="grid grid-cols-1 overflow-hidden rounded-xl border border-border bg-card/40 xl:grid-cols-[230px_minmax(0,1fr)]"
+                    style={{ "--rail-width": `${railWidth}px` } as React.CSSProperties}
+                    className="grid grid-cols-1 overflow-hidden rounded-xl border border-border bg-card/40 xl:grid-cols-[var(--rail-width)_4px_minmax(0,1fr)]"
                   >
-                    <div className="border-b border-border bg-muted/20 xl:border-b-0 xl:border-r">
+                    <div className="border-b border-border bg-muted/20 xl:border-b-0">
                       <VendorsRail
                         vendors={draft.vendors}
                         selectedIndex={vendorEditorIndex}
@@ -920,6 +954,13 @@ export default function App() {
                         busy={busy === "vendors"}
                       />
                     </div>
+                    <div
+                      className="hidden w-1 cursor-col-resize bg-border transition-colors hover:bg-primary/60 xl:block"
+                      onMouseDown={handleRailDragStart}
+                      role="separator"
+                      aria-orientation="vertical"
+                      aria-label="Resize vendor list"
+                    />
                     <div className="min-w-0 p-5">
                       {vendorEditorDraft ? (
                         <VendorEditorPage
