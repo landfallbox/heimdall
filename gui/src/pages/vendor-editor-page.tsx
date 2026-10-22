@@ -276,9 +276,14 @@ function ModelPricingRow({
   const [expanded, setExpanded] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
   const copiedTimeoutRef = React.useRef<number | undefined>(undefined);
+  const mountedRef = React.useRef(false);
 
   React.useEffect(() => {
-    return () => window.clearTimeout(copiedTimeoutRef.current);
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      window.clearTimeout(copiedTimeoutRef.current);
+    };
   }, []);
 
   async function copyModelId() {
@@ -289,6 +294,9 @@ function ModelPricingRow({
       await getDesktopApi().writeClipboard(model.id);
     } catch {
       await navigator.clipboard.writeText(model.id);
+    }
+    if (!mountedRef.current) {
+      return;
     }
     setCopied(true);
     window.clearTimeout(copiedTimeoutRef.current);
