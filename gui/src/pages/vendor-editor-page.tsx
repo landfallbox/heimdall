@@ -275,6 +275,11 @@ function ModelPricingRow({
   const otherCatalogLabel = otherCatalogKey ? PRICING_CATALOG_LABELS[otherCatalogKey] : "";
   const [expanded, setExpanded] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
+  const copiedTimeoutRef = React.useRef<number | undefined>(undefined);
+
+  React.useEffect(() => {
+    return () => window.clearTimeout(copiedTimeoutRef.current);
+  }, []);
 
   async function copyModelId() {
     if (!model.id) {
@@ -286,7 +291,8 @@ function ModelPricingRow({
       await navigator.clipboard.writeText(model.id);
     }
     setCopied(true);
-    window.setTimeout(() => setCopied(false), 1500);
+    window.clearTimeout(copiedTimeoutRef.current);
+    copiedTimeoutRef.current = window.setTimeout(() => setCopied(false), 1500);
   }
 
   const priceParts: string[] = [];
@@ -366,6 +372,7 @@ function ModelPricingRow({
             variant="ghost"
             size="icon-sm"
             onClick={() => void copyModelId()}
+            onKeyDown={(event) => event.stopPropagation()}
             disabled={!model.id}
             title="Copy model id"
             aria-label="Copy model id"
