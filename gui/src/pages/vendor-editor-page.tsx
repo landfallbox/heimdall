@@ -1,5 +1,5 @@
 import * as React from "react";
-import { ArrowLeftRight, ChevronDown, Info, Loader2, Plus, RefreshCw, Server, Trash2 } from "lucide-react";
+import { ArrowLeftRight, Check, ChevronDown, Copy, Info, Loader2, Plus, RefreshCw, Server, Trash2 } from "lucide-react";
 
 import { Field } from "../components/field.tsx";
 import { SecretInput } from "../components/secret-input.tsx";
@@ -22,6 +22,7 @@ import {
   type VendorModelVsCodeDraft,
   getVendorModels,
 } from "../config-draft.ts";
+import { getDesktopApi } from "../desktop-api.ts";
 import { getCatalogPriceView, isPricingCatalogKey, PRICING_CATALOG_KEYS, PRICING_CATALOG_LABELS } from "../../../src/usage.ts";
 import { Button } from "../components/ui/button.tsx";
 import { Card, CardContent } from "../components/ui/card.tsx";
@@ -273,6 +274,20 @@ function ModelPricingRow({
   const catalogLabel = PRICING_CATALOG_LABELS[catalogKey];
   const otherCatalogLabel = otherCatalogKey ? PRICING_CATALOG_LABELS[otherCatalogKey] : "";
   const [expanded, setExpanded] = React.useState(false);
+  const [copied, setCopied] = React.useState(false);
+
+  async function copyModelId() {
+    if (!model.id) {
+      return;
+    }
+    try {
+      await getDesktopApi().writeClipboard(model.id);
+    } catch {
+      await navigator.clipboard.writeText(model.id);
+    }
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1500);
+  }
 
   const priceParts: string[] = [];
   const priceValue = (value: string | number | undefined) => (value === undefined || value === "" ? "—" : String(value));
@@ -346,6 +361,18 @@ function ModelPricingRow({
             disabled={model.enabled === false}
             onToggle={() => onUpdateVendorModel(index, "enableThinking", model.enableThinking !== true)}
           />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => void copyModelId()}
+            disabled={!model.id}
+            title="Copy model id"
+            aria-label="Copy model id"
+            className="text-muted-foreground hover:bg-accent hover:text-foreground"
+          >
+            {copied ? <Check size={15} className="text-success" /> : <Copy size={15} />}
+          </Button>
           <Button
             type="button"
             variant="ghost"
