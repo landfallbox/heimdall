@@ -273,7 +273,8 @@ function findCatalogPriceModel(catalogModels: Record<string, Pricing | RateCard>
     return model;
   }
 
-  const baseModel = model.replace(/-\d{4}-\d{2}-\d{2}$/, "");
+  // Dated snapshot suffixes: -YYYY-MM-DD or compact -MMDD (e.g. deepseek-v4-flash-0731).
+  const baseModel = model.replace(/-(\d{4}-\d{2}-\d{2}|\d{4})$/, "");
   return catalogModels[baseModel] ? baseModel : null;
 }
 

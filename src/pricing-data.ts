@@ -4,7 +4,7 @@ import type { RemotePricingData } from "./usage.ts";
 
 export const BUILTIN_PRICING_DATA: RemotePricingData = {
   "schemaVersion": 1,
-  "updatedAt": "2026-10-07",
+  "updatedAt": "2026-10-24",
   "catalogs": {
     "openai": {
       "sourceUrl": "https://developers.openai.com/api/docs/pricing",
@@ -290,20 +290,34 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
     },
     "deepseek": {
       "sourceUrl": "https://api-docs.deepseek.com/quick_start/pricing",
-      "updatedAt": "2026-08-16",
+      "updatedAt": "2026-10-24",
       "models": {
-        "deepseek-v4-flash": {
+        "deepseek-flash": {
           "peak": {
             "currency": "CNY",
-            "inputPerMillion": 0.44,
-            "cachedInputPerMillion": 0.014,
-            "outputPerMillion": 1.32
+            "inputPerMillion": 0.3,
+            "cachedInputPerMillion": 0.006,
+            "outputPerMillion": 1.2
           },
           "offPeak": {
             "currency": "CNY",
-            "inputPerMillion": 0.22,
-            "cachedInputPerMillion": 0.007,
-            "outputPerMillion": 0.66
+            "inputPerMillion": 0.15,
+            "cachedInputPerMillion": 0.003,
+            "outputPerMillion": 0.6
+          }
+        },
+        "deepseek-v4-flash": {
+          "peak": {
+            "currency": "CNY",
+            "inputPerMillion": 0.3,
+            "cachedInputPerMillion": 0.006,
+            "outputPerMillion": 1.2
+          },
+          "offPeak": {
+            "currency": "CNY",
+            "inputPerMillion": 0.15,
+            "cachedInputPerMillion": 0.003,
+            "outputPerMillion": 0.6
           }
         },
         "deepseek-v4.1-flash": {
@@ -494,8 +508,14 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
     },
     "google": {
       "sourceUrl": "https://ai.google.dev/gemini-api/docs/pricing",
-      "updatedAt": "2026-10-01",
+      "updatedAt": "2026-10-24",
       "models": {
+        "gemini-4-argon": {
+          "currency": "USD",
+          "inputPerMillion": 2,
+          "cachedInputPerMillion": 0.1,
+          "outputPerMillion": 10
+        },
         "gemini-3.1-pro": {
           "currency": "USD",
           "inputPerMillion": 2,
@@ -572,8 +592,14 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
     },
     "kimi": {
       "sourceUrl": "https://platform.kimi.ai/docs/pricing/chat.md",
-      "updatedAt": "2026-09-20",
+      "updatedAt": "2026-10-24",
       "models": {
+        "kimi-k3.1-pro": {
+          "currency": "USD",
+          "inputPerMillion": 2,
+          "cachedInputPerMillion": 0.2,
+          "outputPerMillion": 10
+        },
         "kimi-k3": {
           "currency": "USD",
           "inputPerMillion": 3,
