@@ -468,7 +468,7 @@ function ModelPricingRow({
                 <SelectContent>
                   {PRICING_CATALOG_KEYS.map((key) => (
                     <SelectItem key={key} value={key}>
-                      {PRICING_CATALOG_LABELS[key]} prices
+                      {PRICING_CATALOG_LABELS[key]}
                     </SelectItem>
                   ))}
                   <SelectItem value="custom">Custom</SelectItem>
