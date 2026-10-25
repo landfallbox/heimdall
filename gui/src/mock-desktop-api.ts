@@ -96,12 +96,6 @@ const config: MockConfig = {
           vscode: { name: "Qwen Plus (Tiered)", toolCalling: true, contextWindow: 131072, maxOutputTokens: 8192 }
         },
         {
-          id: "fake-tiered-demo",
-          enabled: true,
-          pricing: { mode: "openai" },
-          vscode: { name: "Tiered Pricing Demo", toolCalling: true, contextWindow: 128000, maxOutputTokens: 16384 }
-        },
-        {
           id: "gpt-5-mini",
           enabled: true,
           pricing: { mode: "openai" },
@@ -263,7 +257,6 @@ if (!hasRealPreload) {
         "deepseek-v4-flash",
         "qwen3.8-max-0902",
         "qwen-plus",
-        "fake-tiered-demo",
         "gpt-5-mini",
         "gpt-4o",
         "claude-3-5-sonnet",
