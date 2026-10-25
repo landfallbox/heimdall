@@ -43,12 +43,20 @@ interface DrawnSegment extends ChartSegment {
   heightPercent: number;
 }
 
-// 为有数据的切片应用最小保底高度，避免极端倾斜数据下小切片被舍入为 0 像素
+// 为有数据的切片应用最小保底高度，避免极端倾斜数据下小切片被舍入为 0 像素。
+// 先预留保底高度，再只对超出部分等比缩放，保证主导段占满图表时小切片仍不低于保底
 function allocateSegmentHeights(segments: ChartSegment[], chartMaximum: number): DrawnSegment[] {
-  const heights = segments.map((segment) => (segment.totalTokens > 0 ? Math.max((segment.totalTokens / chartMaximum) * 100, MIN_SEGMENT_PCT) : 0));
-  const total = heights.reduce((sum, value) => sum + value, 0);
-  const scale = total > 100 ? 100 / total : 1;
-  return segments.map((segment, index) => ({ ...segment, heightPercent: heights[index] * scale }));
+  const raw = segments.map((segment) => (segment.totalTokens > 0 ? (segment.totalTokens / chartMaximum) * 100 : 0));
+  const withData = raw.filter((value) => value > 0).length;
+  const reserved = withData * MIN_SEGMENT_PCT;
+  if (reserved >= 100) {
+    const even = 100 / withData;
+    return segments.map((segment, index) => ({ ...segment, heightPercent: raw[index] > 0 ? even : 0 }));
+  }
+  const excess = raw.map((value) => Math.max(0, value - MIN_SEGMENT_PCT));
+  const totalExcess = excess.reduce((sum, value) => sum + value, 0);
+  const scale = totalExcess > 0 ? Math.min(1, (100 - reserved) / totalExcess) : 0;
+  return segments.map((segment, index) => ({ ...segment, heightPercent: raw[index] > 0 ? MIN_SEGMENT_PCT + excess[index] * scale : 0 }));
 }
 
 function usageModelSegments(day: UsageDaily, activeModels: string[], otherBaseModels: string[], otherVisible: boolean, modelColors: Map<string, string>): ChartSegment[] {
@@ -95,6 +103,8 @@ export function UsageChart({ days, metric = "tokens" }: { days: UsageDaily[]; me
   const modelColors = new Map(legendModels.map((name, index) => [name, usageModelColor(index, name)]));
 
   const isTokens = metric === "tokens";
+  // 悬停的模型被隐藏后其切片不再渲染，此时不应再压暗其余切片
+  const hoverDimModel = hoveredModel && !hiddenModels.has(hoveredModel) ? hoveredModel : null;
   const activeModels = isTokens ? visibleModels.filter((name) => !hiddenModels.has(name)) : [];
   const activeModelSet = new Set(activeModels);
   // Other 桶（Top5 之外的模型）是否展示：存在其他模型且未被用户隐藏
@@ -212,7 +222,7 @@ export function UsageChart({ days, metric = "tokens" }: { days: UsageDaily[]; me
                         style={{
                           height: barHeightPercent > 0 ? `${(segment.heightPercent / barHeightPercent) * 100}%` : "0%",
                           background: segment.color,
-                          opacity: hoveredModel && hoveredModel !== segment.name ? 0.35 : 1,
+                          opacity: hoverDimModel && hoverDimModel !== segment.name ? 0.35 : 1,
                         }}
                       />
                     ))}
