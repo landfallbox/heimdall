@@ -1,5 +1,22 @@
+function cleanTierCondition(raw: string): string {
+  const trimmed = raw.trim();
+  const upToMatch = trimmed.match(/^0\s*<\s*Tokens?\s*≤\s*(.+)$/i);
+  if (upToMatch) {
+    return `≤ ${upToMatch[1]}`;
+  }
+  const rangeMatch = trimmed.match(/^(.+?)\s*<\s*Tokens?\s*≤\s*(.+)$/i);
+  if (rangeMatch) {
+    return `${rangeMatch[1]} ~ ${rangeMatch[2]}`;
+  }
+  const gtMatch = trimmed.match(/^Tokens?\s*>\s*(.+)$/i);
+  if (gtMatch) {
+    return `> ${gtMatch[1]}`;
+  }
+  return trimmed;
+}
+
 import * as React from "react";
-import { ArrowLeftRight, Check, ChevronDown, Copy, Info, Loader2, Plus, RefreshCw, Server, Trash2 } from "lucide-react";
+import { ArrowLeftRight, Check, ChevronDown, Clock, Copy, Info, Layers, Loader2, Plus, RefreshCw, Server, Trash2 } from "lucide-react";
 
 import { Field } from "../components/field.tsx";
 import { SecretInput } from "../components/secret-input.tsx";
@@ -23,12 +40,19 @@ import {
   getVendorModels,
 } from "../config-draft.ts";
 import { getDesktopApi } from "../desktop-api.ts";
-import { getCatalogPriceView, isPricingCatalogKey, PRICING_CATALOG_KEYS, PRICING_CATALOG_LABELS } from "../../../src/usage.ts";
+import {
+  getCatalogPriceView,
+  isPeakHour,
+  isPricingCatalogKey,
+  PRICING_CATALOG_KEYS,
+  PRICING_CATALOG_LABELS,
+} from "../../../src/usage.ts";
 import { Button } from "../components/ui/button.tsx";
 import { Card, CardContent } from "../components/ui/card.tsx";
 import { Separator } from "../components/ui/separator.tsx";
 import { Input } from "../components/ui/input.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.tsx";
+import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover.tsx";
 import { Switch } from "../components/ui/switch.tsx";
 
 const requestFormatOptions: Array<{ value: RequestFormat; label: string }> = [
@@ -273,7 +297,7 @@ function ModelPricingRow({
       : null;
   const catalogLabel = PRICING_CATALOG_LABELS[catalogKey];
   const otherCatalogLabel = otherCatalogKey ? PRICING_CATALOG_LABELS[otherCatalogKey] : "";
-  const [expanded, setExpanded] = React.useState(false);
+  const [expanded, setExpanded] = React.useState(index < 2);
   const [copied, setCopied] = React.useState(false);
   const copiedTimeoutRef = React.useRef<number | undefined>(undefined);
   const mountedRef = React.useRef(false);
@@ -314,6 +338,71 @@ function ModelPricingRow({
   }
   const priceCurrency = customPricing ? normalizeCurrency(model.pricingCurrency) : pricingView?.pricing?.currency;
   const priceSummary = priceParts.length ? `${priceCurrency} ${priceParts.join(" / ")} / 1M` : null;
+  const isTimeWindow = !customPricing && Boolean(pricingView?.offPeakPricing && pricingView?.peakHours);
+  const isTiered = !customPricing && Boolean(pricingView?.tiers?.length);
+  const hasSpecialPricing = isTimeWindow || isTiered;
+  const specialPricingBadge = isTimeWindow ? "⚡ Peak/Off-Peak" : isTiered ? "📊 Tiered" : null;
+  const isPeakNow = isTimeWindow && pricingView?.peakHours ? isPeakHour(new Date(), pricingView.peakHours) : true;
+
+  // Rate selection: null follows default (time-window follows current time, tiered follows base).
+  const specialPricingKey = hasSpecialPricing && pricingView ? `${catalogKey}:${model.id}` : null;
+  const [specialTier, setSpecialTier] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    setSpecialTier(null);
+  }, [specialPricingKey]);
+  const defaultTierKey = isTimeWindow
+    ? (isPeakNow ? "peak" : "off-peak")
+    : isTiered && pricingView?.tiers
+      ? String(Math.max(0, pricingView.tiers.findIndex((tier) => tier.isBase)))
+      : "0";
+  const activeTierKey = specialTier ?? defaultTierKey;
+
+  const displayPricing = customPricing || !pricingView
+    ? null
+    : isTimeWindow
+      ? (activeTierKey === "off-peak" && pricingView.offPeakPricing ? pricingView.offPeakPricing : pricingView.pricing)
+      : isTiered
+        ? (() => {
+            const tier = pricingView.tiers?.[Number(activeTierKey)];
+            return tier
+              ? {
+                  currency: pricingView.pricing.currency,
+                  inputPerMillion: tier.inputPerMillion,
+                  cachedInputPerMillion: tier.cachedInputPerMillion ?? null,
+                  outputPerMillion: tier.outputPerMillion,
+                }
+              : pricingView.pricing;
+          })()
+        : pricingView.pricing;
+
+  const tierOptions = isTimeWindow
+    ? [
+        { value: "peak", label: isPeakNow ? "Daytime Peak (Base · Active)" : "Daytime Peak (Base)" },
+        { value: "off-peak", label: isPeakNow ? "Off-Peak Promo" : "Off-Peak Promo (Active)" },
+      ]
+    : isTiered && pricingView?.tiers
+      ? pricingView.tiers.map((tier, idx) => {
+          const cond = cleanTierCondition(tier.condition);
+          return {
+            value: String(idx),
+            label: tier.isBase ? `${cond} (Base)` : cond,
+          };
+        })
+      : [];
+
+  const tierBadge = isTimeWindow
+    ? (activeTierKey === "off-peak" ? "Off-Peak" : "Peak")
+    : isTiered && pricingView?.tiers
+      ? cleanTierCondition(pricingView.tiers[Number(activeTierKey)]?.condition || "")
+      : null;
+
+  const specialHint = isTimeWindow
+    ? (isPeakNow
+        ? "Currently in daytime peak hours; standard base rates apply."
+        : `Currently in off-peak hours (peak:  local time); promo discount rates active.`)
+    : isTiered
+      ? "Requests exceeding token thresholds are billed at their matched tier."
+      : null;
   const contextSummary = vscodeSummaryContext(model);
   const capabilitySummary = vscodeSummaryCapabilities(model);
 
@@ -419,6 +508,11 @@ function ModelPricingRow({
               onClick={(event) => event.stopPropagation()}
             >
               {priceSummary && <span className="shrink-0 font-mono">{priceSummary}</span>}
+              {specialPricingBadge && (
+                <span className="shrink-0 rounded-full border border-warning/30 bg-warning/10 px-1.5 py-px text-[10px] font-medium text-warning">
+                  {specialPricingBadge}
+                </span>
+              )}
               {contextSummary && (
                 <>
                   <span className="text-border">·</span>
@@ -455,9 +549,8 @@ function ModelPricingRow({
               expanded ? "translate-y-0 opacity-100" : "-translate-y-3 opacity-0",
             )}
           >
-          <div className="grid min-w-0 grid-cols-[148px_repeat(3,minmax(0,1fr))] items-end gap-2.5">
-            <div className="flex min-w-0 flex-col gap-1.5">
-              <span className="text-xs font-semibold text-muted-foreground">Price source</span>
+          {(() => {
+            const sourceSelect = (
               <Select
                 value={model.pricingMode || "openai"}
                 onValueChange={(value) => onUpdateVendorModel(index, "pricingMode", value)}
@@ -474,50 +567,72 @@ function ModelPricingRow({
                   <SelectItem value="custom">Custom</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <PriceInput
-              label={`Input / 1M (${normalizeCurrency(customPricing ? model.pricingCurrency : pricingView?.pricing?.currency)})`}
-              value={String(customPricing ? model.inputPerMillion : pricingView?.pricing?.inputPerMillion ?? "")}
-              onChange={(value) => onUpdateVendorModel(index, "inputPerMillion", value)}
-              numeric
-              readOnly={!customPricing}
-              unavailable={!customPricing && !pricingView}
-            />
-            <PriceInput
-              label="Cached / 1M"
-              value={String(
-                customPricing
-                  ? model.cachedInputPerMillion
-                  : pricingView?.pricing?.cachedInputPerMillion ?? pricingView?.pricing?.inputPerMillion ?? "",
-              )}
-              onChange={(value) => onUpdateVendorModel(index, "cachedInputPerMillion", value)}
-              numeric
-              optional
-              readOnly={!customPricing}
-              unavailable={!customPricing && !pricingView}
-            />
-            <PriceInput
-              label="Output / 1M"
-              value={String(customPricing ? model.outputPerMillion : pricingView?.pricing?.outputPerMillion ?? "")}
-              onChange={(value) => onUpdateVendorModel(index, "outputPerMillion", value)}
-              numeric
-              readOnly={!customPricing}
-              unavailable={!customPricing && !pricingView}
-            />
-          </div>
+            );
+            const priceInputs = (
+              <>
+                <PriceInput
+                  label={`Input / 1M (${normalizeCurrency(customPricing ? model.pricingCurrency : displayPricing?.currency)})`}
+                  headerRight={
+                    hasSpecialPricing && pricingView ? (
+                      <SpecialPricingPopover
+                        isTimeWindow={isTimeWindow}
+                        isTiered={isTiered}
+                        isPeakNow={isPeakNow}
+                        activeTierKey={activeTierKey}
+                        onSelectTier={setSpecialTier}
+                        pricingView={pricingView}
+                        currency={normalizeCurrency(customPricing ? model.pricingCurrency : displayPricing?.currency)}
+                        tierBadge={tierBadge}
+                      />
+                    ) : null
+                  }
+                  value={String(customPricing ? model.inputPerMillion : displayPricing?.inputPerMillion ?? "")}
+                  onChange={(value) => onUpdateVendorModel(index, "inputPerMillion", value)}
+                  numeric
+                  readOnly={!customPricing}
+                  unavailable={!customPricing && !displayPricing}
+                />
+                <PriceInput
+                  label="Cached / 1M"
+                  value={String(
+                    customPricing
+                      ? model.cachedInputPerMillion
+                      : displayPricing?.cachedInputPerMillion ?? displayPricing?.inputPerMillion ?? "",
+                  )}
+                  onChange={(value) => onUpdateVendorModel(index, "cachedInputPerMillion", value)}
+                  numeric
+                  optional
+                  readOnly={!customPricing}
+                  unavailable={!customPricing && !displayPricing}
+                />
+                <PriceInput
+                  label="Output / 1M"
+                  value={String(customPricing ? model.outputPerMillion : displayPricing?.outputPerMillion ?? "")}
+                  onChange={(value) => onUpdateVendorModel(index, "outputPerMillion", value)}
+                  numeric
+                  readOnly={!customPricing}
+                  unavailable={!customPricing && !displayPricing}
+                />
+              </>
+            );
+            return (
+              <div className="grid min-w-0 grid-cols-[136px_repeat(3,minmax(0,1fr))] items-end gap-2.5">
+                <div className="flex min-w-0 flex-col gap-1.5">
+                  <div className="flex h-4 items-center justify-between">
+                    <span className="text-xs font-semibold text-muted-foreground">Price source</span>
+                  </div>
+                  {sourceSelect}
+                </div>
+                {priceInputs}
+              </div>
+            );
+          })()}
 
           <VsCodeModelFields model={model} onUpdateVendorModel={onUpdateVendorModel} modelIndex={index} />
 
           {customPricing && !isValidCustomPricing(model) ? (
             <small className="text-[11px] leading-snug text-destructive">
               Enter valid non-negative prices for {model.id || "this model"}.
-            </small>
-          ) : customPricing ? null : pricingView?.offPeakPricing ? (
-            <small className="text-[11px] leading-snug text-muted-foreground">
-              Peak {pricingView.pricing.currency} {pricingView.pricing.inputPerMillion} / {pricingView.pricing.cachedInputPerMillion} /{" "}
-              {pricingView.pricing.outputPerMillion} per 1M · Off-peak ({formatPeakHours(pricingView.peakHours)}){" "}
-              {pricingView.offPeakPricing.currency} {pricingView.offPeakPricing.inputPerMillion} / {pricingView.offPeakPricing.cachedInputPerMillion} /{" "}
-              {pricingView.offPeakPricing.outputPerMillion}
             </small>
           ) : !pricingView && model.id ? (
             <small className="flex items-start gap-1.5 text-[11px] leading-snug text-warning">
@@ -550,8 +665,204 @@ function normalizeCurrency(value: string | undefined) {
   return normalized === "CNY" ? "CNY" : "USD";
 }
 
+
+function SpecialPricingPopover({
+  isTimeWindow,
+  isTiered,
+  isPeakNow,
+  activeTierKey,
+  onSelectTier,
+  pricingView,
+  currency,
+  tierBadge,
+}: {
+  isTimeWindow: boolean;
+  isTiered: boolean;
+  isPeakNow: boolean;
+  activeTierKey: string;
+  onSelectTier: (tierKey: string) => void;
+  pricingView: ReturnType<typeof getCatalogPriceView>;
+  currency: string;
+  tierBadge: string | null;
+}) {
+  if (isTimeWindow) {
+    return (
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className={cn(
+              "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium border transition-colors cursor-pointer outline-none",
+              isPeakNow
+                ? "border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20"
+                : "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20",
+            )}
+            onClick={(e) => e.stopPropagation()}
+            title="View time-of-use rate details"
+          >
+            <Clock size={10} className="shrink-0" />
+            <span>{isPeakNow ? "Peak" : "Off-Peak"}</span>
+            <ChevronDown size={10} className="opacity-70" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-80 p-3 text-xs space-y-2.5" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center justify-between border-b border-border/50 pb-2">
+            <div className="flex items-center gap-1.5 font-semibold text-xs text-foreground">
+              <Clock size={13} className="text-warning" />
+              <span>Time-of-Use Rates</span>
+            </div>
+            <span
+              className={cn(
+                "rounded px-1.5 py-0.5 text-[10px] font-medium border",
+                isPeakNow
+                  ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                  : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+              )}
+            >
+              {isPeakNow ? "Peak Active" : "Off-Peak Active"}
+            </span>
+          </div>
+
+          <div className="space-y-1.5">
+            {pricingView?.offPeakPricing && (
+              <button
+                type="button"
+                onClick={() => onSelectTier("off-peak")}
+                className={cn(
+                  "w-full text-left rounded-lg p-2 transition-all border cursor-pointer",
+                  activeTierKey === "off-peak"
+                    ? "bg-emerald-500/10 border-emerald-500/30 text-foreground"
+                    : "bg-muted/15 border-border/40 hover:bg-muted/25 text-muted-foreground",
+                )}
+              >
+                <div className="flex items-center justify-between font-medium text-xs">
+                  <span className="flex items-center gap-1.5 text-foreground">
+                    <span className={cn("h-1.5 w-1.5 rounded-full", !isPeakNow ? "bg-emerald-400" : "bg-muted-foreground/40")} />
+                    Off-Peak Discount
+                  </span>
+                  <span className="text-[10px] text-emerald-400 font-mono">{!isPeakNow ? "● Current" : "Discount"}</span>
+                </div>
+                <div className="mt-1 flex items-center justify-between font-mono text-[11px]">
+                  <span>In: {pricingView.offPeakPricing.inputPerMillion}</span>
+                  <span>Cache: {pricingView.offPeakPricing.cachedInputPerMillion ?? "-"}</span>
+                  <span>Out: {pricingView.offPeakPricing.outputPerMillion}</span>
+                  <span className="text-[10px] font-sans text-muted-foreground">/ 1M {currency}</span>
+                </div>
+              </button>
+            )}
+
+            {pricingView?.pricing && (
+              <button
+                type="button"
+                onClick={() => onSelectTier("peak")}
+                className={cn(
+                  "w-full text-left rounded-lg p-2 transition-all border cursor-pointer",
+                  activeTierKey === "peak"
+                    ? "bg-amber-500/10 border-amber-500/30 text-foreground"
+                    : "bg-muted/15 border-border/40 hover:bg-muted/25 text-muted-foreground",
+                )}
+              >
+                <div className="flex items-center justify-between font-medium text-xs">
+                  <span className="flex items-center gap-1.5 text-foreground">
+                    <span className={cn("h-1.5 w-1.5 rounded-full", isPeakNow ? "bg-amber-400" : "bg-muted-foreground/40")} />
+                    Daytime Peak (Base)
+                  </span>
+                  <span className="text-[10px] font-mono text-muted-foreground">
+                    {formatPeakHours(pricingView.peakHours)}
+                  </span>
+                </div>
+                <div className="mt-1 flex items-center justify-between font-mono text-[11px]">
+                  <span>In: {pricingView.pricing.inputPerMillion}</span>
+                  <span>Cache: {pricingView.pricing.cachedInputPerMillion ?? "-"}</span>
+                  <span>Out: {pricingView.pricing.outputPerMillion}</span>
+                  <span className="text-[10px] font-sans text-muted-foreground">/ 1M {currency}</span>
+                </div>
+              </button>
+            )}
+          </div>
+
+          <p className="text-[10px] leading-relaxed text-muted-foreground">
+            Click a rate tier to preview values. Heimdall bills incoming requests automatically by arrival time.
+          </p>
+        </PopoverContent>
+      </Popover>
+    );
+  }
+
+  if (isTiered && pricingView?.tiers?.length) {
+    return (
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary hover:bg-primary/20 transition-colors cursor-pointer outline-none"
+            onClick={(e) => e.stopPropagation()}
+            title="View tiered pricing rules"
+          >
+            <Layers size={10} className="shrink-0" />
+            <span>Tiered · {tierBadge}</span>
+            <ChevronDown size={10} className="opacity-70" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-80 p-3 text-xs space-y-2.5" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center justify-between border-b border-border/50 pb-2">
+            <div className="flex items-center gap-1.5 font-semibold text-xs text-foreground">
+              <Layers size={13} className="text-primary" />
+              <span>Tiered Pricing Rules</span>
+            </div>
+            <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary border border-primary/20">
+              {pricingView.tiers.length} Tiers
+            </span>
+          </div>
+
+          <div className="space-y-1.5">
+            {pricingView.tiers.map((tier, idx) => {
+              const isCurrentActive = activeTierKey === String(idx);
+              const cond = cleanTierCondition(tier.condition);
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => onSelectTier(String(idx))}
+                  className={cn(
+                    "w-full text-left rounded-lg p-2 transition-all border cursor-pointer",
+                    isCurrentActive
+                      ? "bg-primary/10 border-primary/30 text-foreground"
+                      : "bg-muted/15 border-border/40 hover:bg-muted/25 text-muted-foreground",
+                  )}
+                >
+                  <div className="flex items-center justify-between font-medium text-xs">
+                    <span className="flex items-center gap-1.5 text-foreground">
+                      <span className={cn("h-1.5 w-1.5 rounded-full", isCurrentActive ? "bg-primary" : "bg-muted-foreground/40")} />
+                      {cond}
+                    </span>
+                    {tier.isBase && <span className="text-[10px] text-primary font-medium">Default Base</span>}
+                  </div>
+                  <div className="mt-1 flex items-center justify-between font-mono text-[11px]">
+                    <span>In: {tier.inputPerMillion}</span>
+                    <span>Cache: {tier.cachedInputPerMillion ?? "-"}</span>
+                    <span>Out: {tier.outputPerMillion}</span>
+                    <span className="text-[10px] font-sans text-muted-foreground">/ 1M {currency}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          <p className="text-[10px] leading-relaxed text-muted-foreground">
+            Requests exceeding token thresholds are billed at their matched tier. Click any tier to preview values.
+          </p>
+        </PopoverContent>
+      </Popover>
+    );
+  }
+
+  return null;
+}
+
 function PriceInput({
   label,
+  headerRight,
   value,
   onChange,
   numeric = false,
@@ -559,7 +870,8 @@ function PriceInput({
   readOnly = false,
   unavailable = false,
 }: {
-  label: string;
+  label: React.ReactNode;
+  headerRight?: React.ReactNode;
   value: string;
   onChange: (value: string) => void;
   numeric?: boolean;
@@ -569,14 +881,17 @@ function PriceInput({
 }) {
   return (
     <label className="flex min-w-0 flex-col gap-1.5">
-      <span className="text-xs font-semibold text-muted-foreground">{label}</span>
+      <div className="flex h-4 items-center justify-between gap-1.5 min-w-0">
+        <span className="shrink-0 text-xs font-semibold text-muted-foreground">{label}</span>
+        {headerRight}
+      </div>
       <Input
         value={value}
         inputMode={numeric ? "decimal" : "text"}
         placeholder={unavailable ? "N/A" : optional ? "Same as input" : ""}
         readOnly={readOnly}
         onChange={(event) => onChange(event.target.value)}
-        aria-label={label}
+        aria-label={typeof label === "string" ? label : undefined}
         className={unavailable ? "border-dashed opacity-55" : undefined}
       />
     </label>

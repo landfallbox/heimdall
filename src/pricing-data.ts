@@ -285,6 +285,90 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
           "inputPerMillion": 5,
           "cachedInputPerMillion": 0.5,
           "outputPerMillion": 30
+        },
+        "fake-tiered-demo": {
+          "pricing": {
+            "currency": "USD",
+            "inputPerMillion": 0.5,
+            "cachedInputPerMillion": 0.05,
+            "outputPerMillion": 2
+          },
+          "tiers": [
+            {
+              "condition": "0 < Token ≤ 256K",
+              "inputPerMillion": 0.5,
+              "cachedInputPerMillion": 0.05,
+              "outputPerMillion": 2,
+              "isBase": true
+            },
+            {
+              "condition": "256K < Token ≤ 1M",
+              "inputPerMillion": 1.5,
+              "cachedInputPerMillion": 0.15,
+              "outputPerMillion": 6
+            },
+            {
+              "condition": "Token > 1M",
+              "note": "超长上下文",
+              "inputPerMillion": 3,
+              "cachedInputPerMillion": 0.3,
+              "outputPerMillion": 12
+            }
+          ]
+        },
+        "qwen3.8-max-0902": {
+          "pricing": {
+            "currency": "CNY",
+            "inputPerMillion": 12,
+            "cachedInputPerMillion": 1.2,
+            "outputPerMillion": 36
+          },
+          "tiers": [
+            {
+              "condition": "0 < Token ≤ 256K",
+              "inputPerMillion": 12,
+              "cachedInputPerMillion": 1.2,
+              "outputPerMillion": 36,
+              "isBase": true
+            },
+            {
+              "condition": "256K < Token ≤ 1M",
+              "inputPerMillion": 24,
+              "cachedInputPerMillion": 2.4,
+              "outputPerMillion": 72
+            },
+            {
+              "condition": "Token > 1M",
+              "note": "超长文本阶梯",
+              "inputPerMillion": 48,
+              "cachedInputPerMillion": 4.8,
+              "outputPerMillion": 144
+            }
+          ]
+        },
+        "qwen-plus": {
+          "pricing": {
+            "currency": "CNY",
+            "inputPerMillion": 0.8,
+            "cachedInputPerMillion": 0.08,
+            "outputPerMillion": 2
+          },
+          "tiers": [
+            {
+              "condition": "0 < Token ≤ 128K",
+              "inputPerMillion": 0.8,
+              "cachedInputPerMillion": 0.08,
+              "outputPerMillion": 2,
+              "isBase": true
+            },
+            {
+              "condition": "Token > 128K",
+              "note": "长文本档",
+              "inputPerMillion": 1.6,
+              "cachedInputPerMillion": 0.16,
+              "outputPerMillion": 4
+            }
+          ]
         }
       }
     },
@@ -346,6 +430,34 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
             "inputPerMillion": 0.66,
             "cachedInputPerMillion": 0.022,
             "outputPerMillion": 1.98
+          }
+        },
+        "deepseek-chat": {
+          "peak": {
+            "currency": "CNY",
+            "inputPerMillion": 1,
+            "cachedInputPerMillion": 0.1,
+            "outputPerMillion": 2
+          },
+          "offPeak": {
+            "currency": "CNY",
+            "inputPerMillion": 0.5,
+            "cachedInputPerMillion": 0.05,
+            "outputPerMillion": 1
+          }
+        },
+        "deepseek-reasoner": {
+          "peak": {
+            "currency": "CNY",
+            "inputPerMillion": 2,
+            "cachedInputPerMillion": 0.2,
+            "outputPerMillion": 8
+          },
+          "offPeak": {
+            "currency": "CNY",
+            "inputPerMillion": 1,
+            "cachedInputPerMillion": 0.1,
+            "outputPerMillion": 4
           }
         }
       }

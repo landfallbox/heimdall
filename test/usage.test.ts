@@ -100,8 +100,8 @@ assert.deepEqual(estimateUsageCost(chatUsage, deepseekOffPeakPricing), {
 });
 
 assert.equal(resolveModelPricing("deepseek-v4-future", { mode: "deepseek" }), null);
-assert.equal(resolveModelPricing("deepseek-chat", { mode: "deepseek" }), null);
-assert.equal(resolveModelPricing("deepseek-reasoner", { mode: "deepseek" }), null);
+assert.equal(resolveModelPricing("deepseek-chat", { mode: "deepseek" })?.sourceModel, "deepseek-chat");
+assert.equal(resolveModelPricing("deepseek-reasoner", { mode: "deepseek" })?.sourceModel, "deepseek-reasoner");
 assert.equal(
   resolveModelPricing("deepseek-v4-flash", { mode: "deepseek" }, new Date("2026-08-16T04:00:00Z"))!.card,
   "off-peak",
@@ -127,7 +127,7 @@ assert.equal(deepseekView.offPeakPricing!.outputPerMillion, 0.6);
 assert.equal(getCatalogPriceView("deepseek", "deepseek-flash")!.sourceModel, "deepseek-flash");
 assert.deepEqual(deepseekView.peakHours, [[1, 4], [6, 10]]);
 assert.equal(getCatalogPriceView("deepseek", "not-a-deepseek-model"), null);
-assert.equal(getCatalogPriceView("deepseek", "deepseek-chat"), null);
+assert.equal(getCatalogPriceView("deepseek", "deepseek-chat")?.sourceModel, "deepseek-chat");
 assert.equal(getCatalogPriceView("unknown-catalog", "anything"), null);
 const openAIPricingView = getCatalogPriceView("openai", "gpt-5-mini-2025-08-07")!;
 assert.equal(openAIPricingView.sourceModel, "gpt-5-mini");

@@ -19,10 +19,22 @@ const rateCardSchema = z.object({
   peak: pricingSchema,
   offPeak: pricingSchema,
 });
+const pricingTierSchema = z.object({
+  condition: z.string().min(1),
+  note: z.string().min(1).optional(),
+  inputPerMillion: z.number().nonnegative(),
+  cachedInputPerMillion: z.number().nonnegative().nullable().optional(),
+  outputPerMillion: z.number().nonnegative(),
+  isBase: z.boolean().optional(),
+});
+const tieredPricingSchema = z.object({
+  pricing: pricingSchema,
+  tiers: z.array(pricingTierSchema).min(1),
+});
 const remoteCatalogEntrySchema = z.object({
   sourceUrl: z.string().min(1).optional(),
   updatedAt: z.string().min(1).optional(),
-  models: z.record(z.string(), rateCardSchema.or(pricingSchema)),
+  models: z.record(z.string(), rateCardSchema.or(tieredPricingSchema).or(pricingSchema)),
 });
 export const remotePricingSchema = z.object({
   schemaVersion: z.literal(1),

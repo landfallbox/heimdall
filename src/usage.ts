@@ -12,17 +12,42 @@ export interface RateCard {
   offPeak: Pricing;
 }
 
+export interface PricingTier {
+  condition: string;
+  note?: string;
+  inputPerMillion: number;
+  cachedInputPerMillion?: number | null;
+  outputPerMillion: number;
+  isBase?: boolean;
+}
+
+export interface TieredPricing {
+  pricing: Pricing;
+  tiers: PricingTier[];
+}
+
+export interface CatalogPriceView {
+  source: string;
+  sourceModel: string;
+  sourceUrl: string;
+  updatedAt: string;
+  peakHours: [number, number][] | null;
+  pricing: Pricing;
+  offPeakPricing: Pricing | null;
+  tiers?: PricingTier[] | null;
+}
+
 export interface PricingCatalog {
   sourceUrl: string;
   updatedAt: string;
   peakHours: [number, number][] | null;
-  models: Record<string, Pricing | RateCard>;
+  models: Record<string, Pricing | RateCard | TieredPricing>;
 }
 
 export interface RemotePricingCatalogEntry {
   sourceUrl?: string;
   updatedAt?: string;
-  models: Record<string, Pricing | RateCard>;
+  models: Record<string, Pricing | RateCard | TieredPricing>;
 }
 
 export interface RemotePricingData {
@@ -158,7 +183,7 @@ export function resolveModelPricing(model: string, pricingConfig: any, now = new
   };
 }
 
-export function getCatalogPriceView(catalogKey: string, modelId: string) {
+export function getCatalogPriceView(catalogKey: string, modelId: string): CatalogPriceView | null {
   const catalog = isPricingCatalogKey(catalogKey) ? PRICING_CATALOGS[catalogKey] : null;
   if (!catalog) {
     return null;
@@ -169,14 +194,16 @@ export function getCatalogPriceView(catalogKey: string, modelId: string) {
   }
   const entry = catalog.models[sourceModel];
   const hasRateCards = Boolean(catalog.peakHours && (entry as RateCard).peak && (entry as RateCard).offPeak);
+  const tiers = Array.isArray((entry as any).tiers) ? (entry as any).tiers : null;
   return {
     source: catalogKey,
     sourceModel,
     sourceUrl: catalog.sourceUrl,
     updatedAt: catalog.updatedAt,
     peakHours: hasRateCards ? catalog.peakHours : null,
-    pricing: hasRateCards ? (entry as RateCard).peak : (entry as Pricing),
+    pricing: hasRateCards ? (entry as RateCard).peak : ((entry as any).pricing ?? (entry as Pricing)),
     offPeakPricing: hasRateCards ? (entry as RateCard).offPeak : null,
+    tiers,
   };
 }
 
@@ -267,7 +294,7 @@ export function applyRemotePricing(data: RemotePricingData): { applied: number; 
   return { applied, catalogs: changed };
 }
 
-function findCatalogPriceModel(catalogModels: Record<string, Pricing | RateCard>, value: unknown): string | null {
+function findCatalogPriceModel(catalogModels: Record<string, Pricing | RateCard | TieredPricing>, value: unknown): string | null {
   const model = String(value || "").trim().toLowerCase();
   if (catalogModels[model]) {
     return model;
@@ -285,10 +312,16 @@ function resolveCatalogPricing(catalog: PricingCatalog, sourceModel: string, now
       ? { card: "peak", pricing: (entry as RateCard).peak }
       : { card: "off-peak", pricing: (entry as RateCard).offPeak };
   }
+  // Tiered entries carry the base tier in the top-level `pricing` field; cost
+  // estimation always uses that base tier (long-context requests are not
+  // tier-selected, by design).
+  if ((entry as TieredPricing).pricing) {
+    return { card: null, pricing: (entry as TieredPricing).pricing };
+  }
   return { card: null, pricing: entry as Pricing };
 }
 
-function isPeakHour(value: Date, peakHours: [number, number][]): boolean {
+export function isPeakHour(value: Date, peakHours: [number, number][]): boolean {
   const hour = new Date(value).getUTCHours();
   return peakHours.some(([start, end]) => hour >= start && hour < end);
 }

@@ -37,11 +37,17 @@ export function formatCosts(costs: Array<{ currency: string; amount: number }> |
     .join(" + ");
 }
 
-export function formatPeakHours(peakHours: number[][] | null | undefined) {
+// 峰谷窗口以 UTC 小时定义，展示时换算为用户本地时区（兼容半小时偏移）。
+export function formatPeakHours(peakHours: number[][] | null | undefined, now: Date = new Date()) {
   if (!Array.isArray(peakHours) || !peakHours.length) {
     return "";
   }
-  return `${peakHours
-    .map(([start, end]) => `${String(start).padStart(2, "0")}:00–${String(end).padStart(2, "0")}:00`)
-    .join(", ")} UTC`;
+  const offsetMinutes = -now.getTimezoneOffset();
+  const formatHour = (utcHour: number) => {
+    const total = (((utcHour * 60 + offsetMinutes) % 1440) + 1440) % 1440;
+    const hh = String(Math.floor(total / 60)).padStart(2, "0");
+    const mm = String(total % 60).padStart(2, "0");
+    return mm === "00" ? `${hh}:00` : `${hh}:${mm}`;
+  };
+  return peakHours.map(([start, end]) => `${formatHour(start)}–${formatHour(end)}`).join(", ");
 }

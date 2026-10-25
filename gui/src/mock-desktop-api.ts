@@ -34,7 +34,13 @@ interface MockConfig {
   vendors: Array<{
     name: string;
     baseUrl: string;
-    models: Array<{ id: string; enabled: boolean; pricing?: Record<string, unknown> }>;
+    models: Array<{
+      id: string;
+      enabled: boolean;
+      pricing?: Record<string, unknown>;
+      enableThinking?: boolean;
+      vscode?: Record<string, unknown>;
+    }>;
     authentication: string;
     apiKey?: string;
     apiKeyHeader: string;
@@ -59,27 +65,78 @@ const config: MockConfig = {
     fallbackStatusCodes: [408, 409, 425, 429, 500, 502, 503, 504],
     logFile: "logs/router.log",
   },
-  vendors: [
+    vendors: [
     {
-      name: "Mock Vendor",
-      baseUrl: "https://api.example.com/v1",
+      name: "Demo (Pricing Demo)",
+      baseUrl: "http://127.0.0.1:4100/v1",
       models: [
-        { id: "mock-large", enabled: true },
         {
-          id: "mock-small",
+          id: "deepseek-chat",
           enabled: true,
-          pricing: {
-            mode: "custom",
-            currency: "USD",
-            inputPerMillion: 1,
-            cachedInputPerMillion: 0.1,
-            outputPerMillion: 3,
-          },
+          pricing: { mode: "deepseek" },
+          vscode: { name: "DeepSeek-V3 (Time-of-Use)", toolCalling: true, contextWindow: 64000, maxOutputTokens: 8192 }
+        },
+        {
+          id: "qwen3.8-max-0902",
+          enabled: true,
+          pricing: { mode: "openai" },
+          vscode: { name: "Qwen3.8 Max (Tiered)", toolCalling: true, vision: true, contextWindow: 1000000, maxOutputTokens: 8192 }
+        },
+        {
+          id: "deepseek-reasoner",
+          enabled: true,
+          pricing: { mode: "deepseek" },
+          enableThinking: true,
+          vscode: { name: "DeepSeek-R1 (Time-of-Use Reasoning)", toolCalling: true, thinking: true, contextWindow: 64000, maxOutputTokens: 8192 }
+        },
+        {
+          id: "qwen-plus",
+          enabled: true,
+          pricing: { mode: "openai" },
+          vscode: { name: "Qwen Plus (Tiered)", toolCalling: true, contextWindow: 131072, maxOutputTokens: 8192 }
+        },
+        {
+          id: "fake-tiered-demo",
+          enabled: true,
+          pricing: { mode: "openai" },
+          vscode: { name: "Tiered Pricing Demo", toolCalling: true, contextWindow: 128000, maxOutputTokens: 16384 }
+        },
+        {
+          id: "gpt-5-mini",
+          enabled: true,
+          pricing: { mode: "openai" },
+          vscode: { name: "GPT-5 Mini (Standard)", toolCalling: true, contextWindow: 128000, maxOutputTokens: 16384 }
         },
       ],
       authentication: "api-key",
-      apiKey: "sk-mock",
-      apiKeyHeader: "authorization",
+      apiKey: "sk-demo-key-123456",
+      apiKeyHeader: "Authorization",
+      requestFormat: "chat-completions",
+      enabled: true,
+    },
+    {
+      name: "DeepSeek Official",
+      baseUrl: "https://api.deepseek.com/v1",
+      models: [
+        { id: "deepseek-chat", enabled: true, pricing: { mode: "deepseek" } },
+        { id: "deepseek-reasoner", enabled: true, pricing: { mode: "deepseek" }, enableThinking: true },
+      ],
+      authentication: "api-key",
+      apiKey: "sk-deepseek-mock",
+      apiKeyHeader: "Authorization",
+      requestFormat: "chat-completions",
+      enabled: true,
+    },
+    {
+      name: "Qwen DashScope",
+      baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      models: [
+        { id: "qwen3.8-max-0902", enabled: true, pricing: { mode: "openai" } },
+        { id: "qwen-plus", enabled: true, pricing: { mode: "openai" } },
+      ],
+      authentication: "api-key",
+      apiKey: "sk-qwen-mock",
+      apiKeyHeader: "Authorization",
       requestFormat: "chat-completions",
       enabled: true,
     },
@@ -199,8 +256,19 @@ if (!hasRealPreload) {
     cancelClose: async () => undefined,
     quitAndStop: async () => undefined,
     listVendorModels: async (vendor) => {
-      const models = (vendor as { models?: Array<{ id: string }> } | null)?.models ?? [];
-      return { models: models.map((model) => model.id) };
+      const vendorModels = (vendor as { models?: Array<{ id: string }> } | null)?.models?.map(m => m.id) ?? [];
+      const catalogModels = [
+        "deepseek-chat",
+        "deepseek-reasoner",
+        "deepseek-v4-flash",
+        "qwen3.8-max-0902",
+        "qwen-plus",
+        "fake-tiered-demo",
+        "gpt-5-mini",
+        "gpt-4o",
+        "claude-3-5-sonnet",
+      ];
+      return { models: [...new Set([...vendorModels, ...catalogModels])] };
     },
     startRouter: async () => {
       running = true;
@@ -266,3 +334,4 @@ if (!hasRealPreload) {
   window.heimdall = mock;
   console.info("[heimdall-mock] in-memory desktop API installed for browser preview");
 }
+
