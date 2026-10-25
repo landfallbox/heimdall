@@ -4,7 +4,7 @@ import type { RemotePricingData } from "./usage.ts";
 
 export const BUILTIN_PRICING_DATA: RemotePricingData = {
   "schemaVersion": 1,
-  "updatedAt": "2026-10-24",
+  "updatedAt": "2026-10-25",
   "catalogs": {
     "openai": {
       "sourceUrl": "https://developers.openai.com/api/docs/pricing",
@@ -285,36 +285,6 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
           "inputPerMillion": 5,
           "cachedInputPerMillion": 0.5,
           "outputPerMillion": 30
-        },
-        "fake-tiered-demo": {
-          "pricing": {
-            "currency": "USD",
-            "inputPerMillion": 0.5,
-            "cachedInputPerMillion": 0.05,
-            "outputPerMillion": 2
-          },
-          "tiers": [
-            {
-              "condition": "0 < Token ≤ 256K",
-              "inputPerMillion": 0.5,
-              "cachedInputPerMillion": 0.05,
-              "outputPerMillion": 2,
-              "isBase": true
-            },
-            {
-              "condition": "256K < Token ≤ 1M",
-              "inputPerMillion": 1.5,
-              "cachedInputPerMillion": 0.15,
-              "outputPerMillion": 6
-            },
-            {
-              "condition": "Token > 1M",
-              "note": "超长上下文",
-              "inputPerMillion": 3,
-              "cachedInputPerMillion": 0.3,
-              "outputPerMillion": 12
-            }
-          ]
         },
         "qwen3.8-max-0902": {
           "pricing": {

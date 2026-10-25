@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import { once } from "node:events";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { z } from "zod";
+import { BUILTIN_PRICING_DATA } from "../src/pricing-data.ts";
 import {
   applyRemotePricing,
   getCatalogPriceView,
@@ -79,6 +81,41 @@ async function waitFor(predicate: () => boolean, message: string, timeoutMs = 50
 }
 
 try {
+  // The published file must remain readable by clients predating tier support.
+  const source = JSON.parse(readFileSync(new URL("../data/pricing.json", import.meta.url), "utf8"));
+  const legacyPricingSchema = z.object({
+    currency: z.string().min(1),
+    inputPerMillion: z.number().nonnegative(),
+    cachedInputPerMillion: z.number().nonnegative().nullable(),
+    outputPerMillion: z.number().nonnegative(),
+  });
+  const legacySchema = z.object({
+    schemaVersion: z.literal(1),
+    updatedAt: z.string().min(1),
+    catalogs: z.record(z.string(), z.object({
+      sourceUrl: z.string().min(1).optional(),
+      updatedAt: z.string().min(1).optional(),
+      models: z.record(z.string(), z.object({
+        peak: legacyPricingSchema,
+        offPeak: legacyPricingSchema,
+      }).or(legacyPricingSchema)),
+    })),
+  });
+  const legacy = legacySchema.parse(source);
+  const current = parseRemotePricing(source);
+  assert.equal(source.schemaVersion, 1);
+  assert.deepEqual(current, BUILTIN_PRICING_DATA);
+  assert.equal(Object.hasOwn(source.catalogs.openai.models, "fake-tiered-demo"), false);
+  assert.equal(getCatalogPriceView("openai", "fake-tiered-demo"), null);
+  for (const id of ["qwen3.8-max-0902", "qwen-plus"]) {
+    const entry = source.catalogs.openai.models[id];
+    assert.deepEqual(legacy.catalogs.openai.models[id], entry.pricing);
+    assert.deepEqual(current.catalogs.openai.models[id], { pricing: entry.pricing, tiers: entry.tiers });
+    const view = getCatalogPriceView("openai", id)!;
+    assert.deepEqual(view.pricing, entry.pricing);
+    assert.deepEqual(view.tiers, entry.tiers);
+  }
+
   // --- applyRemotePricing merge semantics ---
   const beforeSol = getCatalogPriceView("openai", "gpt-5.6-sol")!.pricing;
   const applied = applyRemotePricing(remoteData("2026-11-01"));

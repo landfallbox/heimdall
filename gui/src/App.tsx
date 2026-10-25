@@ -141,6 +141,7 @@ export default function App() {
   const [configRevision, setConfigRevision] = useState("");
   const [configChanged, setConfigChanged] = useState(false);
   const [dataDirState, setDataDirState] = useState<DataDirState | null>(null);
+  const syncHashFromUrlRef = useRef<() => void>(() => {});
   const vendorModelsRequestRef = useRef(0);
   const vendorModelsSourceKeyRef = useRef("");
   const [railWidth, setRailWidth] = useState<number>(() => {
@@ -265,27 +266,33 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    function syncHashFromUrl() {
-      if (typeof window === "undefined") return;
-      const hash = window.location.hash.toLowerCase();
-      if (hash.includes("router")) {
-        setPage("router");
-        if (draft.vendors.length > 0 && vendorEditorIndex === null) {
-          openVendorEditor(0);
-        }
-      } else if (hash.includes("usage")) {
-        setPage("usage");
-      } else if (hash.includes("logs")) {
-        setPage("logs");
-      } else if (hash.includes("app") || hash === "#/") {
-        setPage("application");
+  // Keep hash events connected to the latest editor state without replaying navigation on edits.
+  syncHashFromUrlRef.current = () => {
+    if (typeof window === "undefined") return;
+    const hash = window.location.hash.toLowerCase();
+    if (hash.includes("router")) {
+      setPage("router");
+      if (draft.vendors.length > 0 && vendorEditorIndex === null) {
+        openVendorEditor(0);
       }
+    } else if (hash.includes("usage")) {
+      closeVendorEditor();
+      setPage("usage");
+    } else if (hash.includes("logs")) {
+      closeVendorEditor();
+      setPage("logs");
+    } else if (hash.includes("app") || hash === "#/") {
+      closeVendorEditor();
+      setPage("application");
     }
+  };
+
+  useEffect(() => {
+    const syncHashFromUrl = () => syncHashFromUrlRef.current();
     syncHashFromUrl();
     window.addEventListener("hashchange", syncHashFromUrl);
     return () => window.removeEventListener("hashchange", syncHashFromUrl);
-  }, [draft.vendors, vendorEditorIndex]);
+  }, []);
 
   useEffect(() => {
     const timer = window.setInterval(() => {

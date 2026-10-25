@@ -843,7 +843,7 @@ function SpecialPricingPopover({
           </div>
 
           <p className="text-[10px] leading-relaxed text-muted-foreground">
-            Requests exceeding token thresholds are billed at their matched tier. Click any tier to preview values.
+            Tiers are for reference. Heimdall estimates cost using the base tier. Click any tier to preview values.
           </p>
         </PopoverContent>
       </Popover>
@@ -873,7 +873,7 @@ function PriceInput({
   unavailable?: boolean;
 }) {
   return (
-    <label className="flex min-w-0 flex-col gap-1.5">
+    <div className="flex min-w-0 flex-col gap-1.5">
       <div className="flex h-4 items-center justify-between gap-1.5 min-w-0">
         <span className="shrink-0 text-xs font-semibold text-muted-foreground">{label}</span>
         {headerRight}
@@ -887,7 +887,7 @@ function PriceInput({
         aria-label={typeof label === "string" ? label : undefined}
         className={unavailable ? "border-dashed opacity-55" : undefined}
       />
-    </label>
+    </div>
   );
 }
 
