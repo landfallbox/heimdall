@@ -141,6 +141,7 @@ export default function App() {
   const [configRevision, setConfigRevision] = useState("");
   const [configChanged, setConfigChanged] = useState(false);
   const [dataDirState, setDataDirState] = useState<DataDirState | null>(null);
+  const syncHashFromUrlRef = useRef<() => void>(() => {});
   const vendorModelsRequestRef = useRef(0);
   const vendorModelsSourceKeyRef = useRef("");
   const [railWidth, setRailWidth] = useState<number>(() => {
@@ -265,6 +266,34 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Keep hash events connected to the latest editor state without replaying navigation on edits.
+  syncHashFromUrlRef.current = () => {
+    if (typeof window === "undefined") return;
+    const hash = window.location.hash.toLowerCase();
+    if (hash.includes("router")) {
+      setPage("router");
+      if (draft.vendors.length > 0 && vendorEditorIndex === null) {
+        openVendorEditor(0);
+      }
+    } else if (hash.includes("usage")) {
+      closeVendorEditor();
+      setPage("usage");
+    } else if (hash.includes("logs")) {
+      closeVendorEditor();
+      setPage("logs");
+    } else if (hash.includes("app") || hash === "#/") {
+      closeVendorEditor();
+      setPage("application");
+    }
+  };
+
+  useEffect(() => {
+    const syncHashFromUrl = () => syncHashFromUrlRef.current();
+    syncHashFromUrl();
+    window.addEventListener("hashchange", syncHashFromUrl);
+    return () => window.removeEventListener("hashchange", syncHashFromUrl);
+  }, []);
+
   useEffect(() => {
     const timer = window.setInterval(() => {
       void refreshHealth({ silent: true, fast: true });
@@ -324,6 +353,16 @@ export default function App() {
       setRestartRequired(false);
       setConfigChanged(false);
       configLoaded = true;
+      if (typeof window !== "undefined" && (window.location.hash.toLowerCase().includes("router") || window.location.search.toLowerCase().includes("router"))) {
+        setPage("router");
+        if (loadedDraft.vendors.length > 0) {
+          const firstVendor = cloneVendor(loadedDraft.vendors[0]);
+          setVendorEditorIndex(0);
+          setVendorEditorDraft(firstVendor);
+          setVendorEditorOriginal(cloneVendor(firstVendor));
+          setVendorEditorIsNew(false);
+        }
+      }
       if (toastMessage) {
         notify(toastMessage);
       }
@@ -849,7 +888,11 @@ export default function App() {
   }
 
   function navigateTo(target: PageId) {
-    closeVendorEditor();
+    if (target === "router" && draft.vendors.length > 0) {
+      openVendorEditor(0);
+    } else {
+      closeVendorEditor();
+    }
     setPage(target);
   }
 

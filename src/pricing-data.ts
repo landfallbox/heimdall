@@ -4,7 +4,7 @@ import type { RemotePricingData } from "./usage.ts";
 
 export const BUILTIN_PRICING_DATA: RemotePricingData = {
   "schemaVersion": 1,
-  "updatedAt": "2026-10-07",
+  "updatedAt": "2026-10-25",
   "catalogs": {
     "openai": {
       "sourceUrl": "https://developers.openai.com/api/docs/pricing",
@@ -285,25 +285,93 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
           "inputPerMillion": 5,
           "cachedInputPerMillion": 0.5,
           "outputPerMillion": 30
+        },
+        "qwen3.8-max-0902": {
+          "pricing": {
+            "currency": "CNY",
+            "inputPerMillion": 12,
+            "cachedInputPerMillion": 1.2,
+            "outputPerMillion": 36
+          },
+          "tiers": [
+            {
+              "condition": "0 < Token ≤ 256K",
+              "inputPerMillion": 12,
+              "cachedInputPerMillion": 1.2,
+              "outputPerMillion": 36,
+              "isBase": true
+            },
+            {
+              "condition": "256K < Token ≤ 1M",
+              "inputPerMillion": 24,
+              "cachedInputPerMillion": 2.4,
+              "outputPerMillion": 72
+            },
+            {
+              "condition": "Token > 1M",
+              "note": "超长文本阶梯",
+              "inputPerMillion": 48,
+              "cachedInputPerMillion": 4.8,
+              "outputPerMillion": 144
+            }
+          ]
+        },
+        "qwen-plus": {
+          "pricing": {
+            "currency": "CNY",
+            "inputPerMillion": 0.8,
+            "cachedInputPerMillion": 0.08,
+            "outputPerMillion": 2
+          },
+          "tiers": [
+            {
+              "condition": "0 < Token ≤ 128K",
+              "inputPerMillion": 0.8,
+              "cachedInputPerMillion": 0.08,
+              "outputPerMillion": 2,
+              "isBase": true
+            },
+            {
+              "condition": "Token > 128K",
+              "note": "长文本档",
+              "inputPerMillion": 1.6,
+              "cachedInputPerMillion": 0.16,
+              "outputPerMillion": 4
+            }
+          ]
         }
       }
     },
     "deepseek": {
       "sourceUrl": "https://api-docs.deepseek.com/quick_start/pricing",
-      "updatedAt": "2026-08-16",
+      "updatedAt": "2026-10-24",
       "models": {
-        "deepseek-v4-flash": {
+        "deepseek-flash": {
           "peak": {
             "currency": "CNY",
-            "inputPerMillion": 0.44,
-            "cachedInputPerMillion": 0.014,
-            "outputPerMillion": 1.32
+            "inputPerMillion": 0.3,
+            "cachedInputPerMillion": 0.006,
+            "outputPerMillion": 1.2
           },
           "offPeak": {
             "currency": "CNY",
-            "inputPerMillion": 0.22,
-            "cachedInputPerMillion": 0.007,
-            "outputPerMillion": 0.66
+            "inputPerMillion": 0.15,
+            "cachedInputPerMillion": 0.003,
+            "outputPerMillion": 0.6
+          }
+        },
+        "deepseek-v4-flash": {
+          "peak": {
+            "currency": "CNY",
+            "inputPerMillion": 0.3,
+            "cachedInputPerMillion": 0.006,
+            "outputPerMillion": 1.2
+          },
+          "offPeak": {
+            "currency": "CNY",
+            "inputPerMillion": 0.15,
+            "cachedInputPerMillion": 0.003,
+            "outputPerMillion": 0.6
           }
         },
         "deepseek-v4.1-flash": {
@@ -332,6 +400,34 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
             "inputPerMillion": 0.66,
             "cachedInputPerMillion": 0.022,
             "outputPerMillion": 1.98
+          }
+        },
+        "deepseek-chat": {
+          "peak": {
+            "currency": "CNY",
+            "inputPerMillion": 1,
+            "cachedInputPerMillion": 0.1,
+            "outputPerMillion": 2
+          },
+          "offPeak": {
+            "currency": "CNY",
+            "inputPerMillion": 0.5,
+            "cachedInputPerMillion": 0.05,
+            "outputPerMillion": 1
+          }
+        },
+        "deepseek-reasoner": {
+          "peak": {
+            "currency": "CNY",
+            "inputPerMillion": 2,
+            "cachedInputPerMillion": 0.2,
+            "outputPerMillion": 8
+          },
+          "offPeak": {
+            "currency": "CNY",
+            "inputPerMillion": 1,
+            "cachedInputPerMillion": 0.1,
+            "outputPerMillion": 4
           }
         }
       }
@@ -494,8 +590,14 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
     },
     "google": {
       "sourceUrl": "https://ai.google.dev/gemini-api/docs/pricing",
-      "updatedAt": "2026-10-01",
+      "updatedAt": "2026-10-24",
       "models": {
+        "gemini-4-argon": {
+          "currency": "USD",
+          "inputPerMillion": 2,
+          "cachedInputPerMillion": 0.1,
+          "outputPerMillion": 10
+        },
         "gemini-3.1-pro": {
           "currency": "USD",
           "inputPerMillion": 2,
@@ -572,8 +674,14 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
     },
     "kimi": {
       "sourceUrl": "https://platform.kimi.ai/docs/pricing/chat.md",
-      "updatedAt": "2026-09-20",
+      "updatedAt": "2026-10-24",
       "models": {
+        "kimi-k3.1-pro": {
+          "currency": "USD",
+          "inputPerMillion": 2,
+          "cachedInputPerMillion": 0.2,
+          "outputPerMillion": 10
+        },
         "kimi-k3": {
           "currency": "USD",
           "inputPerMillion": 3,

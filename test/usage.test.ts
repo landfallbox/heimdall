@@ -72,15 +72,20 @@ const deepseekPeakPricing = resolveModelPricing("deepseek-v4-flash", { mode: "de
 assert.equal(deepseekPeakPricing.source, "deepseek");
 assert.equal(deepseekPeakPricing.sourceModel, "deepseek-v4-flash");
 assert.equal(deepseekPeakPricing.card, "peak");
-assert.equal(deepseekPeakPricing.inputPerMillion, 0.44);
-assert.equal(deepseekPeakPricing.cachedInputPerMillion, 0.014);
-assert.equal(deepseekPeakPricing.outputPerMillion, 1.32);
+assert.equal(deepseekPeakPricing.inputPerMillion, 0.3);
+assert.equal(deepseekPeakPricing.cachedInputPerMillion, 0.006);
+assert.equal(deepseekPeakPricing.outputPerMillion, 1.2);
 assert.equal(deepseekPeakPricing.currency, "CNY");
 assert.deepEqual(estimateUsageCost(chatUsage, deepseekPeakPricing), {
-  amount: 0.00009935,
+  amount: 0.00008265,
   currency: "CNY",
   pricing: deepseekPeakPricing,
 });
+// The legacy name is retired but still accepted, billed at the same Flash price.
+assert.deepEqual(
+  resolveModelPricing("deepseek-flash", { mode: "deepseek" }, new Date("2026-08-16T02:00:00Z")),
+  { ...deepseekPeakPricing, sourceModel: "deepseek-flash" },
+);
 
 const deepseekOffPeakPricing = resolveModelPricing("deepseek-v4-pro", { mode: "deepseek" }, new Date("2026-08-16T12:00:00Z"))!;
 assert.equal(deepseekOffPeakPricing.card, "off-peak");
@@ -95,8 +100,8 @@ assert.deepEqual(estimateUsageCost(chatUsage, deepseekOffPeakPricing), {
 });
 
 assert.equal(resolveModelPricing("deepseek-v4-future", { mode: "deepseek" }), null);
-assert.equal(resolveModelPricing("deepseek-chat", { mode: "deepseek" }), null);
-assert.equal(resolveModelPricing("deepseek-reasoner", { mode: "deepseek" }), null);
+assert.equal(resolveModelPricing("deepseek-chat", { mode: "deepseek" })?.sourceModel, "deepseek-chat");
+assert.equal(resolveModelPricing("deepseek-reasoner", { mode: "deepseek" })?.sourceModel, "deepseek-reasoner");
 assert.equal(
   resolveModelPricing("deepseek-v4-flash", { mode: "deepseek" }, new Date("2026-08-16T04:00:00Z"))!.card,
   "off-peak",
@@ -113,21 +118,25 @@ assert.equal(
 const deepseekView = getCatalogPriceView("deepseek", "deepseek-v4-flash")!;
 assert.equal(deepseekView.source, "deepseek");
 assert.equal(deepseekView.sourceModel, "deepseek-v4-flash");
-assert.equal(deepseekView.pricing.inputPerMillion, 0.44);
-assert.equal(deepseekView.pricing.cachedInputPerMillion, 0.014);
-assert.equal(deepseekView.pricing.outputPerMillion, 1.32);
-assert.equal(deepseekView.offPeakPricing!.inputPerMillion, 0.22);
-assert.equal(deepseekView.offPeakPricing!.cachedInputPerMillion, 0.007);
-assert.equal(deepseekView.offPeakPricing!.outputPerMillion, 0.66);
+assert.equal(deepseekView.pricing.inputPerMillion, 0.3);
+assert.equal(deepseekView.pricing.cachedInputPerMillion, 0.006);
+assert.equal(deepseekView.pricing.outputPerMillion, 1.2);
+assert.equal(deepseekView.offPeakPricing!.inputPerMillion, 0.15);
+assert.equal(deepseekView.offPeakPricing!.cachedInputPerMillion, 0.003);
+assert.equal(deepseekView.offPeakPricing!.outputPerMillion, 0.6);
+assert.equal(getCatalogPriceView("deepseek", "deepseek-flash")!.sourceModel, "deepseek-flash");
 assert.deepEqual(deepseekView.peakHours, [[1, 4], [6, 10]]);
 assert.equal(getCatalogPriceView("deepseek", "not-a-deepseek-model"), null);
-assert.equal(getCatalogPriceView("deepseek", "deepseek-chat"), null);
+assert.equal(getCatalogPriceView("deepseek", "deepseek-chat")?.sourceModel, "deepseek-chat");
 assert.equal(getCatalogPriceView("unknown-catalog", "anything"), null);
 const openAIPricingView = getCatalogPriceView("openai", "gpt-5-mini-2025-08-07")!;
 assert.equal(openAIPricingView.sourceModel, "gpt-5-mini");
 assert.equal(openAIPricingView.pricing.inputPerMillion, 0.25);
 assert.equal(openAIPricingView.offPeakPricing, null);
 assert.equal(openAIPricingView.peakHours, null);
+assert.equal(getCatalogPriceView("deepseek", "deepseek-v4-flash-0731")!.sourceModel, "deepseek-v4-flash");
+assert.equal(getCatalogPriceView("deepseek", "deepseek-v4.1-flash-1017")!.sourceModel, "deepseek-v4.1-flash");
+assert.equal(getCatalogPriceView("deepseek", "deepseek-v4-pro-0813")!.sourceModel, "deepseek-v4-pro");
 
 const anthropicPricing = resolveModelPricing("claude-haiku-4.5", { mode: "anthropic" })!;
 assert.equal(anthropicPricing.source, "anthropic");

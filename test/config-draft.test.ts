@@ -181,7 +181,7 @@ assert.deepEqual(getVendorCircuitSummary({ models: [
 assert.equal(getVendorCircuitSummary({ models: [] }), null);
 
 assert.equal(suggestCatalogSwitch("openai", "deepseek-v4-flash"), "deepseek");
-assert.equal(suggestCatalogSwitch("openai", "deepseek-chat"), null);
+assert.equal(suggestCatalogSwitch("openai", "deepseek-chat"), "deepseek");
 assert.equal(suggestCatalogSwitch("openai", "claude-haiku-4.5"), "anthropic");
 assert.equal(suggestCatalogSwitch("anthropic", "gpt-5-mini"), "openai");
 assert.equal(suggestCatalogSwitch("unknown-mode" as never, "claude-sonnet-4.6"), "anthropic");
