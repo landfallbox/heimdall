@@ -396,13 +396,6 @@ function ModelPricingRow({
       ? cleanTierCondition(pricingView.tiers[Number(activeTierKey)]?.condition || "")
       : null;
 
-  const specialHint = isTimeWindow
-    ? (isPeakNow
-        ? "Currently in daytime peak hours; standard base rates apply."
-        : `Currently in off-peak hours (peak:  local time); promo discount rates active.`)
-    : isTiered
-      ? "Requests exceeding token thresholds are billed at their matched tier."
-      : null;
   const contextSummary = vscodeSummaryContext(model);
   const capabilitySummary = vscodeSummaryCapabilities(model);
 
