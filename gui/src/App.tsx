@@ -8,6 +8,7 @@ import {
   canLoadVendorModels,
   cloneVendor,
   endpointsFromDraft,
+  formatUserErrorMessage,
   getVendorModelsErrorField,
   getVendorModelsLoadMessage,
   getVendorModelsSourceKey,
@@ -185,11 +186,12 @@ export default function App() {
     if (!message) {
       return;
     }
+    const userMessage = kind === "error" ? formatUserErrorMessage(message) : message;
     if (kind === "error") {
-      toast.error(message);
+      toast.error(userMessage);
     } else {
       // info 类型会渲染前置图标，与错误通知的排版节奏保持一致
-      toast.info(message);
+      toast.info(userMessage);
     }
   }, []);
 
@@ -199,7 +201,8 @@ export default function App() {
       try {
         await action();
       } catch (error) {
-        notify((error as Error).message || String(error), "error");
+        console.error(`[App run:${name}] failed:`, error);
+        notify(formatUserErrorMessage(error), "error");
       } finally {
         setBusy("");
       }
@@ -328,7 +331,8 @@ export default function App() {
         notify(toastMessage);
       }
     } catch (error) {
-      notify((error as Error).message || String(error), "error");
+      console.error("[App configLoad] failed:", error);
+      notify(formatUserErrorMessage(error), "error");
     } finally {
       setBusy("");
       window.requestAnimationFrame(() => {
@@ -456,8 +460,9 @@ export default function App() {
       }
       return nextHealth;
     } catch (error) {
+      console.error("[App refreshHealth] failed:", error);
       if (!silent) {
-        notify((error as Error).message || String(error), "error");
+        notify(formatUserErrorMessage(error), "error");
       }
       return null;
     }

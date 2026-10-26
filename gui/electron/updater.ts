@@ -46,6 +46,33 @@ let pendingRelease: PendingRelease | null = null;
 let windowsInstallerPath = "";
 const stateListeners = new Set<(state: UpdateState) => void>();
 
+function formatUpdaterError(error: unknown, fallback: string): string {
+  if (!error) {
+    return fallback;
+  }
+  if (error instanceof Error && error.name === "AbortError") {
+    return "The update request timed out. Check your network and try again.";
+  }
+  const rawMessage = (error as Error)?.message || String(error);
+  if (
+    rawMessage.includes("fetch failed") ||
+    rawMessage.includes("ENOTFOUND") ||
+    rawMessage.includes("ECONNREFUSED") ||
+    rawMessage.includes("ECONNRESET") ||
+    rawMessage.includes("ETIMEDOUT") ||
+    rawMessage.includes("net::ERR_") ||
+    Boolean((error as { cause?: unknown })?.cause)
+  ) {
+    return "Failed to connect to the update server. Check your network and try again.";
+  }
+  const cleaned = rawMessage
+    .replace(/^Error invoking remote method '[^']+':\s*/i, "")
+    .replace(/^TypeError:\s*/i, "")
+    .replace(/^Error:\s*/i, "")
+    .trim();
+  return cleaned || fallback;
+}
+
 function getAutoUpdater(): AutoUpdater {
   if (!updater) {
     updater = electronUpdater.autoUpdater;
@@ -266,12 +293,9 @@ export async function checkForUpdates({ manual = false }: { manual?: boolean } =
     .catch((error: unknown) => {
       update({
         status: "error",
-        error: (error as Error)?.message || String(error),
+        error: formatUpdaterError(error, "Failed to check for updates."),
         progress: null,
       });
-      if (manual) {
-        throw error;
-      }
       return updateState;
     })
     .finally(() => {
@@ -291,7 +315,7 @@ async function checkForMacUpdates(): Promise<UpdateState> {
     .catch((error: unknown) => {
       update({
         status: "error",
-        error: (error as Error)?.message || String(error),
+        error: formatUpdaterError(error, "Failed to check for updates."),
         progress: null,
       });
       return updateState;
@@ -363,15 +387,21 @@ async function fetchLatestRelease(): Promise<Record<string, unknown>> {
       signal: controller.signal,
     });
     if (!response.ok) {
-      throw new Error(`Failed to fetch the latest release (HTTP ${response.status}).`);
+      if (response.status === 403) {
+        throw new Error("GitHub API rate limit exceeded. Please try again later.");
+      }
+      throw new Error(`Failed to check for updates (HTTP ${response.status}).`);
     }
 
     return (await response.json()) as Record<string, unknown>;
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
-      throw new Error("Timed out while fetching the latest release.");
+      throw new Error("Timed out while checking for updates. Check your network and try again.");
     }
-
+    const message = (error as Error)?.message || String(error);
+    if (message.includes("fetch failed") || Boolean((error as { cause?: unknown })?.cause)) {
+      throw new Error("Failed to connect to the update server. Check your network and try again.");
+    }
     throw error;
   } finally {
     clearTimeout(timeout);
@@ -419,10 +449,10 @@ export async function downloadUpdate(): Promise<UpdateState> {
     .catch((error: unknown) => {
       update({
         status: "error",
-        error: (error as Error)?.message || String(error),
+        error: formatUpdaterError(error, "Failed to download update."),
         progress: null,
       });
-      throw error;
+      return updateState;
     })
     .finally(() => {
       downloadPromise = null;
@@ -449,10 +479,10 @@ async function downloadMacUpdate(): Promise<UpdateState> {
     .catch((error: unknown) => {
       update({
         status: "error",
-        error: (error as Error)?.message || String(error),
+        error: formatUpdaterError(error, "Failed to download update."),
         progress: null,
       });
-      throw error;
+      return updateState;
     })
     .finally(() => {
       downloadPromise = null;
@@ -595,7 +625,11 @@ function toDownloadError(error: unknown, aborted: boolean): Error {
   if (aborted && error instanceof Error && error.name === "AbortError") {
     return new Error("The update download stalled and was cancelled. Check your network and try again.");
   }
-  return error instanceof Error ? error : new Error(String(error));
+  const message = (error as Error)?.message || String(error);
+  if (message.includes("fetch failed") || Boolean((error as { cause?: unknown })?.cause)) {
+    return new Error("Failed to connect to the update server. Check your network and try again.");
+  }
+  return error instanceof Error ? error : new Error(message);
 }
 
 function emitDownloadProgress(transferred: number, total: number, startedAt: number) {

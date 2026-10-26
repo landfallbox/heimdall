@@ -1489,8 +1489,13 @@ function registerIpcHandler(
       throw new Error(`Rejected IPC request from an untrusted sender: ${channel}`);
     }
     const parsedArgs = parseIpcRequest(channel, args) as unknown[];
-    const response = await handler(event, ...parsedArgs);
-    return parseIpcResponse(channel, response);
+    try {
+      const response = await handler(event, ...parsedArgs);
+      return parseIpcResponse(channel, response);
+    } catch (error) {
+      console.error(`[IPC ${channel}] handler failed:`, error);
+      throw error;
+    }
   });
 }
 

@@ -214,11 +214,57 @@ export function validateVendor(vendor: VendorLike): ValidationResult {
   return { errors, warnings, fields, hasErrors: errors.length > 0 };
 }
 
+export function formatUserErrorMessage(error: unknown, fallback = "An unexpected error occurred."): string {
+  if (!error) {
+    return fallback;
+  }
+
+  const rawMessage = String((error as { message?: unknown })?.message || error || "").trim();
+  if (!rawMessage) {
+    return fallback;
+  }
+
+  let cleaned = rawMessage
+    .replace(/^Error invoking remote method '[^']+':\s*/i, "")
+    .replace(/^(?:Uncaught\s+)?(?:TypeError|Error):\s*/i, "")
+    .replace(/^Error:\s*/i, "")
+    .trim();
+
+  const jsonMsg = cleaned.match(/"message"\s*:\s*"([^"]+)"/i)?.[1];
+  if (jsonMsg) {
+    cleaned = jsonMsg;
+  }
+
+  if (/fetch failed/i.test(cleaned) || /failed to fetch/i.test(cleaned)) {
+    return "Network request failed. Check your network connection and try again.";
+  }
+  if (/ECONNREFUSED/i.test(cleaned) || /connection refused/i.test(cleaned)) {
+    return "Connection refused. The server or service is not reachable.";
+  }
+  if (/ENOTFOUND/i.test(cleaned) || /getaddrinfo/i.test(cleaned)) {
+    return "Server address could not be resolved. Check your network connection.";
+  }
+  if (/ETIMEDOUT/i.test(cleaned) || /timed?\s*out/i.test(cleaned) || /AbortError/i.test(cleaned)) {
+    return "Request timed out. Please check your network and try again.";
+  }
+  if (/ECONNRESET/i.test(cleaned) || /socket hang up/i.test(cleaned)) {
+    return "Connection was reset by the server. Please try again.";
+  }
+  if (/EACCES/i.test(cleaned) || /EPERM/i.test(cleaned) || /permission denied/i.test(cleaned)) {
+    return "Permission denied. Check file or folder permissions.";
+  }
+  if (/ENOENT/i.test(cleaned) || /no such file or directory/i.test(cleaned)) {
+    return "File or directory not found.";
+  }
+
+  return cleaned || fallback;
+}
+
 export function getVendorModelsErrorField(error: unknown, vendor: VendorLike): { field: string; message: string } {
   const rawMessage = String((error as { message?: unknown })?.message || error || "Failed to refresh models.");
   const jsonCode = rawMessage.match(/"code"\s*:\s*"([^"]+)"/i)?.[1] || "";
   const code = String((error as { code?: unknown })?.code || jsonCode || "").toUpperCase();
-  const message = code ? code.replace(/_/g, " ") : rawMessage.replace(/^Error invoking remote method '[^']+':\s*/i, "").replace(/^Error:\s*/i, "");
+  const message = code ? code.replace(/_/g, " ") : formatUserErrorMessage(error, rawMessage);
   if (code.includes("API_KEY") || code.includes("AUTH") || code.includes("UNAUTHORIZED") || /api key|unauthorized|forbidden/i.test(message)) {
     if (vendor?.authentication !== "api-key") {
       return { field: "authentication", message: "API KEY REQUIRED" };
