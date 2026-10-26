@@ -40,6 +40,7 @@ import {
   getVendorModels,
 } from "../config-draft.ts";
 import { getDesktopApi } from "../desktop-api.ts";
+import { getModelInfo } from "../../../src/model-info.ts";
 import {
   getCatalogPriceView,
   isPeakHour,
@@ -428,6 +429,33 @@ function ModelPricingRow({
             const switchTo = suggestCatalogSwitch(model.pricingMode, modelId);
             if (switchTo) {
               onUpdateVendorModel(index, "pricingMode", switchTo);
+            }
+            // Auto-fill VS Code metadata for the selected model. Merges into the
+            // pre-change draft so user-entered values are never overwritten.
+            const info = getModelInfo(modelId);
+            if (info) {
+              const next: VendorModelVsCodeDraft = { ...(model.vscode || {}) };
+              let changed = false;
+              const setIfEmpty = (key: keyof VendorModelVsCodeDraft, val: unknown) => {
+                const current = next[key];
+                if (val !== undefined && (current === undefined || current === "")) {
+                  (next as Record<string, unknown>)[key] = val;
+                  changed = true;
+                }
+              };
+              setIfEmpty("name", info.displayName);
+              setIfEmpty("contextWindow", info.contextWindow != null ? String(info.contextWindow) : undefined);
+              setIfEmpty("maxOutputTokens", info.maxOutputTokens != null ? String(info.maxOutputTokens) : undefined);
+              setIfEmpty("toolCalling", info.capabilities?.toolCalling);
+              setIfEmpty("vision", info.capabilities?.vision);
+              setIfEmpty("thinking", info.capabilities?.thinking);
+              if (info.supportsReasoningEffort?.length && !next.supportsReasoningEffort?.length) {
+                next.supportsReasoningEffort = info.supportsReasoningEffort;
+                changed = true;
+              }
+              if (changed) {
+                onUpdateVendorModel(index, "vscode", Object.keys(next).length ? next : undefined);
+              }
             }
           }}
           onOpenChange={(open) => {

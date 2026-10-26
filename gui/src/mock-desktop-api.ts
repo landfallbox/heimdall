@@ -288,6 +288,7 @@ if (!hasRealPreload) {
       daily: [],
     }),
     loadPricingCache: async () => ({ ok: false, data: null }),
+    loadModelInfoCache: async () => ({ ok: false, data: null }),
     openConfig: async () => undefined,
     openLog: async () => undefined,
     getDataDirState: async () => ({

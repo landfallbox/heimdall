@@ -1,3 +1,4 @@
+import type { RemoteModelInfoData } from "../../src/model-info.ts";
 import type { RemotePricingData } from "../../src/usage.ts";
 import type { HealthState, LogPage, UpdateState, UsageSummary } from "./types.ts";
 
@@ -41,6 +42,11 @@ export interface PricingCacheResult {
   data: RemotePricingData | null;
 }
 
+export interface ModelInfoCacheResult {
+  ok: boolean;
+  data: RemoteModelInfoData | null;
+}
+
 export interface DataDirState {
   dataDir: string;
   defaultDataDir: string;
@@ -75,6 +81,7 @@ export interface HeimdallDesktopApi {
   readLogs(options?: { limit?: number; before?: number | null }): Promise<LogPage>;
   readUsageSummary(options?: { vendor?: string; model?: string }): Promise<UsageSummary>;
   loadPricingCache(): Promise<PricingCacheResult>;
+  loadModelInfoCache(): Promise<ModelInfoCacheResult>;
   openConfig(): Promise<void>;
   openLog(): Promise<void>;
   getDataDirState(): Promise<DataDirState>;

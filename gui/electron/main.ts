@@ -8,6 +8,7 @@ import { basename, dirname, isAbsolute, join, normalize, relative, resolve } fro
 import { fileURLToPath } from "node:url";
 import { DEFAULT_CONFIG, normalizeConfig } from "../../src/config.ts";
 import { getChatCompletionsUrl, getRouterBaseUrl } from "../../src/router-urls.ts";
+import { loadModelInfoCache } from "../../src/model-info-updater.ts";
 import { loadPricingCache } from "../../src/pricing-updater.ts";
 import { readUsageSummary } from "../../src/usage-store.ts";
 import { readConfigStore, revisionFor, writeConfigStore } from "./config-store.ts";
@@ -1023,6 +1024,11 @@ async function readPricingCache() {
   return { ok: true, data: loadPricingCache(paths.dataDir) };
 }
 
+async function readModelInfoCache() {
+  const { paths } = await loadConfig();
+  return { ok: true, data: loadModelInfoCache(paths.dataDir) };
+}
+
 function clampNumber(value: unknown, fallback: number, min: number, max: number): number {
   const number = Number(value);
   if (!Number.isFinite(number)) {
@@ -1552,6 +1558,7 @@ registerIpcHandler("router:health", (_event, options) => getHealth(null, options
 registerIpcHandler("logs:read", readLogs);
 registerIpcHandler("usage:summary", readUsage);
 registerIpcHandler("pricing:loadCache", readPricingCache);
+registerIpcHandler("model-info:loadCache", readModelInfoCache);
 registerIpcHandler("file:openConfig", openConfigFile);
 registerIpcHandler("file:openLog", openLogFile);
 registerIpcHandler("dataDir:getState", getDataDirState);
