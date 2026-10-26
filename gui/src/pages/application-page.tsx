@@ -53,7 +53,7 @@ export function AppSettingsPage({
   const checking = status === "checking";
   const downloading = status === "downloading";
   const newVersion = updateState.availableVersion ? `v${updateState.availableVersion}` : "";
-  const showsNewVersion = Boolean(newVersion) && ["available", "downloading", "downloaded"].includes(status);
+  const showsNewVersion = Boolean(newVersion) && ["available", "downloading", "downloaded", "error"].includes(status);
   const statusPhrase = !supported
     ? "Updates are only available in packaged builds."
     : status === "checking"
@@ -67,7 +67,7 @@ export function AppSettingsPage({
             : status === "not-available"
               ? "You are on the latest version"
               : status === "error"
-                ? "Update check failed"
+                ? (updateState.availableVersion ? "Update download failed" : "Update check failed")
                 : updateState.lastCheckedAt
                   ? `Last checked ${new Date(updateState.lastCheckedAt).toLocaleTimeString()}`
                   : "Not checked yet";
@@ -145,10 +145,16 @@ export function AppSettingsPage({
             Updates
           </CardTitle>
           <CardAction className="flex items-center gap-2">
-            {status === "available" && (
-              <Button type="button" size="sm" onClick={onDownloadUpdate} disabled={downloading} title="Download the new version now.">
-                {downloading ? <RefreshCw className="animate-spin" size={14} /> : <Download size={14} />}
-                Update now
+            {(status === "available" || (status === "error" && Boolean(updateState.availableVersion))) && (
+              <Button
+                type="button"
+                size="sm"
+                onClick={onDownloadUpdate}
+                disabled={downloading}
+                title={status === "error" ? updateState.error || "Retry downloading the update." : "Download the new version now."}
+              >
+                {downloading ? <RefreshCw className="animate-spin" size={14} /> : status === "error" ? <RefreshCw size={14} /> : <Download size={14} />}
+                {status === "error" ? "Retry download" : "Update now"}
               </Button>
             )}
             {status === "downloaded" && (
@@ -178,7 +184,7 @@ export function AppSettingsPage({
             </span>
             {showsNewVersion && <span className="shrink-0 text-[13px] text-muted-foreground/50">→</span>}
             {showsNewVersion && <span className="shrink-0 font-mono text-[13px] font-medium text-foreground">{newVersion}</span>}
-            <span className="truncate text-[13px] text-muted-foreground">{statusPhrase}</span>
+            <span className="truncate text-[13px] text-muted-foreground" title={status === "error" ? updateState.error : undefined}>{statusPhrase}</span>
           </div>
           {downloading && (
             <div className="h-1.5 overflow-hidden rounded-full bg-muted">

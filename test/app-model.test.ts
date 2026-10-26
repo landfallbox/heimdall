@@ -4,6 +4,7 @@ import {
   cloneVendor,
   endpointsFromDraft,
   formatLogTime,
+  formatUserErrorMessage,
   getVendorModelOptions,
   getVendorModelsErrorField,
   getVendorModelsLoadMessage,
@@ -90,5 +91,38 @@ assert.equal(parseLogRows("single").length, 0);
 assert.equal(formatLogTime(""), "");
 assert.equal(formatLogTime("not-a-date"), "not-a-date");
 assert.notEqual(formatLogTime("2026-01-01T00:00:00Z"), "");
+
+assert.equal(
+  formatUserErrorMessage("Error invoking remote method 'update:download': TypeError: fetch failed"),
+  "Network request failed. Check your network connection and try again.",
+);
+assert.equal(
+  formatUserErrorMessage(new Error("Error invoking remote method 'vendor:listModels': Error: connect ECONNREFUSED 127.0.0.1:8000")),
+  "Connection refused. The server or service is not reachable.",
+);
+assert.equal(
+  formatUserErrorMessage("Error invoking remote method 'update:check': Error: getaddrinfo ENOTFOUND api.github.com"),
+  "Server address could not be resolved. Check your network connection.",
+);
+assert.equal(
+  formatUserErrorMessage("Error: Request timed out"),
+  "Request timed out. Please check your network and try again.",
+);
+assert.equal(
+  formatUserErrorMessage("EPERM: operation not permitted"),
+  "Permission denied. Check file or folder permissions.",
+);
+assert.equal(
+  formatUserErrorMessage("ENOENT: no such file or directory"),
+  "File or directory not found.",
+);
+assert.equal(
+  formatUserErrorMessage("Invalid port number"),
+  "Invalid port number",
+);
+assert.equal(
+  formatUserErrorMessage(null),
+  "An unexpected error occurred.",
+);
 
 console.log("app-model tests passed");

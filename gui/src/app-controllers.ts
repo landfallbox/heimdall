@@ -90,7 +90,7 @@ export function usePricingCache() {
   return { pricingUpdatedAt };
 }
 
-export function useUpdateController({ run, setToast }: { run: (name: string, action: () => Promise<void>) => Promise<void>; setToast: (toast: string) => void }) {
+export function useUpdateController({ run, setToast }: { run: (name: string, action: () => Promise<void>) => Promise<void>; setToast: (toast: string, kind?: "info" | "error") => void }) {
   const [updateState, setUpdateState] = useState<UpdateState>(defaultUpdateState);
 
   useEffect(() => {
@@ -114,7 +114,8 @@ export function useUpdateController({ run, setToast }: { run: (name: string, act
     await run("updateCheck", async () => {
       const state = await getDesktopApi().checkForUpdates({ manual: true });
       setUpdateState(state);
-      setToast(updateToastForState(state, "Update check completed."));
+      const isError = state?.status === "error";
+      setToast(updateToastForState(state, "Update check completed."), isError ? "error" : "info");
     });
   }
 
@@ -122,7 +123,8 @@ export function useUpdateController({ run, setToast }: { run: (name: string, act
     await run("updateDownload", async () => {
       const state = await getDesktopApi().downloadUpdate();
       setUpdateState(state);
-      setToast(updateToastForState(state, "Update download started."));
+      const isError = state?.status === "error";
+      setToast(updateToastForState(state, "Update download started."), isError ? "error" : "info");
     });
   }
 
@@ -130,7 +132,8 @@ export function useUpdateController({ run, setToast }: { run: (name: string, act
     await run("updateInstall", async () => {
       const state = await getDesktopApi().installUpdate();
       setUpdateState(state);
-      setToast(updateToastForState(state, "Installing update."));
+      const isError = state?.status === "error";
+      setToast(updateToastForState(state, "Installing update."), isError ? "error" : "info");
     });
   }
 
