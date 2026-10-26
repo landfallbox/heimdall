@@ -291,8 +291,13 @@ export async function checkForUpdates({ manual = false }: { manual?: boolean } =
 
   checkingPromise = checkForWindowsUpdates()
     .catch((error: unknown) => {
+      console.error("[Updater] check failed:", error);
+      pendingRelease = null;
       update({
         status: "error",
+        availableVersion: "",
+        releaseName: "",
+        releaseNotes: "",
         error: formatUpdaterError(error, "Failed to check for updates."),
         progress: null,
       });
@@ -313,8 +318,12 @@ async function checkForMacUpdates(): Promise<UpdateState> {
   checkingPromise = getAutoUpdater().checkForUpdates()
     .then(() => updateState)
     .catch((error: unknown) => {
+      console.error("[Updater] check failed:", error);
       update({
         status: "error",
+        availableVersion: "",
+        releaseName: "",
+        releaseNotes: "",
         error: formatUpdaterError(error, "Failed to check for updates."),
         progress: null,
       });
@@ -387,7 +396,7 @@ async function fetchLatestRelease(): Promise<Record<string, unknown>> {
       signal: controller.signal,
     });
     if (!response.ok) {
-      if (response.status === 403) {
+      if (response.status === 403 && response.headers.get("x-ratelimit-remaining") === "0") {
         throw new Error("GitHub API rate limit exceeded. Please try again later.");
       }
       throw new Error(`Failed to check for updates (HTTP ${response.status}).`);
@@ -447,6 +456,7 @@ export async function downloadUpdate(): Promise<UpdateState> {
   downloadPromise = downloadWindowsInstaller(release)
     .then(() => updateState)
     .catch((error: unknown) => {
+      console.error("[Updater] download failed:", error);
       update({
         status: "error",
         error: formatUpdaterError(error, "Failed to download update."),
@@ -477,6 +487,7 @@ async function downloadMacUpdate(): Promise<UpdateState> {
   downloadPromise = getAutoUpdater().downloadUpdate()
     .then(() => updateState)
     .catch((error: unknown) => {
+      console.error("[Updater] download failed:", error);
       update({
         status: "error",
         error: formatUpdaterError(error, "Failed to download update."),
