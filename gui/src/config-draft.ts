@@ -226,7 +226,11 @@ function normalizeVsCodeDraft(value: unknown): VendorModelVsCodeDraft | undefine
   }
   const raw = value as Record<string, unknown>;
   const draft: VendorModelVsCodeDraft = {};
-  const name = String(raw.name || "").trim();
+  // Keep the name verbatim (no trim) while editing: the display-name input is
+  // controlled, so trimming here would eat the trailing space the user just
+  // typed. Trimming happens at the save/load boundary (toVsCodeConfig /
+  // normalizeModelVsCodeMetadata) instead.
+  const name = String(raw.name || "");
   if (name) {
     draft.name = name;
   }
