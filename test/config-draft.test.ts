@@ -247,6 +247,30 @@ const emptyVsCodeDraft = toDraft(normalizeConfig({
 emptyVsCodeDraft.vendors[0]!.models![0]!.vscode = { name: "", contextWindow: "" };
 assert.equal(toConfig(emptyVsCodeDraft).vendors[0]!.models![0]!.vscode, undefined);
 
+// The display name keeps spaces verbatim while editing (the input is
+// controlled, so trimming the draft would eat the space the user just typed),
+// and is trimmed again at the save boundary.
+assert.equal(normalizeVendorModelsForDraft({
+  models: [{ id: "model-id", vscode: { name: "DeepSeek " } }],
+})[0].vscode?.name, "DeepSeek ");
+const spacedVsCodeDraft = toDraft(normalizeConfig({
+  router: { apiKey: "test-token" },
+  vendors: [{
+    name: "local",
+    baseUrl: "http://127.0.0.1:8000/v1",
+    models: [{ id: "model-id", enabled: true }],
+  }],
+}));
+spacedVsCodeDraft.vendors[0]!.models![0]!.vscode = { name: " DeepSeek " };
+assert.equal(toConfig(spacedVsCodeDraft).vendors[0]!.models![0]!.vscode?.name, "DeepSeek");
+// A space-only name is still editable state, so it survives in the draft and
+// is dropped only when the config is written.
+assert.equal(normalizeVendorModelsForDraft({
+  models: [{ id: "model-id", vscode: { name: "   " } }],
+})[0].vscode?.name, "   ");
+spacedVsCodeDraft.vendors[0]!.models![0]!.vscode = { name: "   " };
+assert.equal(toConfig(spacedVsCodeDraft).vendors[0]!.models![0]!.vscode, undefined);
+
 // The sync toggle round-trips through the app section.
 assert.equal(toConfig(toDraft(normalizeConfig({
   router: { apiKey: "test-token" },
