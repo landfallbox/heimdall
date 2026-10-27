@@ -1,5 +1,6 @@
-import { getVendorModels, type ConfigVendorInput, type Draft, type PricingMode, type VendorDraft, type VendorModelDraft } from "./config-draft.ts";
+import { getVendorModels, type ConfigVendorInput, type Draft, type PricingMode, type VendorDraft, type VendorModelDraft, type VendorModelVsCodeDraft, type VendorModelVsCodeModelCache } from "./config-draft.ts";
 import { getCatalogPriceView, isPricingCatalogKey, PRICING_CATALOG_KEYS } from "../../src/usage.ts";
+import type { ModelInfo } from "../../src/model-info.ts";
 import type { LogEntry, Tone, VendorHealth } from "./types.ts";
 
 export interface FieldIssue {
@@ -131,6 +132,102 @@ export function suggestCatalogSwitch(pricingMode: unknown, modelId: string): Pri
     }
   }
   return null;
+}
+
+export interface ModelSwitchResult {
+  vscode: VendorModelVsCodeDraft | undefined;
+  vscodeModelCache?: Record<string, VendorModelVsCodeModelCache>;
+  pricingMode?: PricingMode;
+  pricingCurrency?: string;
+  inputPerMillion?: string;
+  cachedInputPerMillion?: string;
+  outputPerMillion?: string;
+}
+
+/**
+ * Computes the row state after switching a model row from `oldId` to `newId`.
+ * The outgoing row's VS Code section and custom pricing are snapshotted into
+ * the per-model cache (keyed by the old id) so an unsaved row can be switched
+ * back without losing edits. If the incoming id has a snapshot it is restored;
+ * otherwise the VS Code section is filled fresh from the model info and the
+ * custom pricing fields are cleared.
+ */
+export function applyModelSwitch(
+  model: VendorModelDraft,
+  newId: string,
+  info: ModelInfo | null,
+): ModelSwitchResult {
+  const oldId = String(model.id || "").trim();
+  const cache = { ...(model.vscodeModelCache || {}) };
+  const result: ModelSwitchResult = { vscode: undefined };
+
+  if (oldId && oldId !== newId) {
+    const snapshot: VendorModelVsCodeModelCache = {};
+    if (model.vscode && Object.keys(model.vscode).length) {
+      snapshot.vscode = { ...model.vscode };
+    }
+    if (model.pricingMode === "custom") {
+      const pricing: NonNullable<VendorModelVsCodeModelCache["customPricing"]> = {};
+      const currency = String(model.pricingCurrency ?? "").trim();
+      const input = String(model.inputPerMillion ?? "");
+      const cached = String(model.cachedInputPerMillion ?? "");
+      const output = String(model.outputPerMillion ?? "");
+      if (currency) pricing.currency = currency;
+      if (input) pricing.inputPerMillion = input;
+      if (cached) pricing.cachedInputPerMillion = cached;
+      if (output) pricing.outputPerMillion = output;
+      if (Object.keys(pricing).length) {
+        snapshot.pricingMode = "custom";
+        snapshot.customPricing = pricing;
+      }
+    }
+    if (Object.keys(snapshot).length) {
+      cache[oldId] = { ...cache[oldId], ...snapshot };
+    }
+  }
+
+  const stored = newId ? cache[newId] : undefined;
+  if (stored) {
+    delete cache[newId];
+    result.vscode = stored.vscode ? { ...stored.vscode } : undefined;
+    if (stored.pricingMode) {
+      result.pricingMode = stored.pricingMode;
+    }
+    if (stored.customPricing) {
+      if (stored.customPricing.currency) {
+        result.pricingCurrency = stored.customPricing.currency;
+      }
+      result.inputPerMillion = stored.customPricing.inputPerMillion ?? "";
+      result.cachedInputPerMillion = stored.customPricing.cachedInputPerMillion ?? "";
+      result.outputPerMillion = stored.customPricing.outputPerMillion ?? "";
+    }
+  } else {
+    const next: VendorModelVsCodeDraft = {};
+    const setIfEmpty = (key: keyof VendorModelVsCodeDraft, val: unknown) => {
+      const current = next[key];
+      if (val !== undefined && (current === undefined || current === "")) {
+        (next as Record<string, unknown>)[key] = val;
+      }
+    };
+    setIfEmpty("name", info?.displayName);
+    setIfEmpty("contextWindow", info?.contextWindow != null ? String(info.contextWindow) : undefined);
+    setIfEmpty("maxOutputTokens", info?.maxOutputTokens != null ? String(info.maxOutputTokens) : undefined);
+    setIfEmpty("toolCalling", info?.capabilities?.toolCalling);
+    setIfEmpty("vision", info?.capabilities?.vision);
+    setIfEmpty("thinking", info?.capabilities?.thinking);
+    if (info?.supportsReasoningEffort?.length) {
+      next.supportsReasoningEffort = info.supportsReasoningEffort;
+    }
+    result.vscode = Object.keys(next).length ? next : undefined;
+    result.inputPerMillion = "";
+    result.cachedInputPerMillion = "";
+    result.outputPerMillion = "";
+  }
+
+  if (Object.keys(cache).length) {
+    result.vscodeModelCache = cache;
+  }
+  return result;
 }
 
 export function getVendorCircuitSummary(vendorHealth: VendorHealth | undefined): { tone: Tone; label: string } | null {

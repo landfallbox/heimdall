@@ -19,6 +19,23 @@ export interface VendorModelVsCodeDraft {
   supportsReasoningEffort?: ReasoningEffortLevel[];
 }
 
+/**
+ * Per-model-id snapshot of the editable VSCode section and custom pricing, kept
+ * in the draft only (stripped by toConfig). Lets the user switch models back
+ * and forth without losing unsaved edits.
+ */
+export interface VendorModelVsCodeModelCache {
+  vscode?: VendorModelVsCodeDraft;
+  /** Only stored when the row was in custom mode, so a round-trip switch restores it. */
+  pricingMode?: PricingMode;
+  customPricing?: {
+    currency?: string;
+    inputPerMillion?: string;
+    cachedInputPerMillion?: string;
+    outputPerMillion?: string;
+  };
+}
+
 export interface VendorModelDraft {
   id: string;
   enabled: boolean;
@@ -36,6 +53,7 @@ export interface VendorModelDraft {
     cachedInputPerMillion?: number | string;
     outputPerMillion?: number | string;
   };
+  vscodeModelCache?: Record<string, VendorModelVsCodeModelCache>;
   [key: string]: unknown;
 }
 

@@ -24,6 +24,7 @@ import { SegmentedControl } from "../components/segmented-control.tsx";
 import { formatCompactTokenCount, formatPeakHours, formatTokenCount } from "../lib/format.ts";
 import { cn } from "../lib/utils.ts";
 import {
+  applyModelSwitch,
   getVendorModelOptions,
   getVendorModelsLoadMessage,
   isValidCustomPricing,
@@ -425,38 +426,33 @@ function ModelPricingRow({
         <Select
           value={model.id || undefined}
           onValueChange={(modelId) => {
+            const oldId = String(model.id || "").trim();
+            if (modelId === oldId) {
+              return;
+            }
             onUpdateVendorModel(index, "id", modelId);
             const switchTo = suggestCatalogSwitch(model.pricingMode, modelId);
             if (switchTo) {
               onUpdateVendorModel(index, "pricingMode", switchTo);
             }
-            // Auto-fill VS Code metadata for the selected model. Merges into the
-            // pre-change draft so user-entered values are never overwritten.
-            const info = getModelInfo(modelId);
-            if (info) {
-              const next: VendorModelVsCodeDraft = { ...(model.vscode || {}) };
-              let changed = false;
-              const setIfEmpty = (key: keyof VendorModelVsCodeDraft, val: unknown) => {
-                const current = next[key];
-                if (val !== undefined && (current === undefined || current === "")) {
-                  (next as Record<string, unknown>)[key] = val;
-                  changed = true;
-                }
-              };
-              setIfEmpty("name", info.displayName);
-              setIfEmpty("contextWindow", info.contextWindow != null ? String(info.contextWindow) : undefined);
-              setIfEmpty("maxOutputTokens", info.maxOutputTokens != null ? String(info.maxOutputTokens) : undefined);
-              setIfEmpty("toolCalling", info.capabilities?.toolCalling);
-              setIfEmpty("vision", info.capabilities?.vision);
-              setIfEmpty("thinking", info.capabilities?.thinking);
-              if (info.supportsReasoningEffort?.length && !next.supportsReasoningEffort?.length) {
-                next.supportsReasoningEffort = info.supportsReasoningEffort;
-                changed = true;
-              }
-              if (changed) {
-                onUpdateVendorModel(index, "vscode", Object.keys(next).length ? next : undefined);
-              }
+            // Snapshot the outgoing row (VS Code section + custom pricing) into
+            // the per-model cache, then restore the incoming model's snapshot
+            // or fill the VS Code section fresh from the model info. A restored
+            // snapshot's pricing mode/currency override the auto-detected one.
+            const next = applyModelSwitch(model, modelId, getModelInfo(modelId));
+            if (next.pricingMode) {
+              onUpdateVendorModel(index, "pricingMode", next.pricingMode);
             }
+            if (next.pricingCurrency !== undefined) {
+              onUpdateVendorModel(index, "pricingCurrency", next.pricingCurrency);
+            }
+            if (next.vscodeModelCache) {
+              onUpdateVendorModel(index, "vscodeModelCache", next.vscodeModelCache);
+            }
+            onUpdateVendorModel(index, "vscode", next.vscode);
+            onUpdateVendorModel(index, "inputPerMillion", next.inputPerMillion ?? "");
+            onUpdateVendorModel(index, "cachedInputPerMillion", next.cachedInputPerMillion ?? "");
+            onUpdateVendorModel(index, "outputPerMillion", next.outputPerMillion ?? "");
           }}
           onOpenChange={(open) => {
             if (open) {
