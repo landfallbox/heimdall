@@ -33,6 +33,9 @@ export async function parse(content, ctx) {
 }
 
 export function parseDetail(markdown, path) {
+  // Normalize CRLF so line-anchored regexes work regardless of the
+  // line endings in the fetched (or checked-out) markdown.
+  markdown = markdown.replace(/\r\n/g, "\n");
   const ids = extractModelCodes(markdown, path);
   if (ids.length === 0) return {};
 
