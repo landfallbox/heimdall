@@ -30,8 +30,20 @@ export async function parse(content) {
     if (contextWindow !== null) model.contextWindow = contextWindow;
     const maxOutputTokens = parseTokenValue(outputCells[i]?.text);
     if (maxOutputTokens !== null) model.maxOutputTokens = maxOutputTokens;
-    if ((thinkingCells[i]?.text ?? "").length > 0) model.capabilities = { thinking: true };
+    if (isAffirmative(thinkingCells[i]?.text)) model.capabilities = { thinking: true };
     models[id] = model;
   }
   return models;
+}
+
+// The Thinking cell is parsed, not just checked for presence: an explicit
+// negative ("No", "Not supported", ...) means the model does not support
+// thinking, while any other non-empty value (e.g. "Adaptive") is treated as
+// supported.
+const THINKING_NEGATIVE_RE = /\b(no|not supported|unsupported|disabled|none|without)\b/i;
+
+function isAffirmative(text) {
+  const value = (text ?? "").trim();
+  if (!value) return false;
+  return !THINKING_NEGATIVE_RE.test(value);
 }

@@ -1,6 +1,6 @@
 // Shared helpers for the model-info refresh scripts: fetching, token-value
 // parsing, and the merge logic for data/model-info.json.
-import { parseRemoteModelInfo } from "../../src/model-info-updater.ts";
+import { parseRemoteModelInfo } from "../../src/model-info-schema.ts";
 
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
@@ -213,11 +213,10 @@ export function mergeModelInfo(existing, vendorScrapes) {
       continue;
     }
 
-    for (const id of baseline) {
-      if (!scrapedIds.has(id)) keptRetired.push(id);
-    }
-    if (keptRetired.length > 0) {
-      warnings.push(`${vendor}: keeping retired models: ${[...keptRetired].sort().join(", ")}`);
+    const retiredForVendor = [...baseline].filter((id) => !scrapedIds.has(id));
+    if (retiredForVendor.length > 0) {
+      keptRetired.push(...retiredForVendor);
+      warnings.push(`${vendor}: keeping retired models: ${[...retiredForVendor].sort().join(", ")}`);
     }
 
     for (const [id, incoming] of Object.entries(scraped)) {

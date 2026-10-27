@@ -12,11 +12,12 @@ const BASE = "https://docs.bigmodel.cn";
 const HREF_RE = /\/cn\/guide\/models\/(?:text|vlm|image-generation|audio|embedding|rerank|ocr)\/[a-z0-9._-]+/g;
 
 export async function parse(content, ctx) {
-  const paths = [...new Set([...content.matchAll(HREF_RE)].map((m) => m[0]))];
+  // Normalize to extension-less paths: live sidebar hrefs carry a ".md"
+  // suffix, fixtures do not.
+  const paths = [...new Set([...content.matchAll(HREF_RE)].map((m) => m[0].replace(/\.md$/, "")))];
   const models = {};
   for (const path of paths) {
-    // Live sidebar hrefs already carry the ".md" suffix; fixtures do not.
-    const url = `${BASE}${path.endsWith(".md") ? path : `${path}.md`}`;
+    const url = `${BASE}${path}.md`;
     let detail;
     try {
       detail = await ctx.fetchText(url);

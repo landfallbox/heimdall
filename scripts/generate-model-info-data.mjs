@@ -7,7 +7,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseRemoteModelInfo } from "../src/model-info-updater.ts";
+import { parseRemoteModelInfo } from "../src/model-info-schema.ts";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const sourcePath = join(root, "data", "model-info.json");

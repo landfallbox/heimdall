@@ -58,15 +58,26 @@ export function getModelInfoUpdatedAt(): string {
 export function applyModelInfo(data: RemoteModelInfoData): { applied: number; updatedAt: string } {
   let applied = 0;
   if (data && typeof data === "object") {
-    if (typeof data.updatedAt === "string" && data.updatedAt.trim()) {
-      MODEL_INFO.updatedAt = data.updatedAt.trim();
+    const incoming = typeof data.updatedAt === "string" ? data.updatedAt.trim() : "";
+    // A cache/remote payload older than the built-in data (e.g. after an app
+    // upgrade shipped newer built-ins) must not downgrade the in-memory record.
+    if (incoming && incoming < MODEL_INFO.updatedAt) {
+      return { applied: 0, updatedAt: MODEL_INFO.updatedAt };
+    }
+    if (incoming) {
+      MODEL_INFO.updatedAt = incoming;
     }
     if (data.models && typeof data.models === "object") {
       for (const [id, entry] of Object.entries(data.models)) {
         if (!id || !entry || typeof entry !== "object") {
           continue;
         }
-        MODEL_INFO.models[id] = { ...MODEL_INFO.models[id], ...entry };
+        const current = MODEL_INFO.models[id];
+        const next: ModelInfo = { ...current, ...entry };
+        if (entry.capabilities && current?.capabilities) {
+          next.capabilities = { ...current.capabilities, ...entry.capabilities };
+        }
+        MODEL_INFO.models[id] = next;
         applied += 1;
       }
     }

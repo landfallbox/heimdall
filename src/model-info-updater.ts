@@ -1,54 +1,22 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { z } from "zod";
 import { applyModelInfo, type RemoteModelInfoData } from "./model-info.ts";
 import type { Logger } from "./logger.ts";
+
+// The validation schema lives in model-info-schema.ts (which does not import
+// the generated model-info-data.ts) so data/model-info.json can be validated
+// even when the generated file is missing. Re-exported for compatibility.
+export { remoteModelInfoSchema, parseRemoteModelInfo } from "./model-info-schema.ts";
+import { parseRemoteModelInfo } from "./model-info-schema.ts";
 
 export const MODEL_INFO_CACHE_FILENAME = "model-info-cache.json";
 export const MODEL_INFO_REMOTE_URL = "https://raw.githubusercontent.com/landfallbox/heimdall/main/data/model-info.json";
 export const MODEL_INFO_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const MODEL_INFO_FETCH_TIMEOUT_MS = 8000;
 
-const REASONING_EFFORT_LEVELS = ["none", "low", "medium", "high", "xhigh", "max"] as const;
-
-const capabilitiesSchema = z
-  .object({
-    toolCalling: z.boolean().optional(),
-    vision: z.boolean().optional(),
-    thinking: z.boolean().optional(),
-  })
-  .strict();
-
-const modelInfoEntrySchema = z
-  .object({
-    displayName: z.string().min(1).optional(),
-    contextWindow: z.number().int().positive().optional(),
-    maxOutputTokens: z.number().int().positive().optional(),
-    capabilities: capabilitiesSchema.optional(),
-    supportsReasoningEffort: z.array(z.enum(REASONING_EFFORT_LEVELS)).min(1).optional(),
-  })
-  .strict();
-
-export const remoteModelInfoSchema = z.object({
-  schemaVersion: z.literal(1),
-  updatedAt: z.string().min(1),
-  models: z.record(z.string(), modelInfoEntrySchema),
-});
-
 export function resolveModelInfoRemoteUrl(): string {
   const override = String(process.env.HEIMDALL_MODEL_INFO_URL || "").trim();
   return override || MODEL_INFO_REMOTE_URL;
-}
-
-export function parseRemoteModelInfo(value: unknown): RemoteModelInfoData {
-  const result = remoteModelInfoSchema.safeParse(value);
-  if (!result.success) {
-    const details = result.error.issues
-      .map((issue) => `${issue.path.length ? issue.path.join(".") : "value"}: ${issue.message}`)
-      .join("; ");
-    throw new Error(`Invalid remote model info data: ${details}`);
-  }
-  return result.data as RemoteModelInfoData;
 }
 
 export function loadModelInfoCache(dataDir: string): RemoteModelInfoData | null {
@@ -112,7 +80,14 @@ export async function refreshModelInfo({ dataDir, logger, url = resolveModelInfo
   }
 
   const cache = loadModelInfoCache(dataDir);
-  if (cache && cache.updatedAt >= data.updatedAt) {
+  if (cache && cache.updatedAt > data.updatedAt) {
+    return { status: "unchanged", updatedAt: cache.updatedAt };
+  }
+  if (
+    cache &&
+    cache.updatedAt === data.updatedAt &&
+    JSON.stringify(cache.models) === JSON.stringify(data.models)
+  ) {
     return { status: "unchanged", updatedAt: cache.updatedAt };
   }
 
@@ -155,6 +130,8 @@ export function startModelInfoRefresh({ dataDir, logger, intervalMs = MODEL_INFO
     inFlight = true;
     try {
       await refreshModelInfo({ dataDir, logger, url });
+    } catch (error) {
+      logger?.warn("model_info_refresh_tick_failed", { error: (error as Error).message || String(error) });
     } finally {
       inFlight = false;
     }

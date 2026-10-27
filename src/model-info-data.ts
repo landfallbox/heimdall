@@ -32,7 +32,7 @@ export const BUILTIN_MODEL_INFO_DATA: RemoteModelInfoData = {
       "maxOutputTokens": 32768,
       "capabilities": {
         "toolCalling": true,
-        "vision": false,
+        "vision": true,
         "thinking": false
       }
     },
@@ -42,7 +42,7 @@ export const BUILTIN_MODEL_INFO_DATA: RemoteModelInfoData = {
       "maxOutputTokens": 32768,
       "capabilities": {
         "toolCalling": true,
-        "vision": false,
+        "vision": true,
         "thinking": false
       }
     },
@@ -52,7 +52,7 @@ export const BUILTIN_MODEL_INFO_DATA: RemoteModelInfoData = {
       "maxOutputTokens": 32768,
       "capabilities": {
         "toolCalling": true,
-        "vision": false,
+        "vision": true,
         "thinking": false
       }
     },
@@ -152,7 +152,7 @@ export const BUILTIN_MODEL_INFO_DATA: RemoteModelInfoData = {
       "maxOutputTokens": 4096,
       "capabilities": {
         "toolCalling": true,
-        "vision": false,
+        "vision": true,
         "thinking": false
       }
     },
@@ -162,7 +162,7 @@ export const BUILTIN_MODEL_INFO_DATA: RemoteModelInfoData = {
       "maxOutputTokens": 4096,
       "capabilities": {
         "toolCalling": true,
-        "vision": false,
+        "vision": true,
         "thinking": false
       }
     },
@@ -193,7 +193,7 @@ export const BUILTIN_MODEL_INFO_DATA: RemoteModelInfoData = {
       "capabilities": {
         "toolCalling": true,
         "vision": true,
-        "thinking": false
+        "thinking": true
       }
     }
   }

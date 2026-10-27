@@ -66,14 +66,16 @@ export function parseDetail(html) {
   }
 
   const effort = extractReasoningEffort(html);
-  const tools = toolsSection(html);
+  const functionCalling = functionCallingSupported(html);
   const image = />Image<\/div><div class="text-xs text-tertiary">([^<]+)<\/div>/.exec(html);
 
   const capabilities = {};
-  if (tools !== null) {
-    // Older pages (e.g. gpt-4o) have no Tools section at all; leave the
-    // existing value untouched in that case.
-    capabilities.toolCalling = /Supported</.test(tools);
+  if (functionCalling !== null) {
+    // Function calling is listed in the Features section, separate from the
+    // Tools section (web search, file search, ...). Only its own value decides
+    // toolCalling; a page without a Features/Function calling row leaves the
+    // existing value untouched.
+    capabilities.toolCalling = functionCalling;
   }
   if (image) capabilities.vision = !/^not supported$/i.test(image[1].trim());
   if (effort.length > 0) capabilities.thinking = true;
@@ -100,13 +102,27 @@ function extractReasoningEffort(html) {
   return REASONING_EFFORT_LEVELS.filter((level) => levels.includes(level));
 }
 
-// The Tools section runs from the "Tools" section label to the next section
-// label (or a bounded window at the end of the page). Returns null when the
-// page has no Tools section.
-function toolsSection(html) {
-  const label = /<div class="flex w-\[200px\]">Tools<\/div>/.exec(html);
-  if (!label) return null;
-  const start = label.index;
-  const next = html.indexOf('w-[200px]', start + label[0].length);
+// Reads the "Function calling" row of the Features section. Returns true/false
+// for an explicit Supported / Not supported value, or null when the page has
+// no Features section or no Function calling row.
+function functionCallingSupported(html) {
+  const section = sectionSlice(html, "Features");
+  if (section === null) return null;
+  const match = /Function calling<\/div>\s*<div class="text-xs text-tertiary">([^<]+)<\/div>/.exec(section);
+  if (!match) return null;
+  const value = match[1].trim();
+  if (/^not supported$/i.test(value)) return false;
+  if (/^supported$/i.test(value)) return true;
+  return null;
+}
+
+// Returns the HTML slice from a section label to the next section label (or a
+// bounded window at the end of the page), or null when the section is absent.
+function sectionSlice(html, label) {
+  const re = new RegExp(`<div class="flex w-\\[200px\\]">${label}</div>`);
+  const match = re.exec(html);
+  if (!match) return null;
+  const start = match.index;
+  const next = html.indexOf('w-[200px]', start + match[0].length);
   return html.slice(start, next > start ? next : start + 30000);
 }

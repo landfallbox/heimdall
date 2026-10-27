@@ -130,10 +130,19 @@ try {
   }
 
   // --- resolveModelInfoRemoteUrl env override ---
-  assert.equal(resolveModelInfoRemoteUrl(), MODEL_INFO_REMOTE_URL);
-  process.env.HEIMDALL_MODEL_INFO_URL = "http://127.0.0.1:9/custom.json";
-  assert.equal(resolveModelInfoRemoteUrl(), "http://127.0.0.1:9/custom.json");
+  const savedEnvUrl = process.env.HEIMDALL_MODEL_INFO_URL;
   delete process.env.HEIMDALL_MODEL_INFO_URL;
+  try {
+    assert.equal(resolveModelInfoRemoteUrl(), MODEL_INFO_REMOTE_URL);
+    process.env.HEIMDALL_MODEL_INFO_URL = "http://127.0.0.1:9/custom.json";
+    assert.equal(resolveModelInfoRemoteUrl(), "http://127.0.0.1:9/custom.json");
+  } finally {
+    if (savedEnvUrl === undefined) {
+      delete process.env.HEIMDALL_MODEL_INFO_URL;
+    } else {
+      process.env.HEIMDALL_MODEL_INFO_URL = savedEnvUrl;
+    }
+  }
 
   // --- startModelInfoRefresh applies cache and refreshes immediately ---
   const refreshDir = join(tempDir, "refresh");

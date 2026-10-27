@@ -38,6 +38,15 @@ type ScrapedModels = Record<string, ScrapedModel>;
   }
 }
 
+// --- anthropic parser: negative Thinking cell ---
+{
+  const models = (await anthropic.parse(fixture("anthropic-thinking-negative.html"))) as ScrapedModels;
+  assert.deepEqual(Object.keys(models).sort(), ["claude-affirm-1-0", "claude-neg-1-0"]);
+  assert.deepEqual(models["claude-affirm-1-0"].capabilities, { thinking: true });
+  // "No" must not be treated as thinking support.
+  assert.equal(models["claude-neg-1-0"].capabilities, undefined);
+}
+
 // --- deepseek parser ---
 {
   const models = (await deepseek.parse(fixture("deepseek.html"))) as ScrapedModels;
@@ -179,6 +188,9 @@ type ScrapedModels = Record<string, ScrapedModel>;
   // Plain-text effort wording with "(default)" annotations, including "none".
   const sol = openai.parseDetail(fixture("openai-gpt-5.6-sol.html")) as ScrapedModel;
   assert.deepEqual(sol.supportsReasoningEffort, ["none", "low", "medium", "high", "xhigh", "max"]);
+  // The Tools section lists other supported tools, but Function calling is
+  // "Not supported" in the Features section, so toolCalling must be false.
+  assert.deepEqual(sol.capabilities, { toolCalling: false, vision: true, thinking: true });
 
   // Old-style page: no Tools section and no effort -> toolCalling/thinking
   // are omitted so the merge keeps the existing values.

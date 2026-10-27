@@ -241,6 +241,9 @@ async function main() {
     run("git", ["add", "data/model-info.json", "src/model-info-data.ts"]);
     const commitMessage = `chore(model-info): refresh model info from official docs\n\nadded: ${added.join(", ")}\nmodified: ${modified.join(", ")}\nkept retired: ${keptRetired.join(", ") || "-"}\n\nwarnings:\n${warnings.map((w) => `- ${w}`).join("\n") || "- none"}`;
     run("git", ["commit", "-m", commitMessage]);
+    // checkout -B reuses the dated branch name on a same-day rerun, so force
+    // the push; gh pr create does not push in non-interactive mode.
+    run("git", ["push", "--force", "--set-upstream", "origin", branch]);
     const prBody = [
       "Automatic refresh of `data/model-info.json` from official model documentation.",
       "",
@@ -253,6 +256,7 @@ async function main() {
     ].join("\n");
     run("gh", [
       "pr", "create",
+      "--head", branch,
       "--title", `chore(model-info): refresh model info ${date}`,
       "--body", prBody,
     ]);
