@@ -1,6 +1,6 @@
 export type CloseBehavior = "tray" | "exit" | "ask";
 export type RequestFormat = "chat-completions" | "responses" | "embeddings" | "custom";
-export type PricingMode = "openai" | "deepseek" | "anthropic" | "google" | "kimi" | "glm" | "mimo" | "custom";
+export type PricingMode = "openai" | "deepseek" | "anthropic" | "google" | "kimi" | "glm" | "mimo" | "minimax" | "stepfun" | "qwen" | "custom";
 export type Authentication = "none" | "api-key";
 
 export type ReasoningEffortLevel = "none" | "low" | "medium" | "high" | "xhigh" | "max";
@@ -180,13 +180,13 @@ export const REASONING_EFFORT_LEVELS: ReasoningEffortLevel[] = ["none", "low", "
 const closeBehaviorValues = new Set<CloseBehavior>(["tray", "exit", "ask"]);
 const requestFormatValues = new Set<RequestFormat>(["chat-completions", "responses", "embeddings", "custom"]);
 const pricingModeValues = new Set<PricingMode>([
-  "openai", "deepseek", "anthropic", "google", "kimi", "glm", "mimo", "custom",
+  "openai", "deepseek", "anthropic", "google", "kimi", "glm", "mimo", "minimax", "stepfun", "qwen", "custom",
 ]);
 
-export type CatalogPricing = Extract<PricingMode, "openai" | "deepseek" | "anthropic" | "google" | "kimi" | "glm" | "mimo">;
+export type CatalogPricing = Extract<PricingMode, "openai" | "deepseek" | "anthropic" | "google" | "kimi" | "glm" | "mimo" | "minimax" | "stepfun" | "qwen">;
 
 const CATALOG_PRICING_MODES: CatalogPricing[] = [
-  "openai", "deepseek", "anthropic", "google", "kimi", "glm", "mimo",
+  "openai", "deepseek", "anthropic", "google", "kimi", "glm", "mimo", "minimax", "stepfun", "qwen",
 ];
 
 export function normalizeRequestFormat(value: unknown): RequestFormat {

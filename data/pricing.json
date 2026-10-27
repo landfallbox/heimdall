@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-10-25",
+  "updatedAt": "2026-10-27",
   "catalogs": {
     "openai": {
       "sourceUrl": "https://developers.openai.com/api/docs/pricing",
@@ -797,7 +797,7 @@
       }
     },
     "mimo": {
-      "sourceUrl": "https://mimo.mi.com/docs/zh-CN/pricing",
+      "sourceUrl": "https://mimo.mi.com/static/docs/price/pay-as-you-go.md",
       "updatedAt": "2026-10-06",
       "models": {
         "mimo-v2.6-pro": {
@@ -829,6 +829,1058 @@
           "inputPerMillion": 1,
           "cachedInputPerMillion": 0.02,
           "outputPerMillion": 2
+        }
+      }
+    },
+    "minimax": {
+      "sourceUrl": "https://platform.minimaxi.com/document/pricing",
+      "updatedAt": "2026-10-27",
+      "models": {
+        "MiniMax-M3.1-Flash": {
+          "currency": "CNY",
+          "inputPerMillion": 1,
+          "cachedInputPerMillion": 0.1,
+          "outputPerMillion": 4
+        },
+        "MiniMax-M3": {
+          "currency": "CNY",
+          "inputPerMillion": 2.1,
+          "cachedInputPerMillion": 0.42,
+          "outputPerMillion": 8.4,
+          "pricing": {
+            "currency": "CNY",
+            "inputPerMillion": 2.1,
+            "cachedInputPerMillion": 0.42,
+            "outputPerMillion": 8.4
+          },
+          "tiers": [
+            {
+              "condition": "≤ 512k 输入 tokens",
+              "isBase": true,
+              "inputPerMillion": 2.1,
+              "cachedInputPerMillion": 0.42,
+              "outputPerMillion": 8.4
+            },
+            {
+              "condition": "> 512k 输入 tokens",
+              "inputPerMillion": 4.2,
+              "cachedInputPerMillion": 0.84,
+              "outputPerMillion": 16.8
+            }
+          ]
+        }
+      }
+    },
+    "stepfun": {
+      "sourceUrl": "https://platform.stepfun.com/docs/zh/guides/pricing/details.md",
+      "updatedAt": "2026-10-27",
+      "models": {
+        "step-5-preview": {
+          "currency": "CNY",
+          "inputPerMillion": 7,
+          "cachedInputPerMillion": 0.7,
+          "outputPerMillion": 20
+        },
+        "step-3.7-flash": {
+          "currency": "CNY",
+          "inputPerMillion": 1.35,
+          "cachedInputPerMillion": 0.27,
+          "outputPerMillion": 8.1
+        },
+        "step-3.5-flash": {
+          "currency": "CNY",
+          "inputPerMillion": 0.7,
+          "cachedInputPerMillion": 0.14,
+          "outputPerMillion": 2.1
+        },
+        "step-3.5-flash-2603": {
+          "currency": "CNY",
+          "inputPerMillion": 0.7,
+          "cachedInputPerMillion": 0.14,
+          "outputPerMillion": 2.1
+        },
+        "step-1o-turbo-vision": {
+          "currency": "CNY",
+          "inputPerMillion": 2.5,
+          "cachedInputPerMillion": 0.5,
+          "outputPerMillion": 8
+        }
+      }
+    },
+    "qwen": {
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/model-pricing",
+      "updatedAt": "2026-10-27",
+      "models": {
+        "qwen3.8-max": {
+          "currency": "CNY",
+          "inputPerMillion": 12,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 36
+        },
+        "qwen3.8-max-0902": {
+          "currency": "CNY",
+          "inputPerMillion": 12,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 36
+        },
+        "qwen3.7-max": {
+          "currency": "CNY",
+          "inputPerMillion": 12,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 36
+        },
+        "qwen3.7-max-2026-06-08": {
+          "currency": "CNY",
+          "inputPerMillion": 12,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 36
+        },
+        "qwen3.7-max-2026-05-20": {
+          "currency": "CNY",
+          "inputPerMillion": 12,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 36
+        },
+        "qwen3.7-max-preview": {
+          "currency": "CNY",
+          "inputPerMillion": 12,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 36
+        },
+        "qwen3.7-max-2026-05-17": {
+          "currency": "CNY",
+          "inputPerMillion": 12,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 36
+        },
+        "qwen-max": {
+          "currency": "CNY",
+          "inputPerMillion": 2.4,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 9.6
+        },
+        "qwen3.7-plus": {
+          "currency": "CNY",
+          "inputPerMillion": 1.6,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 6.4,
+          "pricing": {
+            "currency": "CNY",
+            "inputPerMillion": 1.6,
+            "cachedInputPerMillion": null,
+            "outputPerMillion": 6.4
+          },
+          "tiers": [
+            {
+              "condition": "0 < Token ≤ 256K",
+              "note": "原价 2/8 元，限时 8 折",
+              "inputPerMillion": 1.6,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 6.4,
+              "isBase": true
+            },
+            {
+              "condition": "256K < Token ≤ 1M",
+              "note": "原价 6/24 元，限时 8 折",
+              "inputPerMillion": 4.8,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 19.2
+            }
+          ]
+        },
+        "qwen3.7-plus-2026-05-26": {
+          "currency": "CNY",
+          "inputPerMillion": 2,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 8,
+          "pricing": {
+            "currency": "CNY",
+            "inputPerMillion": 2,
+            "cachedInputPerMillion": null,
+            "outputPerMillion": 8
+          },
+          "tiers": [
+            {
+              "condition": "0 < Token ≤ 256K",
+              "inputPerMillion": 2,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 8,
+              "isBase": true
+            },
+            {
+              "condition": "256K < Token ≤ 1M",
+              "inputPerMillion": 6,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 24
+            }
+          ]
+        },
+        "qwen3.6-plus": {
+          "currency": "CNY",
+          "inputPerMillion": 2,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 12,
+          "pricing": {
+            "currency": "CNY",
+            "inputPerMillion": 2,
+            "cachedInputPerMillion": null,
+            "outputPerMillion": 12
+          },
+          "tiers": [
+            {
+              "condition": "0 < Token ≤ 256K",
+              "inputPerMillion": 2,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 12,
+              "isBase": true
+            },
+            {
+              "condition": "256K < Token ≤ 1M",
+              "inputPerMillion": 8,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 48
+            }
+          ]
+        },
+        "qwen3.6-plus-2026-04-02": {
+          "currency": "CNY",
+          "inputPerMillion": 2,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 12,
+          "pricing": {
+            "currency": "CNY",
+            "inputPerMillion": 2,
+            "cachedInputPerMillion": null,
+            "outputPerMillion": 12
+          },
+          "tiers": [
+            {
+              "condition": "0 < Token ≤ 256K",
+              "inputPerMillion": 2,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 12,
+              "isBase": true
+            },
+            {
+              "condition": "256K < Token ≤ 1M",
+              "inputPerMillion": 8,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 48
+            }
+          ]
+        },
+        "qwen3.5-plus": {
+          "currency": "CNY",
+          "inputPerMillion": 0.8,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 4.8,
+          "pricing": {
+            "currency": "CNY",
+            "inputPerMillion": 0.8,
+            "cachedInputPerMillion": null,
+            "outputPerMillion": 4.8
+          },
+          "tiers": [
+            {
+              "condition": "0 < Token ≤ 128K",
+              "inputPerMillion": 0.8,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 4.8,
+              "isBase": true
+            },
+            {
+              "condition": "128K < Token ≤ 256K",
+              "inputPerMillion": 2,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 12
+            },
+            {
+              "condition": "256K < Token ≤ 1M",
+              "inputPerMillion": 4,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 24
+            }
+          ]
+        },
+        "qwen3.5-plus-2026-04-20": {
+          "currency": "CNY",
+          "inputPerMillion": 0.8,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 4.8,
+          "pricing": {
+            "currency": "CNY",
+            "inputPerMillion": 0.8,
+            "cachedInputPerMillion": null,
+            "outputPerMillion": 4.8
+          },
+          "tiers": [
+            {
+              "condition": "0 < Token ≤ 128K",
+              "inputPerMillion": 0.8,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 4.8,
+              "isBase": true
+            },
+            {
+              "condition": "128K < Token ≤ 256K",
+              "inputPerMillion": 2,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 12
+            },
+            {
+              "condition": "256K < Token ≤ 1M",
+              "inputPerMillion": 4,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 24
+            }
+          ]
+        },
+        "qwen3.5-plus-2026-02-15": {
+          "currency": "CNY",
+          "inputPerMillion": 0.8,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 4.8,
+          "pricing": {
+            "currency": "CNY",
+            "inputPerMillion": 0.8,
+            "cachedInputPerMillion": null,
+            "outputPerMillion": 4.8
+          },
+          "tiers": [
+            {
+              "condition": "0 < Token ≤ 128K",
+              "inputPerMillion": 0.8,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 4.8,
+              "isBase": true
+            },
+            {
+              "condition": "128K < Token ≤ 256K",
+              "inputPerMillion": 2,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 12
+            },
+            {
+              "condition": "256K < Token ≤ 1M",
+              "inputPerMillion": 4,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 24
+            }
+          ]
+        },
+        "qwen-plus": {
+          "currency": "CNY",
+          "inputPerMillion": 0.8,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 2,
+          "pricing": {
+            "currency": "CNY",
+            "inputPerMillion": 0.8,
+            "cachedInputPerMillion": null,
+            "outputPerMillion": 2
+          },
+          "tiers": [
+            {
+              "condition": "0 < Token ≤ 128K",
+              "inputPerMillion": 0.8,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 2,
+              "isBase": true
+            },
+            {
+              "condition": "128K < Token ≤ 256K",
+              "inputPerMillion": 2.4,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 20
+            },
+            {
+              "condition": "256K < Token ≤ 1M",
+              "inputPerMillion": 4.8,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 48
+            }
+          ]
+        },
+        "qwen-plus-latest": {
+          "currency": "CNY",
+          "inputPerMillion": 0.8,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 2,
+          "pricing": {
+            "currency": "CNY",
+            "inputPerMillion": 0.8,
+            "cachedInputPerMillion": null,
+            "outputPerMillion": 2
+          },
+          "tiers": [
+            {
+              "condition": "0 < Token ≤ 128K",
+              "inputPerMillion": 0.8,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 2,
+              "isBase": true
+            },
+            {
+              "condition": "128K < Token ≤ 256K",
+              "inputPerMillion": 2.4,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 20
+            },
+            {
+              "condition": "256K < Token ≤ 1M",
+              "inputPerMillion": 4.8,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 48
+            }
+          ]
+        },
+        "qwen-plus-2025-12-01": {
+          "currency": "CNY",
+          "inputPerMillion": 0.8,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 2,
+          "pricing": {
+            "currency": "CNY",
+            "inputPerMillion": 0.8,
+            "cachedInputPerMillion": null,
+            "outputPerMillion": 2
+          },
+          "tiers": [
+            {
+              "condition": "0 < Token ≤ 128K",
+              "inputPerMillion": 0.8,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 2,
+              "isBase": true
+            },
+            {
+              "condition": "128K < Token ≤ 256K",
+              "inputPerMillion": 2.4,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 20
+            },
+            {
+              "condition": "256K < Token ≤ 1M",
+              "inputPerMillion": 4.8,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 48
+            }
+          ]
+        },
+        "qwen-plus-2025-07-14": {
+          "currency": "CNY",
+          "inputPerMillion": 0.8,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 2
+        },
+        "qwen-plus-2025-04-28": {
+          "currency": "CNY",
+          "inputPerMillion": 0.8,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 2
+        },
+        "qwen-plus-2025-01-25": {
+          "currency": "CNY",
+          "inputPerMillion": 0.8,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 2
+        },
+        "qwen-plus-2025-01-12": {
+          "currency": "CNY",
+          "inputPerMillion": 0.8,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 2
+        },
+        "qwen-plus-2024-12-20": {
+          "currency": "CNY",
+          "inputPerMillion": 0.8,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 2
+        },
+        "qwen3.8-flash": {
+          "currency": "CNY",
+          "inputPerMillion": 0.8,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 2.7
+        },
+        "qwen3.7-flash": {
+          "currency": "CNY",
+          "inputPerMillion": 0.2,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 0.8,
+          "pricing": {
+            "currency": "CNY",
+            "inputPerMillion": 0.2,
+            "cachedInputPerMillion": null,
+            "outputPerMillion": 0.8
+          },
+          "tiers": [
+            {
+              "condition": "0 < Token ≤ 32K",
+              "inputPerMillion": 0.2,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 0.8,
+              "isBase": true
+            },
+            {
+              "condition": "32K < Token ≤ 256K",
+              "inputPerMillion": 0.6,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 2.4
+            },
+            {
+              "condition": "256K < Token ≤ 1M",
+              "inputPerMillion": 1.2,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 4.8
+            }
+          ]
+        },
+        "qwen3.7-flash-2026-07-15": {
+          "currency": "CNY",
+          "inputPerMillion": 0.2,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 0.8,
+          "pricing": {
+            "currency": "CNY",
+            "inputPerMillion": 0.2,
+            "cachedInputPerMillion": null,
+            "outputPerMillion": 0.8
+          },
+          "tiers": [
+            {
+              "condition": "0 < Token ≤ 32K",
+              "inputPerMillion": 0.2,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 0.8,
+              "isBase": true
+            },
+            {
+              "condition": "32K < Token ≤ 256K",
+              "inputPerMillion": 0.6,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 2.4
+            },
+            {
+              "condition": "256K < Token ≤ 1M",
+              "inputPerMillion": 1.2,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 4.8
+            }
+          ]
+        },
+        "qwen3.6-flash": {
+          "currency": "CNY",
+          "inputPerMillion": 1.2,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 7.2,
+          "pricing": {
+            "currency": "CNY",
+            "inputPerMillion": 1.2,
+            "cachedInputPerMillion": null,
+            "outputPerMillion": 7.2
+          },
+          "tiers": [
+            {
+              "condition": "0 < Token ≤ 256K",
+              "inputPerMillion": 1.2,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 7.2,
+              "isBase": true
+            },
+            {
+              "condition": "256K < Token ≤ 1M",
+              "inputPerMillion": 4.8,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 28.8
+            }
+          ]
+        },
+        "qwen3.6-flash-2026-04-16": {
+          "currency": "CNY",
+          "inputPerMillion": 1.2,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 7.2,
+          "pricing": {
+            "currency": "CNY",
+            "inputPerMillion": 1.2,
+            "cachedInputPerMillion": null,
+            "outputPerMillion": 7.2
+          },
+          "tiers": [
+            {
+              "condition": "0 < Token ≤ 256K",
+              "inputPerMillion": 1.2,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 7.2,
+              "isBase": true
+            },
+            {
+              "condition": "256K < Token ≤ 1M",
+              "inputPerMillion": 4.8,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 28.8
+            }
+          ]
+        },
+        "qwen3.5-flash": {
+          "currency": "CNY",
+          "inputPerMillion": 0.2,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 2,
+          "pricing": {
+            "currency": "CNY",
+            "inputPerMillion": 0.2,
+            "cachedInputPerMillion": null,
+            "outputPerMillion": 2
+          },
+          "tiers": [
+            {
+              "condition": "0 < Token ≤ 128K",
+              "inputPerMillion": 0.2,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 2,
+              "isBase": true
+            },
+            {
+              "condition": "128K < Token ≤ 256K",
+              "inputPerMillion": 0.8,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 8
+            },
+            {
+              "condition": "256K < Token ≤ 1M",
+              "inputPerMillion": 1.2,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 12
+            }
+          ]
+        },
+        "qwen3.5-flash-2026-02-23": {
+          "currency": "CNY",
+          "inputPerMillion": 0.2,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 2,
+          "pricing": {
+            "currency": "CNY",
+            "inputPerMillion": 0.2,
+            "cachedInputPerMillion": null,
+            "outputPerMillion": 2
+          },
+          "tiers": [
+            {
+              "condition": "0 < Token ≤ 128K",
+              "inputPerMillion": 0.2,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 2,
+              "isBase": true
+            },
+            {
+              "condition": "128K < Token ≤ 256K",
+              "inputPerMillion": 0.8,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 8
+            },
+            {
+              "condition": "256K < Token ≤ 1M",
+              "inputPerMillion": 1.2,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 12
+            }
+          ]
+        },
+        "qwen-flash": {
+          "currency": "CNY",
+          "inputPerMillion": 0.15,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 1.5,
+          "pricing": {
+            "currency": "CNY",
+            "inputPerMillion": 0.15,
+            "cachedInputPerMillion": null,
+            "outputPerMillion": 1.5
+          },
+          "tiers": [
+            {
+              "condition": "0 < Token ≤ 128K",
+              "inputPerMillion": 0.15,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 1.5,
+              "isBase": true
+            },
+            {
+              "condition": "128K < Token ≤ 256K",
+              "inputPerMillion": 0.6,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 6
+            },
+            {
+              "condition": "256K < Token ≤ 1M",
+              "inputPerMillion": 1.2,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 12
+            }
+          ]
+        },
+        "qwen-flash-2025-07-28": {
+          "currency": "CNY",
+          "inputPerMillion": 0.15,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 1.5,
+          "pricing": {
+            "currency": "CNY",
+            "inputPerMillion": 0.15,
+            "cachedInputPerMillion": null,
+            "outputPerMillion": 1.5
+          },
+          "tiers": [
+            {
+              "condition": "0 < Token ≤ 128K",
+              "inputPerMillion": 0.15,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 1.5,
+              "isBase": true
+            },
+            {
+              "condition": "128K < Token ≤ 256K",
+              "inputPerMillion": 0.6,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 6
+            },
+            {
+              "condition": "256K < Token ≤ 1M",
+              "inputPerMillion": 1.2,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 12
+            }
+          ]
+        },
+        "qwen-long": {
+          "currency": "CNY",
+          "inputPerMillion": 0.5,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 2
+        },
+        "qwen3-coder-flash": {
+          "currency": "CNY",
+          "inputPerMillion": 1,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 4,
+          "pricing": {
+            "currency": "CNY",
+            "inputPerMillion": 1,
+            "cachedInputPerMillion": null,
+            "outputPerMillion": 4
+          },
+          "tiers": [
+            {
+              "condition": "0 < Token ≤ 32K",
+              "inputPerMillion": 1,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 4,
+              "isBase": true
+            },
+            {
+              "condition": "32K < Token ≤ 128K",
+              "inputPerMillion": 1.5,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 6
+            },
+            {
+              "condition": "128K < Token ≤ 256K",
+              "inputPerMillion": 2.5,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 10
+            },
+            {
+              "condition": "256K < Token ≤ 1M",
+              "inputPerMillion": 5,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 25
+            }
+          ]
+        },
+        "qwen3-coder-flash-2025-07-28": {
+          "currency": "CNY",
+          "inputPerMillion": 1,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 4,
+          "pricing": {
+            "currency": "CNY",
+            "inputPerMillion": 1,
+            "cachedInputPerMillion": null,
+            "outputPerMillion": 4
+          },
+          "tiers": [
+            {
+              "condition": "0 < Token ≤ 32K",
+              "inputPerMillion": 1,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 4,
+              "isBase": true
+            },
+            {
+              "condition": "32K < Token ≤ 128K",
+              "inputPerMillion": 1.5,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 6
+            },
+            {
+              "condition": "128K < Token ≤ 256K",
+              "inputPerMillion": 2.5,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 10
+            },
+            {
+              "condition": "256K < Token ≤ 1M",
+              "inputPerMillion": 5,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 25
+            }
+          ]
+        },
+        "qwen-mt-plus": {
+          "currency": "CNY",
+          "inputPerMillion": 1.8,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 5.4
+        },
+        "qwen-mt-flash": {
+          "currency": "CNY",
+          "inputPerMillion": 0.7,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 1.95
+        },
+        "qwen-mt-lite": {
+          "currency": "CNY",
+          "inputPerMillion": 0.6,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 1.6
+        },
+        "qwen-doc-turbo": {
+          "currency": "CNY",
+          "inputPerMillion": 0.6,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 1
+        },
+        "qwen-deep-research": {
+          "currency": "CNY",
+          "inputPerMillion": 54,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 163
+        },
+        "qwen-deep-research-2025-12-15": {
+          "currency": "CNY",
+          "inputPerMillion": 79,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 236
+        },
+        "tongyi-xiaomi-analysis-flash": {
+          "currency": "CNY",
+          "inputPerMillion": 0.2,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 0.4
+        },
+        "tongyi-xiaomi-analysis-pro": {
+          "currency": "CNY",
+          "inputPerMillion": 1,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 2.7
+        },
+        "qwen3.5-ocr": {
+          "currency": "CNY",
+          "inputPerMillion": 0.5,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 2
+        },
+        "qwen-vl-ocr": {
+          "currency": "CNY",
+          "inputPerMillion": 0.3,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 0.5
+        },
+        "qwen-vl-ocr-2025-11-20": {
+          "currency": "CNY",
+          "inputPerMillion": 0.3,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 0.5
+        },
+        "qwen-vl-ocr-2024-10-28": {
+          "currency": "CNY",
+          "inputPerMillion": 5,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 5
+        },
+        "qwen3.8-2.4t-a95b": {
+          "currency": "CNY",
+          "inputPerMillion": 12,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 36
+        },
+        "qwen3.8-27b": {
+          "currency": "CNY",
+          "inputPerMillion": 3,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 12
+        },
+        "qwen3.6-35b-a3b": {
+          "currency": "CNY",
+          "inputPerMillion": 1.8,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 10.8
+        },
+        "qwen3.6-27b": {
+          "currency": "CNY",
+          "inputPerMillion": 3,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 18
+        },
+        "qwen3.5-397b-a17b": {
+          "currency": "CNY",
+          "inputPerMillion": 1.2,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 7.2,
+          "pricing": {
+            "currency": "CNY",
+            "inputPerMillion": 1.2,
+            "cachedInputPerMillion": null,
+            "outputPerMillion": 7.2
+          },
+          "tiers": [
+            {
+              "condition": "0 < Token ≤ 128K",
+              "inputPerMillion": 1.2,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 7.2,
+              "isBase": true
+            },
+            {
+              "condition": "128K < Token ≤ 256K",
+              "inputPerMillion": 3,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 18
+            }
+          ]
+        },
+        "qwen3.5-122b-a10b": {
+          "currency": "CNY",
+          "inputPerMillion": 0.8,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 6.4,
+          "pricing": {
+            "currency": "CNY",
+            "inputPerMillion": 0.8,
+            "cachedInputPerMillion": null,
+            "outputPerMillion": 6.4
+          },
+          "tiers": [
+            {
+              "condition": "0 < Token ≤ 128K",
+              "inputPerMillion": 0.8,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 6.4,
+              "isBase": true
+            },
+            {
+              "condition": "128K < Token ≤ 256K",
+              "inputPerMillion": 2,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 16
+            }
+          ]
+        },
+        "qwen3.5-27b": {
+          "currency": "CNY",
+          "inputPerMillion": 0.6,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 4.8,
+          "pricing": {
+            "currency": "CNY",
+            "inputPerMillion": 0.6,
+            "cachedInputPerMillion": null,
+            "outputPerMillion": 4.8
+          },
+          "tiers": [
+            {
+              "condition": "0 < Token ≤ 128K",
+              "inputPerMillion": 0.6,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 4.8,
+              "isBase": true
+            },
+            {
+              "condition": "128K < Token ≤ 256K",
+              "inputPerMillion": 1.8,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 14.4
+            }
+          ]
+        },
+        "qwen3.5-35b-a3b": {
+          "currency": "CNY",
+          "inputPerMillion": 0.4,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 3.2,
+          "pricing": {
+            "currency": "CNY",
+            "inputPerMillion": 0.4,
+            "cachedInputPerMillion": null,
+            "outputPerMillion": 3.2
+          },
+          "tiers": [
+            {
+              "condition": "0 < Token ≤ 128K",
+              "inputPerMillion": 0.4,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 3.2,
+              "isBase": true
+            },
+            {
+              "condition": "128K < Token ≤ 256K",
+              "inputPerMillion": 1.6,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 12.8
+            }
+          ]
+        },
+        "qwen3-vl-plus": {
+          "currency": "CNY",
+          "inputPerMillion": 1,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 10,
+          "pricing": {
+            "currency": "CNY",
+            "inputPerMillion": 1,
+            "cachedInputPerMillion": null,
+            "outputPerMillion": 10
+          },
+          "tiers": [
+            {
+              "condition": "0 < Token ≤ 32K",
+              "inputPerMillion": 1,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 10,
+              "isBase": true
+            },
+            {
+              "condition": "32K < Token ≤ 128K",
+              "inputPerMillion": 1.5,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 15
+            },
+            {
+              "condition": "128K < Token ≤ 256K",
+              "inputPerMillion": 3,
+              "cachedInputPerMillion": null,
+              "outputPerMillion": 30
+            }
+          ]
+        },
+        "qwen3.8-omni-flash": {
+          "currency": "CNY",
+          "inputPerMillion": 0.8,
+          "cachedInputPerMillion": 0.1,
+          "outputPerMillion": 2.7
         }
       }
     }
