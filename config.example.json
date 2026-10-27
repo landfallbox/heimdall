@@ -10,8 +10,7 @@
     "apiKey": "replace-with-a-local-router-token",
     "requestTimeoutMs": 30000,
     "maxBodyBytes": 52428800,
-    "fallbackStatusCodes": [408, 409, 425, 429, 500, 502, 503, 504],
-    "logFile": "logs/router.log"
+    "fallbackStatusCodes": [408, 409, 425, 429, 500, 502, 503, 504]
   },
   "vendors": [
     {

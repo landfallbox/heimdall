@@ -4,6 +4,7 @@ import {
   buildBulkVendorModels,
   canLoadVendorModels,
   cloneVendor,
+  DEFAULT_LOGS_FILTER,
   endpointsFromDraft,
   formatLogTime,
   formatUserErrorMessage,
@@ -12,7 +13,9 @@ import {
   getVendorModelsLoadMessage,
   getVendorModelsSourceKey,
   isValidCustomPricing,
+  logLineMatchesFilter,
   parseLogRows,
+  toLogFilter,
   validateRouter,
   validateVendor,
   validateVendorBaseUrl,
@@ -82,9 +85,6 @@ const rows = parseLogRows([
   "",
 ]);
 assert.equal(rows.length, 2);
-assert.equal(rows[0].level, "text");
-assert.equal(rows[0].tone, "neutral");
-
 const infoA: ModelInfo = {
   displayName: "Model A",
   contextWindow: 128000,
@@ -167,16 +167,41 @@ const nonCustom = applyModelSwitch(
   infoB,
 );
 assert.deepEqual(nonCustom.vscodeModelCache?.["model-a"], { vscode: { name: "My A" } });
-assert.equal(rows[1].level, "error");
-assert.equal(rows[1].tone, "danger");
-assert.equal(rows[1].message, "boom");
-assert.equal(rows[1].statusCode, 500);
+
+// 时间序（旧→新）：保持输入顺序，新行在底部
+assert.equal(rows[0].level, "error");
+assert.equal(rows[0].tone, "danger");
+assert.equal(rows[0].message, "boom");
+assert.equal(rows[0].statusCode, 500);
+assert.equal(rows[1].level, "text");
+assert.equal(rows[1].tone, "neutral");
 assert.equal(parseLogRows(null).length, 0);
 assert.equal(parseLogRows("single").length, 0);
 
 assert.equal(formatLogTime(""), "");
 assert.equal(formatLogTime("not-a-date"), "not-a-date");
 assert.notEqual(formatLogTime("2026-01-01T00:00:00Z"), "");
+// 紧凑 HH:MM:SS（本地时区）
+assert.match(formatLogTime("2026-01-01T00:00:00Z"), /^\d{2}:\d{2}:\d{2}$/);
+
+// toLogFilter：UI 状态 → 服务端过滤
+assert.deepEqual(toLogFilter(DEFAULT_LOGS_FILTER), {});
+const filter = toLogFilter({ levels: ["error"], vendor: "v1", model: "gpt", keyword: " req ", timeRange: "1h" }, 1_000_000);
+assert.deepEqual(filter, { levels: ["error"], vendor: "v1", model: "gpt", keyword: "req", startTime: 1_000_000 - 3_600_000 });
+
+// logLineMatchesFilter：与主进程同语义（follow 流客户端过滤）
+const infoLine = JSON.stringify({ time: "2026-01-01T00:00:00Z", level: "info", event: "request_completed", vendor: "v1", model: "gpt-4o", requestId: "REQ-1" });
+const errorLine = JSON.stringify({ time: "2026-01-01T01:00:00Z", level: "error", event: "request_failed", vendor: "v2", model: "claude-3", errorMessage: "boom REQ-2" });
+assert.equal(logLineMatchesFilter(infoLine, null), true);
+assert.equal(logLineMatchesFilter(infoLine, { levels: ["error"] }), false);
+assert.equal(logLineMatchesFilter(errorLine, { levels: ["error"] }), true);
+assert.equal(logLineMatchesFilter(infoLine, { vendor: "v1" }), true);
+assert.equal(logLineMatchesFilter(infoLine, { model: "gpt" }), true);
+assert.equal(logLineMatchesFilter(infoLine, { model: "claude" }), false);
+assert.equal(logLineMatchesFilter(infoLine, { keyword: "req-1" }), true);
+assert.equal(logLineMatchesFilter(infoLine, { startTime: Date.parse("2026-01-01T00:00:00Z") + 1 }), false);
+assert.equal(logLineMatchesFilter("plain-text-line", { levels: ["info"] }), false);
+assert.equal(logLineMatchesFilter("plain-text-line", { keyword: "plain" }), true);
 
 assert.equal(
   formatUserErrorMessage("Error invoking remote method 'update:download': TypeError: fetch failed"),

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -325,12 +325,27 @@ function baseConfig(port: number, vendors: any[], overrides: any = {}) {
       host: "127.0.0.1",
       port,
       apiKey: "test-token",
-      logFile: join(tempDir, `router-${port}.log`),
       requestTimeoutMs: 1000,
       ...overrides.router,
     },
     vendors,
   };
+}
+
+// 所有 router 共享 <tempDir>/logs/router-YYYY-MM-DD.log（按天分片）
+function readRouterLogs(): string {
+  const logDirectory = join(tempDir, "logs");
+  let entries: string[];
+  try {
+    entries = readdirSync(logDirectory);
+  } catch {
+    return "";
+  }
+  return entries
+    .filter((name) => name.startsWith("router-") && name.endsWith(".log"))
+    .sort()
+    .map((name) => readFileSync(join(logDirectory, name), "utf8"))
+    .join("");
 }
 
 async function testStatusFallback() {
@@ -560,8 +575,6 @@ async function testCircuitBreakerSkipsFailedVendorPerModel() {
         models: [{ id: "model-id" }, { id: "other-model" }],
       },
     ]);
-    const logFile = config.router.logFile;
-
     await withRouter("circuit-breaker", config, async ({ port: routerPort }) => {
       for (let requestIndex = 0; requestIndex < 3; requestIndex += 1) {
         const response = await requestChat(routerPort);
@@ -587,7 +600,7 @@ async function testCircuitBreakerSkipsFailedVendorPerModel() {
     assert.equal(calls.primaryDefault, 2);
     assert.equal(calls.primaryOther, 1);
     assert.equal(calls.fallback, 3);
-    const logText = readFileSync(logFile, "utf8");
+    const logText = readRouterLogs();
     assert.match(logText, /"event":"vendor_circuit_opened"/);
     assert.match(logText, /"durationMs":10000/);
     assert.match(logText, /"ejectionCount":1/);
@@ -1071,7 +1084,6 @@ async function testUpstreamErrorLogRedaction() {
     const config = baseConfig(port, [
       { name: "vendor", baseUrl: vendor.baseUrl, model: "model-id" },
     ]);
-    const logFile = config.router.logFile;
     await withRouter("log-redaction", config, async ({ port: routerPort }) => {
       const response = await requestChat(routerPort);
       assert.equal(response.status, 502);
@@ -1079,13 +1091,13 @@ async function testUpstreamErrorLogRedaction() {
 
     await waitFor(
     () => {
-      const logText = readFileSync(logFile, "utf8");
+      const logText = readRouterLogs();
       return /"errorType":"rate_limit"/.test(logText);
     },
     "expected rate_limit error did not reach the log file in time",
     );
 
-    const logText = readFileSync(logFile, "utf8");
+    const logText = readRouterLogs();
     assert.match(logText, /"errorType":"rate_limit"/);
     assert.doesNotMatch(logText, /bodyPreview/);
     assert.doesNotMatch(logText, new RegExp(secretPrompt));

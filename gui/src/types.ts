@@ -53,10 +53,24 @@ export interface LogEntry {
 }
 
 export interface LogPage {
-  path: string;
+  dir: string;
   lines: string[];
-  nextBefore: number | null;
+  nextCursor: string | null;
   hasMore: boolean;
+}
+
+export interface LogFilter {
+  levels?: string[];
+  vendor?: string;
+  model?: string;
+  keyword?: string;
+  startTime?: number;
+  endTime?: number;
+}
+
+export interface LogAppendEvent {
+  lines: string[];
+  ts: number;
 }
 
 export interface UpdateState {

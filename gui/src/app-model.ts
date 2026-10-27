@@ -1,7 +1,7 @@
 import { getVendorModels, type ConfigVendorInput, type Draft, type PricingMode, type VendorDraft, type VendorModelDraft, type VendorModelVsCodeDraft, type VendorModelVsCodeModelCache } from "./config-draft.ts";
 import { getCatalogPriceView, isPricingCatalogKey, PRICING_CATALOG_KEYS } from "../../src/usage.ts";
 import { getModelInfo, type ModelInfo } from "../../src/model-info.ts";
-import type { LogEntry, Tone, VendorHealth } from "./types.ts";
+import type { LogEntry, LogFilter, Tone, VendorHealth } from "./types.ts";
 
 export interface FieldIssue {
   tone: "error" | "warning";
@@ -455,8 +455,7 @@ export function parseLogRows(lines: unknown): LogEntry[] {
           message: line,
         };
       }
-    })
-    .reverse();
+    });
 }
 
 export function formatLogTime(value: string): string {
@@ -469,7 +468,118 @@ export function formatLogTime(value: string): string {
     return value;
   }
 
-  return date.toLocaleString();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+export type LogTimeRange = "all" | "1h" | "6h" | "24h" | "7d";
+
+export const LOG_TIME_RANGES: { value: LogTimeRange; label: string }[] = [
+  { value: "all", label: "All time" },
+  { value: "1h", label: "Last 1h" },
+  { value: "6h", label: "Last 6h" },
+  { value: "24h", label: "Last 24h" },
+  { value: "7d", label: "Last 7d" },
+];
+
+// 日志页过滤 UI 状态（时间范围相对当前时间换算成 startTime）
+export interface LogsFilterState {
+  levels: string[];
+  vendor: string;
+  model: string;
+  keyword: string;
+  timeRange: LogTimeRange;
+}
+
+export const DEFAULT_LOGS_FILTER: LogsFilterState = {
+  levels: [],
+  vendor: "",
+  model: "",
+  keyword: "",
+  timeRange: "all",
+};
+
+const LOG_TIME_RANGE_MS: Record<Exclude<LogTimeRange, "all">, number> = {
+  "1h": 60 * 60 * 1000,
+  "6h": 6 * 60 * 60 * 1000,
+  "24h": 24 * 60 * 60 * 1000,
+  "7d": 7 * 24 * 60 * 60 * 1000,
+};
+
+export function toLogFilter(state: LogsFilterState, now = Date.now()): LogFilter {
+  const filter: LogFilter = {};
+  if (state.levels.length > 0) {
+    filter.levels = [...state.levels];
+  }
+  if (state.vendor) {
+    filter.vendor = state.vendor;
+  }
+  if (state.model) {
+    filter.model = state.model;
+  }
+  const keyword = state.keyword.trim();
+  if (keyword) {
+    filter.keyword = keyword;
+  }
+  if (state.timeRange !== "all") {
+    filter.startTime = now - LOG_TIME_RANGE_MS[state.timeRange];
+  }
+  return filter;
+}
+
+/** 与主进程 lineMatchesFilter 同语义的客户端过滤，供 follow 流复用。 */
+export function logLineMatchesFilter(raw: string, filter: LogFilter | null): boolean {
+  if (!filter) {
+    return true;
+  }
+  const needsParsed = Boolean(
+    filter.levels?.length || filter.vendor || filter.model
+    || filter.startTime !== undefined || filter.endTime !== undefined,
+  );
+  let entry: Record<string, unknown> | null = null;
+  if (needsParsed) {
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      entry = parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : null;
+    } catch {
+      entry = null;
+    }
+    if (!entry) {
+      return false;
+    }
+  }
+
+  if (filter.levels?.length) {
+    const level = typeof entry?.level === "string" ? entry.level : "";
+    if (!filter.levels.includes(level)) {
+      return false;
+    }
+  }
+  if (filter.vendor && entry?.vendor !== filter.vendor) {
+    return false;
+  }
+  if (filter.model) {
+    const model = typeof entry?.model === "string" ? entry.model : "";
+    if (!model.startsWith(filter.model)) {
+      return false;
+    }
+  }
+  if (filter.startTime !== undefined || filter.endTime !== undefined) {
+    const time = entry ? Date.parse(String(entry.time ?? "")) : Number.NaN;
+    if (!Number.isFinite(time)) {
+      return false;
+    }
+    if (filter.startTime !== undefined && time < filter.startTime) {
+      return false;
+    }
+    if (filter.endTime !== undefined && time > filter.endTime) {
+      return false;
+    }
+  }
+  if (filter.keyword && !raw.toLowerCase().includes(filter.keyword.toLowerCase())) {
+    return false;
+  }
+  return true;
 }
 
 export function isValidCustomPricing(model: VendorModelDraft): boolean {

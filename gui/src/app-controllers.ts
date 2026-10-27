@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { applyModelInfo } from "../../src/model-info.ts";
 import { applyRemotePricing } from "../../src/usage.ts";
+import { DEFAULT_LOGS_FILTER, logLineMatchesFilter, toLogFilter, type LogsFilterState } from "./app-model.ts";
 import { getDesktopApi } from "./desktop-api.ts";
 import type { LogPage, UpdateState, UsageSummary } from "./types.ts";
 
@@ -18,12 +19,34 @@ const defaultUpdateState: UpdateState = {
   lastCheckedAt: "",
 };
 
-export function useLogsController({ busy, run }: { busy: string; run: (name: string, action: () => Promise<void>) => Promise<void> }) {
-  const [logs, setLogs] = useState<LogPage>({ path: "", lines: [], nextBefore: null, hasMore: false });
+const LOG_PAGE_LIMIT = 200;
+const LOG_LINES_HARD_CAP = 1500;
+
+export function useLogsController({ busy, run, active }: { busy: string; run: (name: string, action: () => Promise<void>) => Promise<void>; active: boolean }) {
+  const [logs, setLogs] = useState<LogPage>({ dir: "", lines: [], nextCursor: null, hasMore: false });
+  const [filterState, setFilterState] = useState<LogsFilterState>(DEFAULT_LOGS_FILTER);
+
+  const filterRef = useRef(filterState);
+  useEffect(() => {
+    filterRef.current = filterState;
+  }, [filterState]);
+
+  function appendLines(newLines: string[]) {
+    if (newLines.length === 0) {
+      return;
+    }
+    setLogs((current) => {
+      const merged = [...current.lines, ...newLines];
+      return {
+        ...current,
+        lines: merged.length > LOG_LINES_HARD_CAP ? merged.slice(merged.length - LOG_LINES_HARD_CAP) : merged,
+      };
+    });
+  }
 
   async function refreshLogs() {
-    const result = await getDesktopApi().readLogs({ limit: 80 });
-    setLogs(result);
+    const result = await getDesktopApi().readLogs({ limit: LOG_PAGE_LIMIT, ...toLogFilter(filterRef.current) });
+    setLogs({ dir: result.dir, lines: result.lines, nextCursor: result.nextCursor, hasMore: result.hasMore });
   }
 
   async function loadOlderLogs() {
@@ -32,17 +55,52 @@ export function useLogsController({ busy, run }: { busy: string; run: (name: str
     }
 
     await run("olderLogs", async () => {
-      const result = await getDesktopApi().readLogs({ limit: 80, before: logs.nextBefore });
+      const result = await getDesktopApi().readLogs({ limit: LOG_PAGE_LIMIT, cursor: logs.nextCursor, ...toLogFilter(filterRef.current) });
       setLogs((current) => ({
-        path: result.path || current.path,
+        dir: result.dir || current.dir,
         lines: [...result.lines, ...current.lines],
-        nextBefore: result.nextBefore,
+        nextCursor: result.nextCursor,
         hasMore: result.hasMore,
       }));
     });
   }
 
-  return { logs, refreshLogs, loadOlderLogs };
+  // 过滤条件变化 → 视图重置到最新匹配项（spec §4）
+  async function updateFilterState(next: LogsFilterState) {
+    setFilterState(next);
+    filterRef.current = next;
+    await run("logs", async () => {
+      const result = await getDesktopApi().readLogs({ limit: LOG_PAGE_LIMIT, ...toLogFilter(next) });
+      setLogs({ dir: result.dir, lines: result.lines, nextCursor: result.nextCursor, hasMore: result.hasMore });
+    });
+  }
+
+  // 仅 Logs 页挂载时订阅 follow 流；推送原始行，按当前过滤状态客户端过滤后始终追加
+  useEffect(() => {
+    if (!active) {
+      return;
+    }
+    const unsubscribe = getDesktopApi().onLogsAppended?.((event) => {
+      const matched = event.lines.filter((line) => logLineMatchesFilter(line, toLogFilter(filterRef.current)));
+      if (matched.length === 0) {
+        return;
+      }
+      appendLines(matched);
+    });
+    return () => {
+      if (typeof unsubscribe === "function") {
+        unsubscribe();
+      }
+    };
+  }, [active]);
+
+  return {
+    logs,
+    refreshLogs,
+    loadOlderLogs,
+    filterState,
+    updateFilterState,
+  };
 }
 
 export function useUsageController() {

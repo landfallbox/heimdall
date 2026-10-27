@@ -14,6 +14,7 @@
  * gui/electron/ipc-contracts.ts.
  */
 import type { HeimdallDesktopApi, SaveConfigResult } from "./desktop-api.ts";
+import { logLineMatchesFilter } from "./app-model.ts";
 import type { HealthState, LogPage, UsageSummary } from "./types.ts";
 
 const hasRealPreload = Boolean(
@@ -29,7 +30,6 @@ interface MockConfig {
     requestTimeoutMs: number;
     maxBodyBytes: number;
     fallbackStatusCodes: number[];
-    logFile: string;
   };
   vendors: Array<{
     name: string;
@@ -63,7 +63,6 @@ const config: MockConfig = {
     requestTimeoutMs: 30000,
     maxBodyBytes: 52428800,
     fallbackStatusCodes: [408, 409, 425, 429, 500, 502, 503, 504],
-    logFile: "logs/router.log",
   },
     vendors: [
     {
@@ -204,9 +203,9 @@ const idleUpdateState = () => ({
 });
 
 const logLines = [
-  "2026-10-14T01:00:00.000Z info  router started (mock) on 127.0.0.1:4000",
-  "2026-10-14T01:00:05.000Z info  request mock-large 200 12ms (mock)",
-  "2026-10-14T01:00:09.000Z warn  upstream timeout for mock-small, falling back (mock)",
+  JSON.stringify({ time: "2026-10-14T01:00:00.000Z", level: "info", event: "router_started", vendor: "mock-vendor", message: "Router started (mock) on 127.0.0.1:4000" }),
+  JSON.stringify({ time: "2026-10-14T01:00:05.000Z", level: "info", event: "request_completed", vendor: "mock-vendor", model: "mock-large", statusCode: 200, elapsedMs: 12, requestId: "req-mock-1" }),
+  JSON.stringify({ time: "2026-10-14T01:00:09.000Z", level: "warn", event: "request_fallback", vendor: "mock-vendor", model: "mock-small", statusCode: 504, elapsedMs: 3000, requestId: "req-mock-2", errorMessage: "Upstream timeout, falling back (mock)" }),
 ];
 
 if (!hasRealPreload) {
@@ -277,12 +276,25 @@ if (!hasRealPreload) {
       return { health: health(), started: true, via: "process" as const };
     },
     checkHealth: async () => health(),
-    readLogs: async (): Promise<LogPage> => ({
-      path: "logs/router.log (mock)",
-      lines: logLines,
-      nextBefore: null,
-      hasMore: false,
-    }),
+    readLogs: async (options): Promise<LogPage> => {
+      const limit = options?.limit ?? 80;
+      const matched = logLines.filter((line) => logLineMatchesFilter(line, options ?? null));
+      // 游标 = 匹配列表中"下一批的结束下标"（十进制字符串，mock 自含）
+      let end = matched.length;
+      if (typeof options?.cursor === "string" && options.cursor) {
+        const index = Number(options.cursor);
+        if (Number.isInteger(index) && index >= 0 && index <= matched.length) {
+          end = index;
+        }
+      }
+      const start = Math.max(0, end - limit);
+      return {
+        dir: "logs (mock)",
+        lines: matched.slice(start, end),
+        nextCursor: start > 0 ? String(start) : null,
+        hasMore: start > 0,
+      };
+    },
     readUsageSummary: async (): Promise<UsageSummary> => ({
       filters: { vendor: "", model: "", vendors: [], models: [] },
       periods: { day: emptyPeriod(), week: emptyPeriod(), month: emptyPeriod() },
@@ -338,6 +350,7 @@ if (!hasRealPreload) {
       return () => media.removeEventListener("change", listener);
     },
     getOsDark: () => Promise.resolve(window.matchMedia("(prefers-color-scheme: dark)").matches),
+    onLogsAppended: () => undefined,
   };
 
   window.heimdall = mock;

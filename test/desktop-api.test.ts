@@ -9,7 +9,7 @@ try {
 
   const fakeApi = {
     getState: async () => ({ appName: "Heimdall" }),
-    readLogs: async () => ({ path: "", lines: [], nextBefore: null, hasMore: false }),
+    readLogs: async () => ({ dir: "", lines: [], nextCursor: null, hasMore: false }),
   };
   (globalThis as { window?: unknown }).window = { heimdall: fakeApi };
   assert.equal(getDesktopApi(), fakeApi);

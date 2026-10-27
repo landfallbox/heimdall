@@ -170,11 +170,17 @@ export const ipcContracts: Record<string, { request: z.ZodType; response: z.ZodT
   "router:health": contract(optionalOptionsRequest(z.object({ includeProcessCount: z.boolean().optional() })), healthSchema),
   "logs:read": contract(optionalOptionsRequest(z.object({
     limit: z.number().int().optional(),
-    before: z.number().int().nonnegative().nullable().optional(),
+    cursor: z.string().nullable().optional(),
+    levels: z.array(z.string()).optional(),
+    vendor: z.string().optional(),
+    model: z.string().optional(),
+    keyword: z.string().optional(),
+    startTime: z.number().optional(),
+    endTime: z.number().optional(),
   })), z.object({
-    path: z.string(),
+    dir: z.string(),
     lines: z.array(z.string()),
-    nextBefore: z.number().int().nonnegative().nullable(),
+    nextCursor: z.string().nullable(),
     hasMore: z.boolean(),
   })),
   "usage:summary": contract(optionalOptionsRequest(z.object({
@@ -201,6 +207,16 @@ export const ipcContracts: Record<string, { request: z.ZodType; response: z.ZodT
 
 export const ipcContractChannels = Object.freeze(Object.keys(ipcContracts)) as readonly string[];
 
+// 主进程 → 渲染进程的单向推送事件契约（无请求/响应）。
+export const ipcEventContracts: Record<string, z.ZodType> = Object.freeze({
+  "logs:appended": z.object({
+    lines: z.array(z.string()),
+    ts: z.number().int(),
+  }),
+});
+
+export const ipcEventChannels = Object.freeze(Object.keys(ipcEventContracts)) as readonly string[];
+
 export function parseIpcRequest(channel: string, args: unknown): unknown {
   return parseContractValue(channel, "request", args);
 }
@@ -224,4 +240,21 @@ function parseContractValue(channel: string, direction: "request" | "response", 
     .map((issue) => `${issue.path.length ? issue.path.join(".") : "value"}: ${issue.message}`)
     .join("; ");
   throw new Error(`Invalid IPC ${direction} for ${channel}: ${details}`);
+}
+
+export function parseIpcEvent(channel: string, value: unknown): unknown {
+  const schema = ipcEventContracts[channel];
+  if (!schema) {
+    throw new Error(`Missing IPC event contract for ${channel}.`);
+  }
+
+  const result = schema.safeParse(value);
+  if (result.success) {
+    return result.data;
+  }
+
+  const details = result.error.issues
+    .map((issue) => `${issue.path.length ? issue.path.join(".") : "value"}: ${issue.message}`)
+    .join("; ");
+  throw new Error(`Invalid IPC event for ${channel}: ${details}`);
 }
