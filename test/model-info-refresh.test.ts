@@ -9,6 +9,9 @@ import * as deepseek from "../scripts/model-info-refresh/parsers/deepseek.mjs";
 import * as glm from "../scripts/model-info-refresh/parsers/glm.mjs";
 import * as google from "../scripts/model-info-refresh/parsers/google.mjs";
 import * as kimi from "../scripts/model-info-refresh/parsers/kimi.mjs";
+import * as mimo from "../scripts/model-info-refresh/parsers/mimo.mjs";
+import * as minimax from "../scripts/model-info-refresh/parsers/minimax.mjs";
+import * as openai from "../scripts/model-info-refresh/parsers/openai.mjs";
 
 const FIXTURES = new URL("./fixtures/model-info/", import.meta.url);
 const fixture = (name: string) => readFileSync(new URL(name, FIXTURES), "utf8");
@@ -18,6 +21,8 @@ type ScrapedModel = {
   contextWindow?: number;
   maxOutputTokens?: number;
   capabilities?: Record<string, boolean>;
+  displayName?: string;
+  supportsReasoningEffort?: string[];
 };
 type ScrapedModels = Record<string, ScrapedModel>;
 
@@ -99,6 +104,40 @@ type ScrapedModels = Record<string, ScrapedModel>;
   assert.equal("moonshot-v1-8k" in models, false);
 }
 
+// --- mimo parser ---
+{
+  const models = (await mimo.parse(fixture("mimo-models.md"))) as ScrapedModels;
+  assert.deepEqual(Object.keys(models).sort(), [
+    "mimo-v2.6-flash",
+    "mimo-v2.6-pro",
+    "mimo-v2.6-pro-ultraspeed",
+  ]);
+  // All three models share the rowspan capability/length cells.
+  for (const id of Object.keys(models)) {
+    assert.equal(models[id].contextWindow, 1048576);
+    assert.equal(models[id].maxOutputTokens, 131072);
+    assert.deepEqual(models[id].capabilities, { vision: true, thinking: true, toolCalling: true });
+  }
+  // ASR/TTS models are out of scope (chat-only).
+  assert.equal("mimo-v2.5-asr" in models, false);
+}
+
+// --- minimax parser ---
+{
+  const models = (await minimax.parse(fixture("minimax-text-generation.md"))) as ScrapedModels;
+  assert.deepEqual(Object.keys(models).sort(), ["MiniMax-M3", "MiniMax-M3.1-Flash"]);
+  // Context window is the literal table value (1,000,000), not a power of two.
+  for (const id of ["MiniMax-M3", "MiniMax-M3.1-Flash"]) {
+    assert.equal(models[id].contextWindow, 1000000);
+    assert.ok(models[id].capabilities?.vision);
+  }
+  // Only M3.1-Flash has adjustable thinking depth.
+  assert.ok(models["MiniMax-M3.1-Flash"].capabilities?.thinking);
+  assert.deepEqual(models["MiniMax-M3.1-Flash"].supportsReasoningEffort, ["low", "medium", "high", "xhigh", "max"]);
+  assert.equal(models["MiniMax-M3"].capabilities?.thinking, undefined);
+  assert.equal("supportsReasoningEffort" in models["MiniMax-M3"], false);
+}
+
 // --- glm parser (index + detail, fixture-backed fetch) ---
 {
   const warnings: string[] = [];
@@ -117,6 +156,49 @@ type ScrapedModels = Record<string, ScrapedModel>;
     assert.equal(models[id].maxOutputTokens, 131072);
     assert.deepEqual(models[id].capabilities, { thinking: true, toolCalling: true, vision: true });
   }
+}
+
+// --- openai parser (list + detail, fixture-backed fetch) ---
+{
+  const entries = openai.extractListEntries(fixture("openai-all.html"));
+  assert.deepEqual(
+    entries.map((entry) => entry.id),
+    ["gpt-6-astra", "gpt-5.6-sol", "gpt-oss-120b"],
+  );
+  assert.equal(entries[0].displayName, "GPT-6 Astra");
+  // Deprecated cards (gpt-4.1) are skipped.
+  assert.ok(!entries.some((entry) => entry.id === "gpt-4.1"));
+
+  // <code>-style effort wording, without "none".
+  const astra = openai.parseDetail(fixture("openai-gpt-6-astra.html")) as ScrapedModel;
+  assert.equal(astra.contextWindow, 1050000);
+  assert.equal(astra.maxOutputTokens, 128000);
+  assert.deepEqual(astra.capabilities, { toolCalling: true, vision: true, thinking: true });
+  assert.deepEqual(astra.supportsReasoningEffort, ["low", "medium", "high", "xhigh", "max"]);
+
+  // Plain-text effort wording with "(default)" annotations, including "none".
+  const sol = openai.parseDetail(fixture("openai-gpt-5.6-sol.html")) as ScrapedModel;
+  assert.deepEqual(sol.supportsReasoningEffort, ["none", "low", "medium", "high", "xhigh", "max"]);
+
+  // Old-style page: no Tools section and no effort -> toolCalling/thinking
+  // are omitted so the merge keeps the existing values.
+  const oss = openai.parseDetail(fixture("openai-gpt-oss-120b.html")) as ScrapedModel;
+  assert.equal(oss.contextWindow, 131072);
+  assert.equal(oss.maxOutputTokens, 131072);
+  assert.deepEqual(oss.capabilities, { vision: false });
+  assert.equal("supportsReasoningEffort" in oss, false);
+
+  const warnings: string[] = [];
+  const models = await openai.parse(fixture("openai-all.html"), {
+    fetchText: async (url: string) => {
+      const id = new URL(url).pathname.split("/").pop();
+      return fixture(`openai-${id}.html`);
+    },
+    warn: (message: string) => warnings.push(message),
+  }) as ScrapedModels;
+  assert.deepEqual(Object.keys(models).sort(), ["gpt-5.6-sol", "gpt-6-astra", "gpt-oss-120b"]);
+  assert.equal(models["gpt-6-astra"].displayName, "GPT-6 Astra");
+  assert.equal(warnings.length, 0);
 }
 
 // --- merge semantics ---
@@ -195,11 +277,19 @@ type ScrapedModels = Record<string, ScrapedModel>;
 // --- CLI dry run against fixtures (no network, no writes) ---
 {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-  const dataFile = path.join(root, "data/model-info.json");
+  // A fixed baseline keeps the run deterministic regardless of the real
+  // data/model-info.json content; it also exercises the openai merge path
+  // (one added model, one modified, one kept retired).
+  const dataFile = new URL("fixtures/model-info/baseline-data.json", import.meta.url);
   const before = readFileSync(dataFile, "utf8");
   const output = execFileSync(
     process.execPath,
-    [path.join("scripts", "model-info-refresh", "refresh-model-info.mjs"), "--from-file", path.join("test", "fixtures", "model-info"), "--dry-run"],
+    [
+      path.join("scripts", "model-info-refresh", "refresh-model-info.mjs"),
+      "--from-file", path.join("test", "fixtures", "model-info"),
+      "--data-file", path.join("test", "fixtures", "model-info", "baseline-data.json"),
+      "--dry-run",
+    ],
     { cwd: root, encoding: "utf8" },
   );
   assert.match(output, /anthropic: 4 models scraped/);
@@ -207,9 +297,12 @@ type ScrapedModels = Record<string, ScrapedModel>;
   assert.match(output, /google: \d+ models scraped/);
   assert.match(output, /kimi: 6 models scraped/);
   assert.match(output, /glm: 3 models scraped/);
-  assert.match(output, /openai: manual maintenance/);
-  assert.match(output, /mimo: manual maintenance/);
-  assert.match(output, /added \(\d+\):/);
+  assert.match(output, /openai: 3 models scraped/);
+  assert.match(output, /mimo: 3 models scraped/);
+  assert.match(output, /minimax: 2 models scraped/);
+  assert.match(output, /added \(22\):/);
+  assert.match(output, /modified \(1\): gpt-5\.6-sol/);
+  assert.match(output, /kept retired \(1\): gpt-4o/);
   assert.match(output, /dry run: not writing any file/);
   // Dry run must not touch the data file.
   assert.equal(readFileSync(dataFile, "utf8"), before);

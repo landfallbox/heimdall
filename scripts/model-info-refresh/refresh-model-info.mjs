@@ -6,15 +6,15 @@
 //
 // Options:
 //   --only <vendor>       Only refresh the given vendor (repeatable).
-//                         Vendors: anthropic, deepseek, google, kimi, glm.
+//                         Vendors: anthropic, deepseek, google, kimi, glm,
+//                         openai, mimo, minimax.
 //   --dry-run             Print the report without writing any file.
 //   --commit              After writing, create a model-info-refresh-YYYYMMDD
 //                         branch, commit, and open a PR (for CI).
 //   --from-file <dir>     Read vendor pages from fixture files in <dir>
 //                         instead of the network (used by tests).
-//
-// Vendors without a structured source (openai, mimo) are maintained manually
-// and are reported as such.
+//   --data-file <path>    Read/write model info from <path> instead of
+//                         data/model-info.json (used by tests).
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -25,6 +25,9 @@ import * as deepseek from "./parsers/deepseek.mjs";
 import * as glm from "./parsers/glm.mjs";
 import * as google from "./parsers/google.mjs";
 import * as kimi from "./parsers/kimi.mjs";
+import * as mimo from "./parsers/mimo.mjs";
+import * as minimax from "./parsers/minimax.mjs";
+import * as openai from "./parsers/openai.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const DATA_FILE = path.join(ROOT, "data/model-info.json");
@@ -61,22 +64,35 @@ const VENDORS = {
     idPrefixes: ["glm-"],
     parser: glm,
   },
-};
-
-// Vendors whose pages cannot be parsed reliably; kept for the report only.
-const MANUAL_VENDORS = {
-  openai: "platform.openai.com/docs/models returns HTTP 403 to scripts; maintained manually",
-  mimo: "Xiaomi MiMo docs are a JS-rendered SPA without a static source; maintained manually",
+  openai: {
+    url: "https://platform.openai.com/docs/models/all",
+    fixture: "openai-all.html",
+    idPrefixes: ["gpt-", "o1", "o3", "o4"],
+    parser: openai,
+  },
+  mimo: {
+    url: "https://mimo.mi.com/static/docs/quick-start/summary/model.md",
+    fixture: "mimo-models.md",
+    idPrefixes: ["mimo-"],
+    parser: mimo,
+  },
+  minimax: {
+    url: "https://platform.minimaxi.com/docs/guides/text-generation.md",
+    fixture: "minimax-text-generation.md",
+    idPrefixes: ["MiniMax-"],
+    parser: minimax,
+  },
 };
 
 function parseArgs(argv) {
-  const args = { only: [], dryRun: false, commit: false, fromFile: null };
+  const args = { only: [], dryRun: false, commit: false, fromFile: null, dataFile: null };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--only") args.only.push(argv[++i]);
     else if (arg === "--dry-run") args.dryRun = true;
     else if (arg === "--commit") args.commit = true;
     else if (arg === "--from-file") args.fromFile = path.resolve(argv[++i]);
+    else if (arg === "--data-file") args.dataFile = path.resolve(argv[++i]);
     else {
       throw new Error(`unknown argument: ${arg}`);
     }
@@ -114,6 +130,15 @@ function urlToFixtureFile(url) {
     const m = /^\/cn\/guide\/models\/[a-z-]+\/([a-z0-9._-]+)\.md$/.exec(parsed.pathname);
     if (m) return `glm-${m[1]}.md`;
   }
+  if (parsed.hostname === "platform.openai.com") {
+    if (parsed.pathname === "/docs/models/all") return "openai-all.html";
+    const m = /^\/docs\/models\/([^/]+)$/.exec(parsed.pathname);
+    if (m) return `openai-${m[1]}.html`;
+  }
+  if (parsed.hostname === "mimo.mi.com") return "mimo-models.md";
+  if (parsed.hostname === "platform.minimaxi.com" || parsed.hostname === "platform.minimax.cn") {
+    if (parsed.pathname === "/docs/guides/text-generation.md") return "minimax-text-generation.md";
+  }
   throw new Error(`no fixture mapping for ${url}`);
 }
 
@@ -132,7 +157,8 @@ function run(cmd, args) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const raw = fs.readFileSync(DATA_FILE, "utf8");
+  const dataFile = args.dataFile ?? DATA_FILE;
+  const raw = fs.readFileSync(dataFile, "utf8");
   const existing = JSON.parse(raw);
   const warnings = [];
   const vendorScrapes = [];
@@ -168,10 +194,6 @@ async function main() {
     vendorScrapes.push({ vendor, models, baselineIds: baselineIds(existing, vendor) });
   }
 
-  for (const [vendor, reason] of Object.entries(MANUAL_VENDORS)) {
-    report.push(`${vendor}: manual maintenance (${reason})`);
-  }
-
   const { data, added, modified, keptRetired } = mergeModelInfo(existing, vendorScrapes);
 
   const changed = added.length > 0 || modified.length > 0;
@@ -204,9 +226,13 @@ async function main() {
     return;
   }
 
-  fs.writeFileSync(DATA_FILE, nextRaw);
-  run("node", [GENERATOR]);
-  console.log(`wrote ${path.relative(ROOT, DATA_FILE)} and regenerated src/model-info-data.ts`);
+  fs.writeFileSync(dataFile, nextRaw);
+  if (dataFile === DATA_FILE) {
+    run("node", [GENERATOR]);
+    console.log(`wrote ${path.relative(ROOT, dataFile)} and regenerated src/model-info-data.ts`);
+  } else {
+    console.log(`wrote ${dataFile} (custom data file; src/model-info-data.ts not regenerated)`);
+  }
 
   if (args.commit) {
     const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
