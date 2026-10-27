@@ -98,7 +98,7 @@
       "maxOutputTokens": 100000,
       "capabilities": {
         "toolCalling": true,
-        "vision": true,
+        "vision": false,
         "thinking": true
       }
     },

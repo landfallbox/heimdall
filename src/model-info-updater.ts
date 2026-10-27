@@ -91,8 +91,10 @@ export async function refreshModelInfo({ dataDir, logger, url = resolveModelInfo
     return { status: "unchanged", updatedAt: cache.updatedAt };
   }
 
-  const applied = applyModelInfo(data);
+  // Save before mutating in-memory metadata so a cache-write failure leaves
+  // the current metadata and the on-disk cache consistent.
   saveModelInfoCache(dataDir, data);
+  const applied = applyModelInfo(data);
   logger?.info("model_info_remote_updated", {
     updatedAt: data.updatedAt,
     models: applied.applied,

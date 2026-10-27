@@ -97,15 +97,23 @@ export function useModelInfoCache() {
   useEffect(() => {
     let active = true;
     let lastUpdatedAt: string | null = null;
+    // Same-day catalog changes keep the same updatedAt date, so the model
+    // content is fingerprinted as well to pick them up.
+    let lastModelsFingerprint: string | null = null;
 
     async function refreshModelInfoCache() {
       try {
         const result = await getDesktopApi().loadModelInfoCache();
         const data = result?.data;
-        if (!active || !data || !data.updatedAt || data.updatedAt === lastUpdatedAt) {
+        if (!active || !data || !data.updatedAt) {
+          return;
+        }
+        const modelsFingerprint = JSON.stringify(data.models);
+        if (data.updatedAt === lastUpdatedAt && modelsFingerprint === lastModelsFingerprint) {
           return;
         }
         lastUpdatedAt = data.updatedAt;
+        lastModelsFingerprint = modelsFingerprint;
         applyModelInfo(data);
         setModelInfoUpdatedAt(data.updatedAt);
       } catch {

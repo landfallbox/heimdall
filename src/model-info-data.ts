@@ -102,7 +102,7 @@ export const BUILTIN_MODEL_INFO_DATA: RemoteModelInfoData = {
       "maxOutputTokens": 100000,
       "capabilities": {
         "toolCalling": true,
-        "vision": true,
+        "vision": false,
         "thinking": true
       }
     },

@@ -20,6 +20,13 @@ import {
 
 const tempDir = mkdtempSync(join(tmpdir(), "heimdall-model-info-test-"));
 
+// Far-future dates keep the newer/stale ordering stable no matter what date a
+// real refresh stamps into the bundled catalog.
+const CACHE_DATE = "2999-11-01";
+const NEWER_DATE = "2999-12-01";
+const STALE_DATE = "2999-10-01";
+const REFRESH_DATE = "2999-12-02";
+
 function remoteData(updatedAt: string): RemoteModelInfoData {
   return {
     schemaVersion: 1,
@@ -58,8 +65,8 @@ async function waitFor(predicate: () => boolean, message: string, timeoutMs = 50
 
 try {
   // --- parseRemoteModelInfo validation ---
-  assert.equal(parseRemoteModelInfo(remoteData("2026-11-01")).updatedAt, "2026-11-01");
-  assert.throws(() => parseRemoteModelInfo({ ...remoteData("2026-11-01"), schemaVersion: 2 }), /Invalid remote model info data/);
+  assert.equal(parseRemoteModelInfo(remoteData(CACHE_DATE)).updatedAt, CACHE_DATE);
+  assert.throws(() => parseRemoteModelInfo({ ...remoteData(CACHE_DATE), schemaVersion: 2 }), /Invalid remote model info data/);
   assert.throws(() => parseRemoteModelInfo({ schemaVersion: 1, updatedAt: "x", models: { bad: { contextWindow: 0 } } }), /Invalid remote model info data/);
   assert.throws(() => parseRemoteModelInfo({ schemaVersion: 1, updatedAt: "x", models: { bad: { surprise: true } } }), /Invalid remote model info data/);
   assert.throws(() => parseRemoteModelInfo({ schemaVersion: 1, updatedAt: "x", models: "not-an-object" }), /Invalid remote model info data/);
@@ -67,22 +74,22 @@ try {
   // --- cache roundtrip ---
   const cacheDir = join(tempDir, "cache");
   assert.equal(loadModelInfoCache(cacheDir), null);
-  saveModelInfoCache(cacheDir, remoteData("2026-11-01"));
-  assert.deepEqual(loadModelInfoCache(cacheDir), remoteData("2026-11-01"));
+  saveModelInfoCache(cacheDir, remoteData(CACHE_DATE));
+  assert.deepEqual(loadModelInfoCache(cacheDir), remoteData(CACHE_DATE));
   writeFileSync(join(cacheDir, MODEL_INFO_CACHE_FILENAME), "{not json", "utf8");
   assert.equal(loadModelInfoCache(cacheDir), null);
-  saveModelInfoCache(cacheDir, remoteData("2026-11-01"));
+  saveModelInfoCache(cacheDir, remoteData(CACHE_DATE));
 
   // --- refreshModelInfo against a mock server ---
-  const { server: newerServer, url: newerUrl } = await createMockModelInfoServer(remoteData("2026-12-01"));
+  const { server: newerServer, url: newerUrl } = await createMockModelInfoServer(remoteData(NEWER_DATE));
   try {
     const refreshed = await refreshModelInfo({ dataDir: cacheDir, url: newerUrl });
     if (refreshed.status !== "updated") {
       throw new Error(`expected updated status, got ${refreshed.status}`);
     }
-    assert.equal(refreshed.updatedAt, "2026-12-01");
+    assert.equal(refreshed.updatedAt, NEWER_DATE);
     assert.equal(refreshed.models, 2);
-    assert.equal(loadModelInfoCache(cacheDir)!.updatedAt, "2026-12-01");
+    assert.equal(loadModelInfoCache(cacheDir)!.updatedAt, NEWER_DATE);
     assert.equal(getModelInfo("remote-only-model")?.contextWindow, 256000);
 
     const unchanged = await refreshModelInfo({ dataDir: cacheDir, url: newerUrl });
@@ -91,11 +98,11 @@ try {
     newerServer.close();
   }
 
-  const { server: staleServer, url: staleUrl } = await createMockModelInfoServer(remoteData("2026-10-01"));
+  const { server: staleServer, url: staleUrl } = await createMockModelInfoServer(remoteData(STALE_DATE));
   try {
     const stale = await refreshModelInfo({ dataDir: cacheDir, url: staleUrl });
     assert.equal(stale.status, "unchanged");
-    assert.equal(loadModelInfoCache(cacheDir)!.updatedAt, "2026-12-01");
+    assert.equal(loadModelInfoCache(cacheDir)!.updatedAt, NEWER_DATE);
   } finally {
     staleServer.close();
   }
@@ -107,7 +114,7 @@ try {
       throw new Error(`expected failed status, got ${failed.status}`);
     }
     assert.match(failed.error, /status 500/);
-    assert.equal(loadModelInfoCache(cacheDir)!.updatedAt, "2026-12-01");
+    assert.equal(loadModelInfoCache(cacheDir)!.updatedAt, NEWER_DATE);
   } finally {
     errorServer.close();
   }
@@ -119,7 +126,7 @@ try {
   downServer.close();
   const refused = await refreshModelInfo({ dataDir: cacheDir, url: downUrl });
   assert.equal(refused.status, "failed");
-  assert.equal(loadModelInfoCache(cacheDir)!.updatedAt, "2026-12-01");
+  assert.equal(loadModelInfoCache(cacheDir)!.updatedAt, NEWER_DATE);
 
   // --- fetchRemoteModelInfo timeout ---
   const { server: hangServer, url: hangUrl } = await createMockModelInfoServer(null, { hang: true });
@@ -146,11 +153,11 @@ try {
 
   // --- startModelInfoRefresh applies cache and refreshes immediately ---
   const refreshDir = join(tempDir, "refresh");
-  const { server: refreshServer, url: refreshUrl } = await createMockModelInfoServer(remoteData("2026-12-02"));
+  const { server: refreshServer, url: refreshUrl } = await createMockModelInfoServer(remoteData(REFRESH_DATE));
   try {
     const stop = startModelInfoRefresh({ dataDir: refreshDir, url: refreshUrl, intervalMs: 60_000 });
     await waitFor(() => existsSync(join(refreshDir, MODEL_INFO_CACHE_FILENAME)), "expected model info cache to be written");
-    assert.equal(loadModelInfoCache(refreshDir)!.updatedAt, "2026-12-02");
+    assert.equal(loadModelInfoCache(refreshDir)!.updatedAt, REFRESH_DATE);
     stop();
   } finally {
     refreshServer.close();
