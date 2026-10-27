@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-01-01",
+  "models": {
+    "claude-sonnet-5-5": {
+      "displayName": "Claude Sonnet 5.5",
+      "contextWindow": 1048576,
+      "maxOutputTokens": 131072,
+      "capabilities": {
+        "thinking": true
+      }
+    },
+    "gpt-4o": {
+      "displayName": "GPT-4o",
+      "contextWindow": 128000
+    },
+    "gpt-5.6-sol": {
+      "displayName": "GPT-5.6 Sol",
+      "contextWindow": 1000000
+    }
+  }
+}

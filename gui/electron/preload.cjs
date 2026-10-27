@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld("heimdall", {
   readLogs: (options) => ipcRenderer.invoke("logs:read", options),
   readUsageSummary: (options) => ipcRenderer.invoke("usage:summary", options),
   loadPricingCache: () => ipcRenderer.invoke("pricing:loadCache"),
+  loadModelInfoCache: () => ipcRenderer.invoke("model-info:loadCache"),
   openConfig: () => ipcRenderer.invoke("file:openConfig"),
   openLog: () => ipcRenderer.invoke("file:openLog"),
   getDataDirState: () => ipcRenderer.invoke("dataDir:getState"),

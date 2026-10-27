@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+  applyModelSwitch,
   canLoadVendorModels,
   cloneVendor,
   endpointsFromDraft,
@@ -16,6 +17,7 @@ import {
   validateVendorBaseUrl,
 } from "../gui/src/app-model.ts";
 import type { Draft, VendorDraft, VendorModelDraft } from "../gui/src/config-draft.ts";
+import type { ModelInfo } from "../src/model-info.ts";
 
 assert.equal(validateVendorBaseUrl(""), "Base URL is required.");
 assert.equal(validateVendorBaseUrl("ftp://example.com"), "Base URL must start with http:// or https://.");
@@ -81,6 +83,89 @@ const rows = parseLogRows([
 assert.equal(rows.length, 2);
 assert.equal(rows[0].level, "text");
 assert.equal(rows[0].tone, "neutral");
+
+const infoA: ModelInfo = {
+  displayName: "Model A",
+  contextWindow: 128000,
+  maxOutputTokens: 8192,
+  capabilities: { toolCalling: true, vision: false, thinking: true },
+  supportsReasoningEffort: ["low", "high"],
+};
+const infoB: ModelInfo = {
+  displayName: "Model B",
+  contextWindow: 200000,
+  maxOutputTokens: 16384,
+  capabilities: { toolCalling: true, vision: true, thinking: false },
+};
+const baseRowA: VendorModelDraft = {
+  id: "model-a",
+  enabled: true,
+  pricingMode: "custom",
+  pricingCurrency: "USD",
+  inputPerMillion: "3",
+  cachedInputPerMillion: "0.3",
+  outputPerMillion: "15",
+  vscode: { name: "My A", contextWindow: "128000", toolCalling: true },
+};
+
+// Switch A -> B: A's vscode + custom pricing (mode + currency) are snapshotted, B is filled fresh.
+const toB = applyModelSwitch(baseRowA, "model-b", infoB);
+assert.equal(toB.vscodeModelCache?.["model-a"]?.vscode?.name, "My A");
+assert.equal(toB.vscodeModelCache?.["model-a"]?.pricingMode, "custom");
+assert.deepEqual(toB.vscodeModelCache?.["model-a"]?.customPricing, { currency: "USD", inputPerMillion: "3", cachedInputPerMillion: "0.3", outputPerMillion: "15" });
+assert.equal(toB.vscode?.name, "Model B");
+assert.equal(toB.vscode?.contextWindow, "200000");
+assert.equal(toB.vscode?.maxOutputTokens, "16384");
+assert.equal(toB.vscode?.vision, true);
+assert.equal(toB.vscode?.thinking, false);
+assert.deepEqual(toB.vscode?.supportsReasoningEffort, undefined);
+assert.equal(toB.inputPerMillion, "");
+assert.equal(toB.cachedInputPerMillion, "");
+assert.equal(toB.outputPerMillion, "");
+
+// Switch B -> A (unsaved): the snapshot is restored, cache no longer holds A.
+const rowB: VendorModelDraft = {
+  id: "model-b",
+  enabled: true,
+  pricingMode: "custom",
+  pricingCurrency: "USD",
+  vscode: toB.vscode,
+  vscodeModelCache: toB.vscodeModelCache,
+};
+const backToA = applyModelSwitch(rowB, "model-a", infoA);
+assert.equal(backToA.vscode?.name, "My A");
+assert.equal(backToA.vscode?.contextWindow, "128000");
+assert.equal(backToA.vscode?.toolCalling, true);
+assert.equal(backToA.inputPerMillion, "3");
+assert.equal(backToA.cachedInputPerMillion, "0.3");
+assert.equal(backToA.outputPerMillion, "15");
+// A was consumed from the cache; B's own snapshot stays for a later switch back.
+assert.equal(backToA.vscodeModelCache?.["model-a"], undefined);
+assert.equal(backToA.vscodeModelCache?.["model-b"]?.vscode?.name, "Model B");
+
+// No snapshot for the incoming model: fresh fill from info, pricing cleared.
+const fresh = applyModelSwitch({ id: "model-a", enabled: true, pricingMode: "openai" } as VendorModelDraft, "model-b", infoB);
+assert.equal(fresh.vscode?.name, "Model B");
+assert.equal(fresh.inputPerMillion, "");
+assert.equal(fresh.vscodeModelCache, undefined);
+
+// Unknown model (info null): vscode cleared, no cache entry created.
+const unknown = applyModelSwitch(baseRowA, "model-x", null);
+assert.equal(unknown.vscode, undefined);
+assert.equal(unknown.vscodeModelCache?.["model-a"]?.vscode?.name, "My A");
+
+// Same id: no snapshot, no cache mutation.
+const same = applyModelSwitch(baseRowA, "model-a", infoA);
+assert.equal(same.vscodeModelCache, undefined);
+assert.equal(same.inputPerMillion, "");
+
+// Non-custom pricing: only the vscode section is snapshotted.
+const nonCustom = applyModelSwitch(
+  { id: "model-a", enabled: true, pricingMode: "openai", inputPerMillion: "3", vscode: { name: "My A" } } as VendorModelDraft,
+  "model-b",
+  infoB,
+);
+assert.deepEqual(nonCustom.vscodeModelCache?.["model-a"], { vscode: { name: "My A" } });
 assert.equal(rows[1].level, "error");
 assert.equal(rows[1].tone, "danger");
 assert.equal(rows[1].message, "boom");

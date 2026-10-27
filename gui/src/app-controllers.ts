@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { applyModelInfo } from "../../src/model-info.ts";
 import { applyRemotePricing } from "../../src/usage.ts";
 import { getDesktopApi } from "./desktop-api.ts";
 import type { LogPage, UpdateState, UsageSummary } from "./types.ts";
@@ -88,6 +89,49 @@ export function usePricingCache() {
   }, []);
 
   return { pricingUpdatedAt };
+}
+
+export function useModelInfoCache() {
+  const [modelInfoUpdatedAt, setModelInfoUpdatedAt] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    let lastUpdatedAt: string | null = null;
+    // Same-day catalog changes keep the same updatedAt date, so the model
+    // content is fingerprinted as well to pick them up.
+    let lastModelsFingerprint: string | null = null;
+
+    async function refreshModelInfoCache() {
+      try {
+        const result = await getDesktopApi().loadModelInfoCache();
+        const data = result?.data;
+        if (!active || !data || !data.updatedAt) {
+          return;
+        }
+        const modelsFingerprint = JSON.stringify(data.models);
+        if (data.updatedAt === lastUpdatedAt && modelsFingerprint === lastModelsFingerprint) {
+          return;
+        }
+        lastUpdatedAt = data.updatedAt;
+        lastModelsFingerprint = modelsFingerprint;
+        applyModelInfo(data);
+        setModelInfoUpdatedAt(data.updatedAt);
+      } catch {
+        // Best-effort: the built-in model info stays available when the cache is missing or invalid.
+      }
+    }
+
+    void refreshModelInfoCache();
+    const timer = window.setInterval(() => {
+      void refreshModelInfoCache();
+    }, PRICING_CACHE_POLL_MS);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  return { modelInfoUpdatedAt };
 }
 
 export function useUpdateController({ run, setToast }: { run: (name: string, action: () => Promise<void>) => Promise<void>; setToast: (toast: string, kind?: "info" | "error") => void }) {

@@ -25,7 +25,7 @@ import {
   type VendorDraft,
   getVendorModels,
 } from "./config-draft.ts";
-import { useLogsController, usePricingCache, useUpdateController, useUsageController } from "./app-controllers.ts";
+import { useLogsController, useModelInfoCache, usePricingCache, useUpdateController, useUsageController } from "./app-controllers.ts";
 import { getDesktopApi, type DataDirState, type SaveConfigResult } from "./desktop-api.ts";
 import type { HealthState } from "./types.ts";
 import { Sidebar, type PageId } from "./components/sidebar.tsx";
@@ -262,6 +262,7 @@ export default function App() {
   const { usage, refreshUsage } = useUsageController();
   const { updateState, checkAppUpdate, downloadAppUpdate, installAppUpdate } = useUpdateController({ run, setToast: notify });
   usePricingCache();
+  useModelInfoCache();
 
   useEffect(() => {
     void loadState();

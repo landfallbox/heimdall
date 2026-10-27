@@ -271,6 +271,26 @@ assert.equal(normalizeVendorModelsForDraft({
 spacedVsCodeDraft.vendors[0]!.models![0]!.vscode = { name: "   " };
 assert.equal(toConfig(spacedVsCodeDraft).vendors[0]!.models![0]!.vscode, undefined);
 
+// The per-model snapshot cache is draft-only UI state and must never reach
+// the config file.
+const cachedDraft = toDraft(normalizeConfig({
+  router: { apiKey: "test-token" },
+  vendors: [{
+    name: "local",
+    baseUrl: "http://127.0.0.1:8000/v1",
+    models: [{ id: "model-id", enabled: true }],
+  }],
+}));
+cachedDraft.vendors[0]!.models![0]!.vscodeModelCache = {
+  "model-id": { vscode: { name: "My Model" }, customPricing: { inputPerMillion: "3", outputPerMillion: "15" } },
+};
+const cachedConfig = toConfig(cachedDraft);
+assert.equal(
+  (cachedConfig.vendors[0]!.models![0]! as unknown as Record<string, unknown>).vscodeModelCache,
+  undefined,
+);
+assert.equal(JSON.stringify(cachedConfig).includes("vscodeModelCache"), false);
+
 // The sync toggle round-trips through the app section.
 assert.equal(toConfig(toDraft(normalizeConfig({
   router: { apiKey: "test-token" },

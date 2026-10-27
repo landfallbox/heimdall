@@ -24,6 +24,7 @@ import { SegmentedControl } from "../components/segmented-control.tsx";
 import { formatCompactTokenCount, formatPeakHours, formatTokenCount } from "../lib/format.ts";
 import { cn } from "../lib/utils.ts";
 import {
+  applyModelSwitch,
   getVendorModelOptions,
   getVendorModelsLoadMessage,
   isValidCustomPricing,
@@ -40,6 +41,7 @@ import {
   getVendorModels,
 } from "../config-draft.ts";
 import { getDesktopApi } from "../desktop-api.ts";
+import { getModelInfo } from "../../../src/model-info.ts";
 import {
   getCatalogPriceView,
   isPeakHour,
@@ -424,11 +426,33 @@ function ModelPricingRow({
         <Select
           value={model.id || undefined}
           onValueChange={(modelId) => {
+            const oldId = String(model.id || "").trim();
+            if (modelId === oldId) {
+              return;
+            }
             onUpdateVendorModel(index, "id", modelId);
             const switchTo = suggestCatalogSwitch(model.pricingMode, modelId);
             if (switchTo) {
               onUpdateVendorModel(index, "pricingMode", switchTo);
             }
+            // Snapshot the outgoing row (VS Code section + custom pricing) into
+            // the per-model cache, then restore the incoming model's snapshot
+            // or fill the VS Code section fresh from the model info. A restored
+            // snapshot's pricing mode/currency override the auto-detected one.
+            const next = applyModelSwitch(model, modelId, getModelInfo(modelId));
+            if (next.pricingMode) {
+              onUpdateVendorModel(index, "pricingMode", next.pricingMode);
+            }
+            if (next.pricingCurrency !== undefined) {
+              onUpdateVendorModel(index, "pricingCurrency", next.pricingCurrency);
+            }
+            if (next.vscodeModelCache) {
+              onUpdateVendorModel(index, "vscodeModelCache", next.vscodeModelCache);
+            }
+            onUpdateVendorModel(index, "vscode", next.vscode);
+            onUpdateVendorModel(index, "inputPerMillion", next.inputPerMillion ?? "");
+            onUpdateVendorModel(index, "cachedInputPerMillion", next.cachedInputPerMillion ?? "");
+            onUpdateVendorModel(index, "outputPerMillion", next.outputPerMillion ?? "");
           }}
           onOpenChange={(open) => {
             if (open) {
