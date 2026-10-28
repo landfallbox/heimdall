@@ -1,6 +1,6 @@
 import { getVendorModels, type ConfigVendorInput, type Draft, type PricingMode, type VendorDraft, type VendorModelDraft, type VendorModelVsCodeDraft, type VendorModelVsCodeModelCache } from "./config-draft.ts";
 import { getCatalogPriceView, isPricingCatalogKey, PRICING_CATALOG_KEYS } from "../../src/usage.ts";
-import type { ModelInfo } from "../../src/model-info.ts";
+import { getModelInfo, type ModelInfo } from "../../src/model-info.ts";
 import type { LogEntry, Tone, VendorHealth } from "./types.ts";
 
 export interface FieldIssue {
@@ -228,6 +228,46 @@ export function applyModelSwitch(
     result.vscodeModelCache = cache;
   }
   return result;
+}
+
+/**
+ * Builds new vendor model rows for bulk "add all models". Each row is built
+ * with the same field set as selecting a model in an existing row
+ * (ModelPricingRow onValueChange): catalog pricing is auto-suggested when a
+ * catalog covers the model id, and the VS Code section is filled from the
+ * model info when available. Duplicates and blank ids are dropped.
+ */
+export function buildBulkVendorModels(modelIds: string[]): VendorModelDraft[] {
+  const seen = new Set<string>();
+  const rows: VendorModelDraft[] = [];
+  for (const raw of modelIds) {
+    const id = String(raw || "").trim();
+    if (!id || seen.has(id)) {
+      continue;
+    }
+    seen.add(id);
+    const row: VendorModelDraft = { id, enabled: true };
+    const switchTo = suggestCatalogSwitch(row.pricingMode, id);
+    if (switchTo) {
+      row.pricingMode = switchTo;
+    }
+    const next = applyModelSwitch(row, id, getModelInfo(id));
+    if (next.pricingMode) {
+      row.pricingMode = next.pricingMode;
+    }
+    if (next.pricingCurrency !== undefined) {
+      row.pricingCurrency = next.pricingCurrency;
+    }
+    if (next.vscodeModelCache) {
+      row.vscodeModelCache = next.vscodeModelCache;
+    }
+    row.vscode = next.vscode;
+    row.inputPerMillion = next.inputPerMillion ?? "";
+    row.cachedInputPerMillion = next.cachedInputPerMillion ?? "";
+    row.outputPerMillion = next.outputPerMillion ?? "";
+    rows.push(row);
+  }
+  return rows;
 }
 
 export function getVendorCircuitSummary(vendorHealth: VendorHealth | undefined): { tone: Tone; label: string } | null {
