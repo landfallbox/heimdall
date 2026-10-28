@@ -673,6 +673,9 @@ export default function App() {
   }
 
   function updateVendorEditor(field: string, value: unknown) {
+    if (field === "baseUrl") {
+      clearVendorModelOptions();
+    }
     setVendorEditorDraft((current) => (current ? { ...current, [field]: value } : current));
   }
 
@@ -795,15 +798,24 @@ export default function App() {
   }
 
   function confirmAddVendorModels(selectedIds: string[]) {
-    const rows = buildBulkVendorModels(selectedIds);
+    const current = vendorEditorDraft;
+    if (!current) {
+      setModal(null);
+      return;
+    }
+    const existing = new Set(
+      getVendorModels(current)
+        .map((model) => String(model.id || "").trim())
+        .filter(Boolean),
+    );
+    const rows = buildBulkVendorModels(
+      selectedIds.filter((modelId) => !existing.has(String(modelId || "").trim())),
+    );
     if (rows.length === 0) {
       setModal(null);
       return;
     }
-    setVendorEditorDraft((current) => {
-      if (!current) return current;
-      return { ...current, models: [...getVendorModels(current), ...rows] };
-    });
+    setVendorEditorDraft({ ...current, models: [...getVendorModels(current), ...rows] });
     setModal(null);
     notify(`Added ${rows.length} models.`);
   }
