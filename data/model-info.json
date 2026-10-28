@@ -191,6 +191,57 @@
         "vision": true,
         "thinking": true
       }
+    },
+    "sensenova-v6.5-pro": {
+      "displayName": "SenseNova V6.5 Pro",
+      "contextWindow": 131072,
+      "maxOutputTokens": 32768,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true
+      }
+    },
+    "sensenova-v6.5-turbo": {
+      "displayName": "SenseNova V6.5 Turbo",
+      "contextWindow": 131072,
+      "maxOutputTokens": 32768
+    },
+    "sensenova-v6-pro": {
+      "displayName": "SenseNova V6 Pro",
+      "contextWindow": 131072,
+      "maxOutputTokens": 32768,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true
+      }
+    },
+    "sensenova-v6-turbo": {
+      "displayName": "SenseNova V6 Turbo",
+      "contextWindow": 131072,
+      "maxOutputTokens": 32768
+    },
+    "sensenova-v6-reasoner": {
+      "displayName": "SenseNova V6 Reasoner",
+      "contextWindow": 131072,
+      "maxOutputTokens": 32768,
+      "capabilities": {
+        "thinking": true
+      }
+    },
+    "sensechat-vision": {
+      "displayName": "SenseChat Vision",
+      "capabilities": {
+        "vision": true
+      }
+    },
+    "sensechat-character-pro": {
+      "displayName": "SenseChat Character Pro"
+    },
+    "sensechat-character": {
+      "displayName": "SenseChat Character"
+    },
+    "sensenova-6.8-flash-lite": {
+      "displayName": "SenseNova 6.8 Flash Lite"
     }
   }
 }

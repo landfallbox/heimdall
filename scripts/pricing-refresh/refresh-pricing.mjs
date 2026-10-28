@@ -41,6 +41,7 @@ export const VENDORS = {
   minimax: { parser: "./parsers/minimax.mjs", fixture: "minimax-pricing.html" },
   stepfun: { parser: "./parsers/stepfun.mjs", fixture: "stepfun-pricing.md" },
   qwen: { parser: "./parsers/qwen.mjs", fixture: "qwen-pricing.html" },
+  sensenova: { parser: "./parsers/sensenova.mjs", fixture: "sensenova-pricing.html" },
 };
 
 function parseArgs(argv) {

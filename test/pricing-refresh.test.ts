@@ -25,7 +25,7 @@ const tempDir = mkdtempSync(join(tmpdir(), "heimdall-pricing-refresh-test-"));
 
 // Vendors with a real page fixture: every catalog model must be scraped with
 // an identical entry, and no bogus model may be added.
-const REAL_FIXTURE_VENDORS = ["deepseek", "glm", "kimi", "mimo", "minimax", "stepfun", "qwen", "openai", "google", "anthropic"] as const;
+const REAL_FIXTURE_VENDORS = ["deepseek", "glm", "kimi", "mimo", "minimax", "stepfun", "qwen", "openai", "google", "anthropic", "sensenova"] as const;
 
 // Models that are intentionally kept in the catalog after being removed from
 // the official page (retired, kept by design — see plan §3.2).
@@ -44,6 +44,9 @@ const KNOWN_RETIRED = new Set([
   "claude-sonnet-4.6",
   "claude-sonnet-4.5",
   "claude-haiku-4.5",
+  // SenseNova 6.8 Flash Lite is a free Preview model not listed on the public
+  // pricing page; it is a hand-written catalog entry, so the round-trip skips it.
+  "sensenova-6.8-flash-lite",
 ]);
 
 async function loadParser(vendor: string) {
@@ -63,6 +66,7 @@ for (const vendor of REAL_FIXTURE_VENDORS) {
     openai: "openai-pricing.html",
     google: "google-pricing.html",
     anthropic: "anthropic-pricing.html",
+    sensenova: "sensenova-pricing.html",
   }[vendor];
   const parse = await loadParser(vendor);
   const models = (await parse(readFileSync(join(fixtureDir, fixture), "utf8"), vendor === "google" ? { now: new Date(2026, 9, 27) } : undefined)) as ScrapedModels;
