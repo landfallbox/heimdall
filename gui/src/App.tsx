@@ -673,7 +673,7 @@ export default function App() {
   }
 
   function updateVendorEditor(field: string, value: unknown) {
-    if (field === "baseUrl" || field === "apiKey") {
+    if (field === "baseUrl" || field === "apiKey" || field === "authentication") {
       clearVendorModelOptions();
     }
     setVendorEditorDraft((current) => (current ? { ...current, [field]: value } : current));
