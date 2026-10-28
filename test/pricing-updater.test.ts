@@ -107,11 +107,11 @@ try {
   assert.deepEqual(current, BUILTIN_PRICING_DATA);
   assert.equal(Object.hasOwn(source.catalogs.openai.models, "fake-tiered-demo"), false);
   assert.equal(getCatalogPriceView("openai", "fake-tiered-demo"), null);
-  for (const id of ["qwen3.8-max-0902", "qwen-plus"]) {
-    const entry = source.catalogs.openai.models[id];
-    assert.deepEqual(legacy.catalogs.openai.models[id], entry.pricing);
-    assert.deepEqual(current.catalogs.openai.models[id], { pricing: entry.pricing, tiers: entry.tiers });
-    const view = getCatalogPriceView("openai", id)!;
+  for (const id of ["qwen-plus", "qwen3.7-plus"]) {
+    const entry = source.catalogs.qwen.models[id];
+    assert.deepEqual(legacy.catalogs.qwen.models[id], entry.pricing);
+    assert.deepEqual(current.catalogs.qwen.models[id], { pricing: entry.pricing, tiers: entry.tiers });
+    const view = getCatalogPriceView("qwen", id)!;
     assert.deepEqual(view.pricing, entry.pricing);
     assert.deepEqual(view.tiers, entry.tiers);
   }

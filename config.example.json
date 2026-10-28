@@ -104,7 +104,7 @@
       "baseUrl": "https://api.deepseek.com",
       "models": [
         {
-          "id": "deepseek-v4-flash",
+          "id": "deepseek-flash",
           "enabled": true,
           "pricing": {
             "mode": "deepseek"

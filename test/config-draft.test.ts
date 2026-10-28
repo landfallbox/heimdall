@@ -120,7 +120,7 @@ const deepseekRoundTrip = toConfig(toDraft(normalizeConfig({
     name: "deepseek",
     baseUrl: "https://api.deepseek.com",
     models: [{
-      id: "deepseek-v4-flash",
+      id: "deepseek-flash",
       enabled: true,
       pricing: { mode: "deepseek" },
     }],
@@ -156,7 +156,7 @@ const deepseekDraftModel = toDraft(normalizeConfig({
   vendors: [{
     name: "deepseek",
     baseUrl: "https://api.deepseek.com",
-    models: [{ id: "deepseek-v4-flash", pricing: { mode: "deepseek" } }],
+    models: [{ id: "deepseek-flash", pricing: { mode: "deepseek" } }],
   }],
 })).vendors[0]!.models![0]!;
 assert.equal(deepseekDraftModel.pricingMode, "deepseek");
@@ -180,8 +180,8 @@ assert.deepEqual(getVendorCircuitSummary({ models: [
 ] }), { tone: "warning", label: "Recovering · model-a" });
 assert.equal(getVendorCircuitSummary({ models: [] }), null);
 
-assert.equal(suggestCatalogSwitch("openai", "deepseek-v4-flash"), "deepseek");
-assert.equal(suggestCatalogSwitch("openai", "deepseek-chat"), "deepseek");
+assert.equal(suggestCatalogSwitch("openai", "deepseek-flash"), "deepseek");
+assert.equal(suggestCatalogSwitch("openai", "deepseek-v4-pro"), "deepseek");
 assert.equal(suggestCatalogSwitch("openai", "claude-haiku-4.5"), "anthropic");
 assert.equal(suggestCatalogSwitch("anthropic", "gpt-5-mini"), "openai");
 assert.equal(suggestCatalogSwitch("unknown-mode" as never, "claude-sonnet-4.6"), "anthropic");
@@ -191,7 +191,7 @@ assert.equal(suggestCatalogSwitch("deepseek", "gpt-5-mini"), "openai");
 assert.equal(suggestCatalogSwitch("openai", "gpt-5-mini"), null);
 assert.equal(suggestCatalogSwitch("deepseek", "deepseek-v4-pro"), null);
 assert.equal(suggestCatalogSwitch("openai", "private-model"), null);
-assert.equal(suggestCatalogSwitch("custom", "deepseek-v4-flash"), null);
+assert.equal(suggestCatalogSwitch("custom", "deepseek-flash"), null);
 assert.equal(suggestCatalogSwitch("openai", ""), null);
 
 // VS Code metadata round-trips through the draft (numbers travel as strings).

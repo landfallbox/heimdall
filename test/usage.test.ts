@@ -40,10 +40,10 @@ assert.equal(defaultPricing.sourceModel, "gpt-5-mini");
 assert.equal(resolveModelPricing("gpt-5-future-variant", undefined), null);
 assert.equal(resolveModelPricing("gpt-6-sol", undefined)!.outputPerMillion, 10);
 assert.equal(resolveModelPricing("gpt-6-luna", undefined)!.inputPerMillion, 0.1);
-assert.equal(resolveModelPricing("gpt-5.2-codex", undefined)!.outputPerMillion, 14);
-assert.equal(resolveModelPricing("gpt-5.1-codex", undefined)!.inputPerMillion, 1.25);
-assert.equal(resolveModelPricing("gpt-5.3-instant", undefined)!.outputPerMillion, 14);
-assert.equal(resolveModelPricing("gpt-5.2-instant", undefined)!.inputPerMillion, 1.5);
+assert.equal(resolveModelPricing("gpt-5.2", undefined)!.outputPerMillion, 14);
+assert.equal(resolveModelPricing("gpt-5.1", undefined)!.inputPerMillion, 1.25);
+assert.equal(resolveModelPricing("gpt-5.4-pro", undefined)!.outputPerMillion, 180);
+assert.equal(resolveModelPricing("gpt-5.4", undefined)!.inputPerMillion, 2.5);
 assert.equal(resolveModelPricing("gpt-5.6-sol", undefined)!.inputPerMillion, 4);
 assert.equal(resolveModelPricing("gpt-5.6-sol", undefined)!.cachedInputPerMillion, 0.4);
 assert.equal(resolveModelPricing("gpt-5.6-sol", undefined)!.outputPerMillion, 20);
@@ -68,9 +68,9 @@ assert.deepEqual(estimateUsageCost(chatUsage, customPricing), {
 });
 assert.equal(resolveModelPricing("private-model", undefined), null);
 
-const deepseekPeakPricing = resolveModelPricing("deepseek-v4-flash", { mode: "deepseek" }, new Date("2026-08-16T02:00:00Z"))!;
+const deepseekPeakPricing = resolveModelPricing("deepseek-flash", { mode: "deepseek" }, new Date("2026-08-16T02:00:00Z"))!;
 assert.equal(deepseekPeakPricing.source, "deepseek");
-assert.equal(deepseekPeakPricing.sourceModel, "deepseek-v4-flash");
+assert.equal(deepseekPeakPricing.sourceModel, "deepseek-flash");
 assert.equal(deepseekPeakPricing.card, "peak");
 assert.equal(deepseekPeakPricing.inputPerMillion, 0.3);
 assert.equal(deepseekPeakPricing.cachedInputPerMillion, 0.006);
@@ -81,11 +81,8 @@ assert.deepEqual(estimateUsageCost(chatUsage, deepseekPeakPricing), {
   currency: "CNY",
   pricing: deepseekPeakPricing,
 });
-// The legacy name is retired but still accepted, billed at the same Flash price.
-assert.deepEqual(
-  resolveModelPricing("deepseek-flash", { mode: "deepseek" }, new Date("2026-08-16T02:00:00Z")),
-  { ...deepseekPeakPricing, sourceModel: "deepseek-flash" },
-);
+// Retired model names no longer resolve.
+assert.equal(resolveModelPricing("deepseek-v4-flash", { mode: "deepseek" }), null);
 
 const deepseekOffPeakPricing = resolveModelPricing("deepseek-v4-pro", { mode: "deepseek" }, new Date("2026-08-16T12:00:00Z"))!;
 assert.equal(deepseekOffPeakPricing.card, "off-peak");
@@ -100,24 +97,24 @@ assert.deepEqual(estimateUsageCost(chatUsage, deepseekOffPeakPricing), {
 });
 
 assert.equal(resolveModelPricing("deepseek-v4-future", { mode: "deepseek" }), null);
-assert.equal(resolveModelPricing("deepseek-chat", { mode: "deepseek" })?.sourceModel, "deepseek-chat");
-assert.equal(resolveModelPricing("deepseek-reasoner", { mode: "deepseek" })?.sourceModel, "deepseek-reasoner");
+assert.equal(resolveModelPricing("deepseek-chat", { mode: "deepseek" }), null);
+assert.equal(resolveModelPricing("deepseek-reasoner", { mode: "deepseek" }), null);
 assert.equal(
-  resolveModelPricing("deepseek-v4-flash", { mode: "deepseek" }, new Date("2026-08-16T04:00:00Z"))!.card,
+  resolveModelPricing("deepseek-flash", { mode: "deepseek" }, new Date("2026-08-16T04:00:00Z"))!.card,
   "off-peak",
 );
 assert.equal(
-  resolveModelPricing("deepseek-v4-flash", { mode: "deepseek" }, new Date("2026-08-16T06:00:00Z"))!.card,
+  resolveModelPricing("deepseek-flash", { mode: "deepseek" }, new Date("2026-08-16T06:00:00Z"))!.card,
   "peak",
 );
 assert.equal(
-  resolveModelPricing("deepseek-v4-flash", { mode: "deepseek" }, new Date("2026-08-16T10:00:00Z"))!.card,
+  resolveModelPricing("deepseek-flash", { mode: "deepseek" }, new Date("2026-08-16T10:00:00Z"))!.card,
   "off-peak",
 );
 
-const deepseekView = getCatalogPriceView("deepseek", "deepseek-v4-flash")!;
+const deepseekView = getCatalogPriceView("deepseek", "deepseek-flash")!;
 assert.equal(deepseekView.source, "deepseek");
-assert.equal(deepseekView.sourceModel, "deepseek-v4-flash");
+assert.equal(deepseekView.sourceModel, "deepseek-flash");
 assert.equal(deepseekView.pricing.inputPerMillion, 0.3);
 assert.equal(deepseekView.pricing.cachedInputPerMillion, 0.006);
 assert.equal(deepseekView.pricing.outputPerMillion, 1.2);
@@ -127,15 +124,15 @@ assert.equal(deepseekView.offPeakPricing!.outputPerMillion, 0.6);
 assert.equal(getCatalogPriceView("deepseek", "deepseek-flash")!.sourceModel, "deepseek-flash");
 assert.deepEqual(deepseekView.peakHours, [[1, 4], [6, 10]]);
 assert.equal(getCatalogPriceView("deepseek", "not-a-deepseek-model"), null);
-assert.equal(getCatalogPriceView("deepseek", "deepseek-chat")?.sourceModel, "deepseek-chat");
+assert.equal(getCatalogPriceView("deepseek", "deepseek-chat"), null);
 assert.equal(getCatalogPriceView("unknown-catalog", "anything"), null);
 const openAIPricingView = getCatalogPriceView("openai", "gpt-5-mini-2025-08-07")!;
 assert.equal(openAIPricingView.sourceModel, "gpt-5-mini");
 assert.equal(openAIPricingView.pricing.inputPerMillion, 0.25);
 assert.equal(openAIPricingView.offPeakPricing, null);
 assert.equal(openAIPricingView.peakHours, null);
-assert.equal(getCatalogPriceView("deepseek", "deepseek-v4-flash-0731")!.sourceModel, "deepseek-v4-flash");
-assert.equal(getCatalogPriceView("deepseek", "deepseek-v4.1-flash-1017")!.sourceModel, "deepseek-v4.1-flash");
+assert.equal(getCatalogPriceView("deepseek", "deepseek-flash-0731")!.sourceModel, "deepseek-flash");
+assert.equal(getCatalogPriceView("deepseek", "deepseek-v4.1-flash-1017"), null);
 assert.equal(getCatalogPriceView("deepseek", "deepseek-v4-pro-0813")!.sourceModel, "deepseek-v4-pro");
 
 const anthropicPricing = resolveModelPricing("claude-haiku-4.5", { mode: "anthropic" })!;
@@ -165,11 +162,11 @@ assert.equal(resolveModelPricing("claude-haiku-4-5", { mode: "anthropic" })!.inp
 assert.equal(resolveModelPricing("claude-fable-5-1", { mode: "anthropic" })!.inputPerMillion, 10);
 assert.equal(resolveModelPricing("claude-fable-5-1", { mode: "anthropic" })!.outputPerMillion, 50);
 
-const geminiPricing = resolveModelPricing("gemini-3.1-pro", { mode: "google" })!;
+const geminiPricing = resolveModelPricing("gemini-4-argon", { mode: "google" })!;
 assert.equal(geminiPricing.source, "google");
 assert.equal(geminiPricing.inputPerMillion, 2);
-assert.equal(geminiPricing.cachedInputPerMillion, 0.2);
-assert.equal(geminiPricing.outputPerMillion, 12);
+assert.equal(geminiPricing.cachedInputPerMillion, 0.1);
+assert.equal(geminiPricing.outputPerMillion, 10);
 
 const kimiPricing = resolveModelPricing("kimi-k3", { mode: "kimi" })!;
 assert.equal(kimiPricing.source, "kimi");

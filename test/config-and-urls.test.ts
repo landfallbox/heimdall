@@ -87,7 +87,7 @@ try {
       name: "deepseek",
       baseUrl: "https://api.deepseek.com",
       authentication: "none",
-      models: [{ id: "deepseek-v4-flash", enabled: true, pricing: { mode: "deepseek" } }],
+      models: [{ id: "deepseek-flash", enabled: true, pricing: { mode: "deepseek" } }],
     }],
   });
   assert.deepEqual(deepseekConfig.vendors[0].models[0].pricing, { mode: "deepseek" });

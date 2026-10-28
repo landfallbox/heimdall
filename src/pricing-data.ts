@@ -8,7 +8,7 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
   "catalogs": {
     "openai": {
       "sourceUrl": "https://developers.openai.com/api/docs/pricing",
-      "updatedAt": "2026-10-07",
+      "updatedAt": "2026-10-27",
       "models": {
         "gpt-6-astra": {
           "currency": "USD",
@@ -82,36 +82,6 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
           "cachedInputPerMillion": null,
           "outputPerMillion": 180
         },
-        "gpt-5.3-codex": {
-          "currency": "USD",
-          "inputPerMillion": 1.75,
-          "cachedInputPerMillion": 0.175,
-          "outputPerMillion": 14
-        },
-        "gpt-5.2-codex": {
-          "currency": "USD",
-          "inputPerMillion": 1.75,
-          "cachedInputPerMillion": null,
-          "outputPerMillion": 14
-        },
-        "gpt-5.1-codex": {
-          "currency": "USD",
-          "inputPerMillion": 1.25,
-          "cachedInputPerMillion": 0.125,
-          "outputPerMillion": 10
-        },
-        "gpt-5.3-instant": {
-          "currency": "USD",
-          "inputPerMillion": 1.75,
-          "cachedInputPerMillion": null,
-          "outputPerMillion": 14
-        },
-        "gpt-5.2-instant": {
-          "currency": "USD",
-          "inputPerMillion": 1.5,
-          "cachedInputPerMillion": null,
-          "outputPerMillion": 6
-        },
         "gpt-5.2": {
           "currency": "USD",
           "inputPerMillion": 1.75,
@@ -153,12 +123,6 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
           "inputPerMillion": 15,
           "cachedInputPerMillion": null,
           "outputPerMillion": 120
-        },
-        "gpt-5-search-api": {
-          "currency": "USD",
-          "inputPerMillion": 1.25,
-          "cachedInputPerMillion": 0.125,
-          "outputPerMillion": 10
         },
         "gpt-4.1": {
           "currency": "USD",
@@ -255,90 +219,6 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
           "inputPerMillion": 0.5,
           "cachedInputPerMillion": null,
           "outputPerMillion": 1.5
-        },
-        "gpt-3.5-turbo-1106": {
-          "currency": "USD",
-          "inputPerMillion": 1,
-          "cachedInputPerMillion": null,
-          "outputPerMillion": 2
-        },
-        "gpt-3.5-turbo-instruct": {
-          "currency": "USD",
-          "inputPerMillion": 1.5,
-          "cachedInputPerMillion": null,
-          "outputPerMillion": 2
-        },
-        "davinci-002": {
-          "currency": "USD",
-          "inputPerMillion": 2,
-          "cachedInputPerMillion": null,
-          "outputPerMillion": 2
-        },
-        "babbage-002": {
-          "currency": "USD",
-          "inputPerMillion": 0.4,
-          "cachedInputPerMillion": null,
-          "outputPerMillion": 0.4
-        },
-        "chat-latest": {
-          "currency": "USD",
-          "inputPerMillion": 5,
-          "cachedInputPerMillion": 0.5,
-          "outputPerMillion": 30
-        },
-        "qwen3.8-max-0902": {
-          "pricing": {
-            "currency": "CNY",
-            "inputPerMillion": 12,
-            "cachedInputPerMillion": 1.2,
-            "outputPerMillion": 36
-          },
-          "tiers": [
-            {
-              "condition": "0 < Token ≤ 256K",
-              "inputPerMillion": 12,
-              "cachedInputPerMillion": 1.2,
-              "outputPerMillion": 36,
-              "isBase": true
-            },
-            {
-              "condition": "256K < Token ≤ 1M",
-              "inputPerMillion": 24,
-              "cachedInputPerMillion": 2.4,
-              "outputPerMillion": 72
-            },
-            {
-              "condition": "Token > 1M",
-              "note": "超长文本阶梯",
-              "inputPerMillion": 48,
-              "cachedInputPerMillion": 4.8,
-              "outputPerMillion": 144
-            }
-          ]
-        },
-        "qwen-plus": {
-          "pricing": {
-            "currency": "CNY",
-            "inputPerMillion": 0.8,
-            "cachedInputPerMillion": 0.08,
-            "outputPerMillion": 2
-          },
-          "tiers": [
-            {
-              "condition": "0 < Token ≤ 128K",
-              "inputPerMillion": 0.8,
-              "cachedInputPerMillion": 0.08,
-              "outputPerMillion": 2,
-              "isBase": true
-            },
-            {
-              "condition": "Token > 128K",
-              "note": "长文本档",
-              "inputPerMillion": 1.6,
-              "cachedInputPerMillion": 0.16,
-              "outputPerMillion": 4
-            }
-          ]
         }
       }
     },
@@ -360,34 +240,6 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
             "outputPerMillion": 0.6
           }
         },
-        "deepseek-v4-flash": {
-          "peak": {
-            "currency": "CNY",
-            "inputPerMillion": 0.3,
-            "cachedInputPerMillion": 0.006,
-            "outputPerMillion": 1.2
-          },
-          "offPeak": {
-            "currency": "CNY",
-            "inputPerMillion": 0.15,
-            "cachedInputPerMillion": 0.003,
-            "outputPerMillion": 0.6
-          }
-        },
-        "deepseek-v4.1-flash": {
-          "peak": {
-            "currency": "CNY",
-            "inputPerMillion": 2,
-            "cachedInputPerMillion": 0.04,
-            "outputPerMillion": 8
-          },
-          "offPeak": {
-            "currency": "CNY",
-            "inputPerMillion": 1,
-            "cachedInputPerMillion": 0.02,
-            "outputPerMillion": 4
-          }
-        },
         "deepseek-v4-pro": {
           "peak": {
             "currency": "CNY",
@@ -401,40 +253,12 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
             "cachedInputPerMillion": 0.022,
             "outputPerMillion": 1.98
           }
-        },
-        "deepseek-chat": {
-          "peak": {
-            "currency": "CNY",
-            "inputPerMillion": 1,
-            "cachedInputPerMillion": 0.1,
-            "outputPerMillion": 2
-          },
-          "offPeak": {
-            "currency": "CNY",
-            "inputPerMillion": 0.5,
-            "cachedInputPerMillion": 0.05,
-            "outputPerMillion": 1
-          }
-        },
-        "deepseek-reasoner": {
-          "peak": {
-            "currency": "CNY",
-            "inputPerMillion": 2,
-            "cachedInputPerMillion": 0.2,
-            "outputPerMillion": 8
-          },
-          "offPeak": {
-            "currency": "CNY",
-            "inputPerMillion": 1,
-            "cachedInputPerMillion": 0.1,
-            "outputPerMillion": 4
-          }
         }
       }
     },
     "anthropic": {
       "sourceUrl": "https://platform.claude.com/docs/en/about-claude/pricing",
-      "updatedAt": "2026-10-07",
+      "updatedAt": "2026-10-27",
       "models": {
         "claude-opus-5-5": {
           "currency": "USD",
@@ -499,7 +323,7 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
         "claude-sonnet-5-5": {
           "currency": "USD",
           "inputPerMillion": 2,
-          "cachedInputPerMillion": 0.2,
+          "cachedInputPerMillion": 0.1,
           "outputPerMillion": 10
         },
         "claude-sonnet-5": {
@@ -562,35 +386,17 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
           "cachedInputPerMillion": 0.25,
           "outputPerMillion": 50
         },
-        "claude-3-5-sonnet": {
-          "currency": "USD",
-          "inputPerMillion": 3,
-          "cachedInputPerMillion": 0.3,
-          "outputPerMillion": 15
-        },
         "claude-3-5-haiku": {
           "currency": "USD",
           "inputPerMillion": 0.8,
           "cachedInputPerMillion": 0.08,
           "outputPerMillion": 4
-        },
-        "claude-3-opus": {
-          "currency": "USD",
-          "inputPerMillion": 15,
-          "cachedInputPerMillion": 1.5,
-          "outputPerMillion": 75
-        },
-        "claude-3-haiku": {
-          "currency": "USD",
-          "inputPerMillion": 0.25,
-          "cachedInputPerMillion": 0.025,
-          "outputPerMillion": 1.25
         }
       }
     },
     "google": {
       "sourceUrl": "https://ai.google.dev/gemini-api/docs/pricing",
-      "updatedAt": "2026-10-24",
+      "updatedAt": "2026-10-27",
       "models": {
         "gemini-4-argon": {
           "currency": "USD",
@@ -598,31 +404,7 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
           "cachedInputPerMillion": 0.1,
           "outputPerMillion": 10
         },
-        "gemini-3.1-pro": {
-          "currency": "USD",
-          "inputPerMillion": 2,
-          "cachedInputPerMillion": 0.2,
-          "outputPerMillion": 12
-        },
-        "gemini-3-pro": {
-          "currency": "USD",
-          "inputPerMillion": 2,
-          "cachedInputPerMillion": 0.2,
-          "outputPerMillion": 12
-        },
-        "gemini-3.5-flash": {
-          "currency": "USD",
-          "inputPerMillion": 1.5,
-          "cachedInputPerMillion": 0.15,
-          "outputPerMillion": 9
-        },
         "gemini-3.8-flash": {
-          "currency": "USD",
-          "inputPerMillion": 0.75,
-          "cachedInputPerMillion": 0.075,
-          "outputPerMillion": 3.75
-        },
-        "gemini-3.7-flash": {
           "currency": "USD",
           "inputPerMillion": 0.75,
           "cachedInputPerMillion": 0.075,
@@ -633,12 +415,6 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
           "inputPerMillion": 0.75,
           "cachedInputPerMillion": 0.075,
           "outputPerMillion": 3.75
-        },
-        "gemini-3-flash": {
-          "currency": "USD",
-          "inputPerMillion": 0.5,
-          "cachedInputPerMillion": 0.05,
-          "outputPerMillion": 3
         },
         "gemini-3.5-flash-lite": {
           "currency": "USD",
@@ -673,7 +449,7 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
       }
     },
     "kimi": {
-      "sourceUrl": "https://platform.kimi.ai/docs/pricing/chat.md",
+      "sourceUrl": "https://platform.kimi.ai/docs/pricing/chat",
       "updatedAt": "2026-10-24",
       "models": {
         "kimi-k3.1-pro": {
