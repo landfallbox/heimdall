@@ -9,12 +9,15 @@
 import { parsePrice, splitCells, splitRows, splitTables } from "../lib.mjs";
 
 export async function parse(content) {
+  // Fail closed: if either heading is missing (page reworded), parsing the
+  // full page would let the Overseas (USD) rows overwrite the Domestic (CNY)
+  // rows, silently storing USD values as CNY.
   const domesticIdx = content.indexOf("### Domestic Pricing");
   const overseasIdx = content.indexOf("### Overseas Pricing");
-  const region =
-    domesticIdx >= 0 && overseasIdx > domesticIdx
-      ? content.slice(domesticIdx, overseasIdx)
-      : content;
+  if (domesticIdx < 0 || overseasIdx <= domesticIdx) {
+    throw new Error("mimo: Domestic/Overseas Pricing sections not found");
+  }
+  const region = content.slice(domesticIdx, overseasIdx);
 
   const models = {};
   let currentType = null;

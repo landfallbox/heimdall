@@ -187,7 +187,10 @@ async function main() {
     for (const e of fetchErrors) bodyLines.push(`- error: ${e}`);
     git(["commit", "-m", `chore(pricing): refresh model pricing (${vendorsChanged.join(", ")})`, "-m", bodyLines.join("\n")]);
     git(["push", "-f", "origin", branch]);
-    const prUrl = git(["pr", "create", "--fill", "--head", branch]);
+    const gh = (args) => execFileSync("gh", args, { cwd: ROOT, encoding: "utf8" }).trim();
+    // A same-day rerun reuses the branch; reuse its open PR instead of duplicating.
+    const existingPr = gh(["pr", "list", "--head", branch, "--state", "open", "--json", "url", "--jq", ".[0].url // empty"]);
+    const prUrl = existingPr || gh(["pr", "create", "--fill", "--head", branch]);
     console.log(`PR: ${prUrl}`);
   }
 }
