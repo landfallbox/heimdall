@@ -69,6 +69,21 @@ function git(args) {
   return execFileSync("git", args, { cwd: ROOT, encoding: "utf8" }).trim();
 }
 
+function remoteBranchExists(branch) {
+  try {
+    git(["ls-remote", "--exit-code", "--heads", "origin", branch]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function remoteOwner() {
+  const url = git(["remote", "get-url", "origin"]);
+  const m = url.match(/github\.com[:/]([^/]+)\//);
+  return m ? m[1] : "";
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) {
@@ -132,17 +147,22 @@ async function main() {
     vendorScrapes.push({ vendor, models, baselineIds: baseline });
   }
 
-  const { data, added, modified, keptRetired, warnings } = mergePricing(existing, vendorScrapes);
+  let { data, added, modified, keptRetired, warnings } = mergePricing(existing, vendorScrapes);
 
-  const changed = added.length > 0 || modified.length > 0;
-  if (changed) {
+  // Stamp the top-level and per-vendor updatedAt for the vendors this run
+  // actually changed. Re-called after a same-day rerun rebase, when the
+  // changed-vendor set is recomputed against the refresh branch.
+  const stampChanged = () => {
     for (const vendor of vendorNames) {
       if (added.some((e) => e.startsWith(`${vendor}/`)) || modified.some((e) => e.startsWith(`${vendor}/`))) {
         data.catalogs[vendor] = { ...data.catalogs[vendor], updatedAt: today() };
       }
     }
     data.updatedAt = today();
-  }
+  };
+
+  const changed = added.length > 0 || modified.length > 0;
+  if (changed) stampChanged();
 
   console.log(`vendors: ${vendorNames.join(", ")}`);
   for (const w of warnings) console.log(`warn: ${w}`);
@@ -172,8 +192,35 @@ async function main() {
   console.log(`updated ${path.relative(ROOT, dataFile)} and regenerated src/pricing-data.ts`);
 
   if (args.commit) {
-    const vendorsChanged = [...new Set([...added, ...modified].map((e) => e.split("/")[0]))].sort();
     const branch = `pricing-refresh-${today()}`;
+    const gh = (args) => execFileSync("gh", args, { cwd: ROOT, encoding: "utf8" }).trim();
+    // On a same-day rerun, base this run on the refresh branch's own data file
+    // so price changes from earlier runs are preserved, not overwritten.
+    if (remoteBranchExists(branch)) {
+      git(["fetch", "origin", branch]);
+      const branchData = git(["show", `origin/${branch}:data/pricing.json`]);
+      const merged = mergePricing(JSON.parse(branchData), vendorScrapes);
+      data = merged.data;
+      added = merged.added;
+      modified = merged.modified;
+      keptRetired = merged.keptRetired;
+      warnings = merged.warnings;
+      const revalidated = validatePricing(data);
+      await writeFile(dataFile, formatPricing(revalidated), "utf8");
+      execFileSync(process.execPath, [GENERATOR], { cwd: ROOT, stdio: "inherit" });
+      stampChanged();
+      console.log(`rerun: rebased this scrape onto ${branch}'s pending pricing changes`);
+    }
+    // If everything scraped is already on the refresh branch, there is
+    // nothing new to commit; the branch and its PR are up to date.
+    if (added.length === 0 && modified.length === 0) {
+      // Undo the rebase's writes so the working tree stays clean.
+      git(["checkout", "--", "data/pricing.json", "src/pricing-data.ts"]);
+      console.log("no new changes beyond the refresh branch; nothing to do");
+      if (fetchErrors.length > 0) process.exit(1);
+      return;
+    }
+    const vendorsChanged = [...new Set([...added, ...modified].map((e) => e.split("/")[0]))].sort();
     git(["checkout", "-B", branch]);
     git(["add", "data/pricing.json", "src/pricing-data.ts"]);
     const bodyLines = [
@@ -185,13 +232,27 @@ async function main() {
     ];
     for (const w of warnings) bodyLines.push(`- warn: ${w}`);
     for (const e of fetchErrors) bodyLines.push(`- error: ${e}`);
-    git(["commit", "-m", `chore(pricing): refresh model pricing (${vendorsChanged.join(", ")})`, "-m", bodyLines.join("\n")]);
+    const title = `chore(pricing): refresh model pricing (${vendorsChanged.join(", ")})`;
+    const body = bodyLines.join("\n");
+    git(["commit", "-m", title, "-m", body]);
     git(["push", "-f", "origin", branch]);
-    const gh = (args) => execFileSync("gh", args, { cwd: ROOT, encoding: "utf8" }).trim();
-    // A same-day rerun reuses the branch; reuse its open PR instead of duplicating.
-    const existingPr = gh(["pr", "list", "--head", branch, "--state", "open", "--json", "url", "--jq", ".[0].url // empty"]);
-    const prUrl = existingPr || gh(["pr", "create", "--fill", "--head", branch]);
-    console.log(`PR: ${prUrl}`);
+    // A same-day rerun reuses the branch; reuse its open PR instead of
+    // duplicating. --head matches on branch name only, so also require the
+    // head repo to be this repository to ignore same-named fork PRs.
+    const owner = remoteOwner();
+    const existingPr = gh([
+      "pr", "list", "--head", branch, "--state", "open",
+      "--json", "url,headRepositoryOwner",
+      "--jq", `.[] | select(.headRepositoryOwner.login == "${owner}") | .url | select(length > 0)`,
+    ]).split("\n").filter(Boolean)[0] ?? "";
+    if (existingPr) {
+      // Refresh the PR's title and body so they describe this run, not the first.
+      gh(["pr", "edit", existingPr, "--title", title, "-b", body]);
+      console.log(`PR: ${existingPr} (updated)`);
+    } else {
+      const prUrl = gh(["pr", "create", "--fill", "--title", title, "-b", body, "--head", branch]);
+      console.log(`PR: ${prUrl}`);
+    }
   }
 }
 
