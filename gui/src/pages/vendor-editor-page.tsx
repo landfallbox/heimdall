@@ -51,6 +51,15 @@ import {
 } from "../../../src/usage.ts";
 import { Button } from "../components/ui/button.tsx";
 import { Card, CardContent } from "../components/ui/card.tsx";
+import { Checkbox } from "../components/ui/checkbox.tsx";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../components/ui/dialog.tsx";
 import { Separator } from "../components/ui/separator.tsx";
 import { Input } from "../components/ui/input.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.tsx";
@@ -71,6 +80,7 @@ interface VendorEditorPageProps {
   onUpdateVendor: (field: string, value: unknown) => void;
   onUpdateVendorModel: (modelIndex: number, field: string, value: unknown) => void;
   onAddVendorModel: () => void;
+  onAddAllVendorModels: () => void;
   onRemoveVendorModel: (modelIndex: number) => void;
   availableModels: string[];
   vendorModelsError: { field: string; message: string } | null;
@@ -89,6 +99,7 @@ export function VendorEditorPage({
   onUpdateVendor,
   onUpdateVendorModel,
   onAddVendorModel,
+  onAddAllVendorModels,
   onRemoveVendorModel,
   availableModels,
   vendorModelsError,
@@ -208,6 +219,15 @@ export function VendorEditorPage({
                 <Button variant="outline" size="sm" onClick={onAddVendorModel}>
                   <Plus size={14} />
                   Add model
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onAddAllVendorModels}
+                  disabled={busy === "vendorModels"}
+                >
+                  {busy === "vendorModels" ? <Loader2 className="animate-spin" size={14} /> : <Layers size={14} />}
+                  Add all models
                 </Button>
                 <Button
                   variant="outline"
@@ -1074,5 +1094,93 @@ function CapabilityPill({ label, active, onClick }: { label: string; active: boo
     >
       {label}
     </button>
+  );
+}
+
+export function AddVendorModelsDialog({
+  open,
+  models,
+  onConfirm,
+  onCancel,
+}: {
+  open: boolean;
+  models: string[];
+  onConfirm: (modelIds: string[]) => void;
+  onCancel: () => void;
+}) {
+  const [checked, setChecked] = React.useState<Set<string>>(() => new Set(models));
+  React.useEffect(() => {
+    if (open) {
+      setChecked(new Set(models));
+    }
+  }, [open, models]);
+
+  const allChecked = models.length > 0 && models.every((modelId) => checked.has(modelId));
+  const someChecked = models.some((modelId) => checked.has(modelId));
+  const headerChecked: boolean | "indeterminate" = allChecked ? true : someChecked ? "indeterminate" : false;
+
+  function toggleModel(modelId: string, value: boolean) {
+    setChecked((current) => {
+      const next = new Set(current);
+      if (value) {
+        next.add(modelId);
+      } else {
+        next.delete(modelId);
+      }
+      return next;
+    });
+  }
+
+  function toggleAll(value: boolean) {
+    setChecked(value ? new Set(models) : new Set());
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(value) => { if (!value) onCancel(); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Add models</DialogTitle>
+          <DialogDescription>
+            {models.length} models available from this vendor. Select the models to add.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="max-h-80 overflow-y-auto rounded-lg border border-border/60">
+          <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-border/60 bg-card px-3 py-2">
+            <Checkbox
+              checked={headerChecked}
+              onCheckedChange={(value) => toggleAll(value === true)}
+              aria-label="Select all models"
+            />
+            <span className="text-xs font-medium text-muted-foreground">All models</span>
+          </div>
+          <div className="flex flex-col">
+            {models.map((modelId) => (
+              <label
+                key={modelId}
+                className="flex cursor-pointer items-center gap-2 px-3 py-1.5 hover:bg-foreground/[0.03]"
+              >
+                <Checkbox
+                  checked={checked.has(modelId)}
+                  onCheckedChange={(value) => toggleModel(modelId, value === true)}
+                  aria-label={`Add ${modelId}`}
+                />
+                <span className="font-mono text-xs">{modelId}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+        <DialogFooter>
+          <span className="mr-auto text-xs text-muted-foreground">
+            {checked.size} of {models.length} selected
+          </span>
+          <Button variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button disabled={checked.size === 0} onClick={() => onConfirm(models.filter((modelId) => checked.has(modelId)))}>
+            Add
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

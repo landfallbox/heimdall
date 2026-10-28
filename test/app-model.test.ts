@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   applyModelSwitch,
+  buildBulkVendorModels,
   canLoadVendorModels,
   cloneVendor,
   endpointsFromDraft,
@@ -209,5 +210,28 @@ assert.equal(
   formatUserErrorMessage(null),
   "An unexpected error occurred.",
 );
+
+// buildBulkVendorModels: dedupe/blank filtering, catalog pricing suggestion, model info fill.
+const bulkRows = buildBulkVendorModels(["gpt-4o", "gpt-4o", "  ", "unknown-model-xyz", "deepseek-chat"]);
+assert.equal(bulkRows.length, 3);
+assert.deepEqual(bulkRows.map((row) => row.id), ["gpt-4o", "unknown-model-xyz", "deepseek-chat"]);
+assert.ok(bulkRows.every((row) => row.enabled === true));
+assert.ok(bulkRows.every((row) => row.inputPerMillion === "" && row.cachedInputPerMillion === "" && row.outputPerMillion === ""));
+
+const bulkGpt4o = bulkRows[0];
+assert.equal(bulkGpt4o.pricingMode, "openai");
+assert.equal(bulkGpt4o.vscode?.contextWindow, "128000");
+assert.equal(bulkGpt4o.vscode?.maxOutputTokens, "16384");
+assert.equal(bulkGpt4o.vscode?.toolCalling, true);
+assert.equal(bulkGpt4o.vscode?.vision, true);
+assert.equal(bulkGpt4o.vscode?.thinking, false);
+
+const bulkUnknown = bulkRows[1];
+assert.equal(bulkUnknown.pricingMode, undefined);
+assert.equal(bulkUnknown.vscode, undefined);
+assert.equal(bulkUnknown.vscodeModelCache, undefined);
+
+assert.deepEqual(buildBulkVendorModels([]), []);
+assert.deepEqual(buildBulkVendorModels(["", "  "]), []);
 
 console.log("app-model tests passed");

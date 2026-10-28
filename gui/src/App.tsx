@@ -5,6 +5,7 @@ import { FileWarning, Layers, Plus, Save, Server, Undo2, X, XCircle } from "luci
 import { toast } from "sonner";
 
 import {
+  buildBulkVendorModels,
   canLoadVendorModels,
   cloneVendor,
   endpointsFromDraft,
@@ -35,7 +36,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Toaster } from "./components/ui/sonner.tsx";
 import { AppSettingsPage } from "./pages/application-page.tsx";
 import { RouterPage } from "./pages/router-page.tsx";
-import { VendorEditorPage } from "./pages/vendor-editor-page.tsx";
+import { AddVendorModelsDialog, VendorEditorPage } from "./pages/vendor-editor-page.tsx";
 import { VendorsRail } from "./components/vendors-rail.tsx";
 import { UsagePage } from "./pages/usage-page.tsx";
 import { LogsPage } from "./pages/logs-page.tsx";
@@ -54,6 +55,7 @@ type Page = PageId;
 type ModalState =
   | { type: "delete"; index: number; name: string }
   | { type: "deleteVendorModel"; index: number; name: string }
+  | { type: "addVendorModels"; models: string[] }
   | { type: "revertVendor" }
   | { type: "enableThinking"; modelIndex: number }
   | { type: "reloadConfig" }
@@ -671,6 +673,9 @@ export default function App() {
   }
 
   function updateVendorEditor(field: string, value: unknown) {
+    if (field === "baseUrl" || field === "apiKey" || field === "authentication") {
+      clearVendorModelOptions();
+    }
     setVendorEditorDraft((current) => (current ? { ...current, [field]: value } : current));
   }
 
@@ -705,9 +710,9 @@ export default function App() {
   async function loadVendorModels(
     vendor: VendorDraft | null,
     { silent = false, force = false, sourceKey = getVendorModelsSourceKey(vendor) }: { silent?: boolean; force?: boolean; sourceKey?: string } = {},
-  ) {
+  ): Promise<string[] | null> {
     if (!vendor) {
-      return;
+      return null;
     }
     if (!canLoadVendorModels(vendor)) {
       const message = getVendorModelsLoadMessage(vendor);
@@ -715,16 +720,16 @@ export default function App() {
       if (!silent) {
         notify(message);
       }
-      return;
+      return null;
     }
     if (!force && sourceKey === vendorModelsSourceKeyRef.current) {
-      return;
+      return null;
     }
     if (typeof getDesktopApi().listVendorModels !== "function") {
       if (!silent) {
         notify("Restart the desktop app to enable model list loading.");
       }
-      return;
+      return null;
     }
 
     const requestId = vendorModelsRequestRef.current + 1;
@@ -739,22 +744,25 @@ export default function App() {
     try {
       const result = await getDesktopApi().listVendorModels(vendor);
       if (requestId !== vendorModelsRequestRef.current || sourceKey !== vendorModelsSourceKeyRef.current) {
-        return;
+        return null;
       }
-      setAvailableVendorModels(result.models || []);
+      const loaded = result.models || [];
+      setAvailableVendorModels(loaded);
       setVendorModelsError(null);
       if (!silent) {
-        notify(`Loaded ${(result.models || []).length} models.`);
+        notify(`Loaded ${loaded.length} models.`);
       }
+      return loaded;
     } catch (error) {
       if (requestId !== vendorModelsRequestRef.current || sourceKey !== vendorModelsSourceKeyRef.current) {
-        return;
+        return null;
       }
       const fieldError = getVendorModelsErrorField(error, vendor);
       setVendorModelsError(fieldError);
       if (!silent) {
         notify(fieldError.message, "error");
       }
+      return null;
     } finally {
       if (!silent && requestId === vendorModelsRequestRef.current) {
         setBusy((current) => (current === "vendorModels" ? "" : current));
@@ -764,6 +772,52 @@ export default function App() {
 
   async function refreshVendorModels() {
     await loadVendorModels(vendorEditorDraft, { force: true });
+  }
+
+  async function openAddVendorModelsDialog() {
+    const vendor = vendorEditorDraft;
+    if (!vendor) {
+      return;
+    }
+    let candidates = availableVendorModels;
+    if (candidates.length === 0) {
+      candidates = (await loadVendorModels(vendor, { force: true })) || [];
+    }
+    if (candidates.length === 0) {
+      return;
+    }
+    const existing = new Set(getVendorModels(vendor).map((model) => String(model.id || "").trim()).filter(Boolean));
+    const modelIds = [...new Set(candidates.map((modelId) => String(modelId || "").trim()).filter(Boolean))].filter(
+      (modelId) => !existing.has(modelId),
+    );
+    if (modelIds.length === 0) {
+      notify("All available models are already added.");
+      return;
+    }
+    setModal({ type: "addVendorModels", models: modelIds });
+  }
+
+  function confirmAddVendorModels(selectedIds: string[]) {
+    const current = vendorEditorDraft;
+    if (!current) {
+      setModal(null);
+      return;
+    }
+    const existing = new Set(
+      getVendorModels(current)
+        .map((model) => String(model.id || "").trim())
+        .filter(Boolean),
+    );
+    const rows = buildBulkVendorModels(
+      selectedIds.filter((modelId) => !existing.has(String(modelId || "").trim())),
+    );
+    if (rows.length === 0) {
+      setModal(null);
+      return;
+    }
+    setVendorEditorDraft({ ...current, models: [...getVendorModels(current), ...rows] });
+    setModal(null);
+    notify(`Added ${rows.length} models.`);
   }
 
   async function loadVendorModelsOnSelect() {
@@ -1078,6 +1132,7 @@ export default function App() {
                           onUpdateVendor={updateVendorEditor}
                           onUpdateVendorModel={updateVendorEditorModel}
                           onAddVendorModel={addVendorEditorModel}
+                          onAddAllVendorModels={() => void openAddVendorModelsDialog()}
                           onRemoveVendorModel={requestRemoveVendorEditorModel}
                           availableModels={availableVendorModels}
                           vendorModelsError={vendorModelsError}
@@ -1154,6 +1209,13 @@ export default function App() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AddVendorModelsDialog
+        open={modal?.type === "addVendorModels"}
+        models={modal?.type === "addVendorModels" ? modal.models : []}
+        onConfirm={confirmAddVendorModels}
+        onCancel={() => setModal(null)}
+      />
 
       <Dialog open={modal?.type === "revertVendor"} onOpenChange={(open) => { if (!open) setModal(null); }}>
         <DialogContent>
