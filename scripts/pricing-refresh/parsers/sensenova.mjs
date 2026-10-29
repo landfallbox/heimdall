@@ -5,6 +5,9 @@
 // Token-priced models live in HTML tables. Two row layouts appear:
 //   5 cols: 服务 | 输入tokens | 0.003元/千tokens | 输出tokens | 0.009元/千tokens
 //   3 cols: 服务 | 输入tokens、输出tokens | 0.015元/千tokens   (single price)
+// Single-price rows may also appear as 5-col rows with an empty trailing
+// output cell; those fall back to the input price for both directions.
+// Duplicate model rows keep the first valid row (first occurrence wins).
 // Prices are quoted in CNY per THOUSAND tokens (元/千tokens); the catalog stores
 // CNY per million tokens, so values are multiplied by 1000.
 //
@@ -40,14 +43,16 @@ export async function parse(content) {
       if (hasOutputCell && TOKEN_PRICE.test(row[4].text) && TOKEN_PRICE.test(row[2].text)) {
         input = parsePrice(row[2].text);
         output = parsePrice(row[4].text);
-      } else if (!hasOutputCell && TOKEN_PRICE.test(row[2].text)) {
-        // 3-col rows quote one price for both input and output
+      } else if ((!hasOutputCell || row[4].text === "") && TOKEN_PRICE.test(row[2].text)) {
+        // Single price for both input and output: 3-col rows, or 5-col rows
+        // whose trailing output cell is empty.
         input = parsePrice(row[2].text);
         output = input;
       } else {
         continue; // per-minute / per-character / free rows are not token-priced
       }
       if (input == null || output == null) continue;
+      if (models[id]) continue; // first occurrence wins
 
       models[id] = {
         currency: "CNY",

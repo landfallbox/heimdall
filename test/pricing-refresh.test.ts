@@ -95,6 +95,37 @@ for (const vendor of REAL_FIXTURE_VENDORS) {
   console.log(`${vendor}: ${Object.keys(models).length} models parsed`);
 }
 
+// --- sensenova parser edge cases --------------------------------------------
+
+{
+  // Synthetic rows: duplicate ID (first valid row wins), a 5-col row with an
+  // empty trailing output cell (single-price fallback), and a populated free
+  // output value (still rejected).
+  const parse = await loadParser("sensenova");
+  const html = `<table>
+    <tr><td>服务</td><td>计费项</td><td>单价</td><td>计费项</td><td>单价</td></tr>
+    <tr><td>SenseNova-Test-A模型调用</td><td>输入tokens</td><td>0.003元/千tokens</td><td>输出tokens</td><td>0.009元/千tokens</td></tr>
+    <tr><td>SenseNova-Test-B模型调用</td><td>输入tokens、输出tokens</td><td>0.015元/千tokens</td><td></td><td></td></tr>
+    <tr><td>SenseNova-Test-A模型调用</td><td>输入tokens</td><td>0.999元/千tokens</td><td>输出tokens</td><td>0.999元/千tokens</td></tr>
+    <tr><td>SenseNova-Test-C模型调用</td><td>输入tokens</td><td>0.001元/千tokens</td><td>输出tokens</td><td>限时免费体验</td></tr>
+  </table>`;
+  const models = (await parse(html)) as ScrapedModels;
+  assert.deepEqual(models["sensenova-test-a"], {
+    currency: "CNY",
+    inputPerMillion: 3,
+    cachedInputPerMillion: null,
+    outputPerMillion: 9,
+  });
+  assert.deepEqual(models["sensenova-test-b"], {
+    currency: "CNY",
+    inputPerMillion: 15,
+    cachedInputPerMillion: null,
+    outputPerMillion: 15,
+  });
+  assert.equal(models["sensenova-test-c"], undefined, "free output value must be rejected");
+  console.log("sensenova parser: duplicate + empty-output-cell handling works");
+}
+
 // --- merge semantics -------------------------------------------------------
 
 function baseData(): {
