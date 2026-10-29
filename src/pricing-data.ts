@@ -4,11 +4,11 @@ import type { RemotePricingData } from "./usage.ts";
 
 export const BUILTIN_PRICING_DATA: RemotePricingData = {
   "schemaVersion": 1,
-  "updatedAt": "2026-10-27",
+  "updatedAt": "2026-10-29",
   "catalogs": {
     "openai": {
       "sourceUrl": "https://developers.openai.com/api/docs/pricing",
-      "updatedAt": "2026-10-27",
+      "updatedAt": "2026-10-29",
       "models": {
         "gpt-6-astra": {
           "currency": "USD",
@@ -219,6 +219,18 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
           "inputPerMillion": 0.5,
           "cachedInputPerMillion": null,
           "outputPerMillion": 1.5
+        },
+        "gpt-6.1-sol": {
+          "currency": "USD",
+          "inputPerMillion": 2,
+          "cachedInputPerMillion": 0.1,
+          "outputPerMillion": 10
+        },
+        "gpt-6.1-terra": {
+          "currency": "USD",
+          "inputPerMillion": 1,
+          "cachedInputPerMillion": 0.05,
+          "outputPerMillion": 5
         }
       }
     },
@@ -258,7 +270,7 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
     },
     "anthropic": {
       "sourceUrl": "https://platform.claude.com/docs/en/about-claude/pricing",
-      "updatedAt": "2026-10-27",
+      "updatedAt": "2026-10-29",
       "models": {
         "claude-opus-5-5": {
           "currency": "USD",
@@ -391,12 +403,30 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
           "inputPerMillion": 0.8,
           "cachedInputPerMillion": 0.08,
           "outputPerMillion": 4
+        },
+        "claude-haiku-5-5": {
+          "currency": "USD",
+          "inputPerMillion": 0.1,
+          "cachedInputPerMillion": 0.01,
+          "outputPerMillion": 0.5
+        },
+        "claude-fable-5": {
+          "currency": "USD",
+          "inputPerMillion": 10,
+          "cachedInputPerMillion": 1,
+          "outputPerMillion": 50
+        },
+        "claude-mythos-5": {
+          "currency": "USD",
+          "inputPerMillion": 10,
+          "cachedInputPerMillion": 1,
+          "outputPerMillion": 50
         }
       }
     },
     "google": {
       "sourceUrl": "https://ai.google.dev/gemini-api/docs/pricing",
-      "updatedAt": "2026-10-27",
+      "updatedAt": "2026-10-29",
       "models": {
         "gemini-4-argon": {
           "currency": "USD",
@@ -445,12 +475,24 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
           "inputPerMillion": 0.1,
           "cachedInputPerMillion": 0.01,
           "outputPerMillion": 0.4
+        },
+        "gemini-3.1-pro-preview": {
+          "currency": "USD",
+          "inputPerMillion": 2,
+          "cachedInputPerMillion": 0.2,
+          "outputPerMillion": 12
+        },
+        "gemini-3-flash-preview": {
+          "currency": "USD",
+          "inputPerMillion": 0.5,
+          "cachedInputPerMillion": 0.05,
+          "outputPerMillion": 3
         }
       }
     },
     "kimi": {
       "sourceUrl": "https://platform.kimi.ai/docs/pricing/chat",
-      "updatedAt": "2026-10-24",
+      "updatedAt": "2026-10-29",
       "models": {
         "kimi-k3.1-pro": {
           "currency": "USD",
@@ -493,12 +535,18 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
           "inputPerMillion": 0.6,
           "cachedInputPerMillion": null,
           "outputPerMillion": 2.5
+        },
+        "kimi-k3.1-pro-highspeed": {
+          "currency": "USD",
+          "inputPerMillion": 4,
+          "cachedInputPerMillion": 0.2,
+          "outputPerMillion": 20
         }
       }
     },
     "glm": {
       "sourceUrl": "https://docs.bigmodel.cn/cn/guide/start/pricing.md",
-      "updatedAt": "2026-09-28",
+      "updatedAt": "2026-10-29",
       "models": {
         "glm-5.3": {
           "currency": "CNY",
@@ -565,6 +613,102 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
           "inputPerMillion": 0.5,
           "cachedInputPerMillion": 0.1,
           "outputPerMillion": 3
+        },
+        "glm-5.3-flashx-legal": {
+          "currency": "CNY",
+          "inputPerMillion": 2,
+          "cachedInputPerMillion": 0.57,
+          "outputPerMillion": 7
+        },
+        "glm-4-plus": {
+          "currency": "CNY",
+          "inputPerMillion": 5,
+          "cachedInputPerMillion": 2.5,
+          "outputPerMillion": 5
+        },
+        "glm-4-air-250414": {
+          "currency": "CNY",
+          "inputPerMillion": 0.5,
+          "cachedInputPerMillion": 0.25,
+          "outputPerMillion": 0.5
+        },
+        "glm-4-airx": {
+          "currency": "CNY",
+          "inputPerMillion": 10,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 10
+        },
+        "glm-4-long": {
+          "currency": "CNY",
+          "inputPerMillion": 1,
+          "cachedInputPerMillion": 0.5,
+          "outputPerMillion": 1
+        },
+        "glm-4-assistant": {
+          "currency": "CNY",
+          "inputPerMillion": 5,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 5
+        },
+        "glm-z1-air": {
+          "currency": "CNY",
+          "inputPerMillion": 0.5,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 0.5
+        },
+        "glm-z1-airx": {
+          "currency": "CNY",
+          "inputPerMillion": 5,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 5
+        },
+        "glm-z1-flashx": {
+          "currency": "CNY",
+          "inputPerMillion": 0.1,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 0.1
+        },
+        "glm-4-flashx-250414": {
+          "currency": "CNY",
+          "inputPerMillion": 0.1,
+          "cachedInputPerMillion": 0.05,
+          "outputPerMillion": 0.1
+        },
+        "glm-ocr": {
+          "currency": "CNY",
+          "inputPerMillion": 0.2,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 0.2
+        },
+        "glm-5v-turbo": {
+          "currency": "CNY",
+          "inputPerMillion": 5,
+          "cachedInputPerMillion": 1.2,
+          "outputPerMillion": 22
+        },
+        "glm-4.6v-flashx": {
+          "currency": "CNY",
+          "inputPerMillion": 0.15,
+          "cachedInputPerMillion": 0.03,
+          "outputPerMillion": 1.5
+        },
+        "glm-4.5v": {
+          "currency": "CNY",
+          "inputPerMillion": 2,
+          "cachedInputPerMillion": 0.4,
+          "outputPerMillion": 6
+        },
+        "glm-4v-plus-0111": {
+          "currency": "CNY",
+          "inputPerMillion": 4,
+          "cachedInputPerMillion": 2,
+          "outputPerMillion": 4
+        },
+        "glm-4.1v-thinking-flashx": {
+          "currency": "CNY",
+          "inputPerMillion": 2,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 2
         }
       }
     },
@@ -606,7 +750,7 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
     },
     "minimax": {
       "sourceUrl": "https://platform.minimaxi.com/document/pricing",
-      "updatedAt": "2026-10-27",
+      "updatedAt": "2026-10-29",
       "models": {
         "MiniMax-M3.1-Flash": {
           "currency": "CNY",
@@ -636,6 +780,12 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
               "outputPerMillion": 16.8
             }
           ]
+        },
+        "MiniMax-H3-Context-IR": {
+          "currency": "CNY",
+          "inputPerMillion": 5.8,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 23
         }
       }
     },
