@@ -14,7 +14,7 @@ const sourcePath = join(root, "data", "pricing.json");
 const targetPath = join(root, "src", "pricing-data.ts");
 
 // Must match PRICING_CATALOG_KEYS in src/usage.ts.
-const EXPECTED_CATALOG_KEYS = ["openai", "deepseek", "anthropic", "google", "kimi", "glm", "mimo", "minimax", "stepfun", "qwen"];
+const EXPECTED_CATALOG_KEYS = ["openai", "deepseek", "anthropic", "google", "kimi", "glm", "mimo", "minimax", "stepfun", "qwen", "sensenova"];
 
 function render(data) {
   return [

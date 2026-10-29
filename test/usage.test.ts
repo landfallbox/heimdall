@@ -197,7 +197,7 @@ assert.equal(resolveModelPricing("mimo-v2.5-pro", { mode: "mimo" })!.inputPerMil
 assert.equal(resolveModelPricing("gpt-5-mini", { mode: "unknown-catalog" })!.source, "openai");
 assert.equal(isPricingCatalogKey("anthropic"), true);
 assert.equal(isPricingCatalogKey("custom"), false);
-assert.equal(getPricingCatalogSummary().length, 10);
+assert.equal(getPricingCatalogSummary().length, 11);
 
 const tempDirectory = mkdtempSync(join(tmpdir(), "local-router-usage-test-"));
 try {

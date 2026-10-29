@@ -1551,6 +1551,72 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
           "outputPerMillion": 2.7
         }
       }
+    },
+    "sensenova": {
+      "sourceUrl": "https://www.sensecore.cn/help/docs/model-as-a-service/nova/pricing",
+      "updatedAt": "2026-10-29",
+      "models": {
+        "sensenova-v6.5-pro": {
+          "currency": "CNY",
+          "inputPerMillion": 3,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 9
+        },
+        "sensenova-v6-5-pro": {
+          "currency": "CNY",
+          "inputPerMillion": 3,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 9
+        },
+        "sensenova-v6.5-turbo": {
+          "currency": "CNY",
+          "inputPerMillion": 1.5,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 4.5
+        },
+        "sensenova-v6-pro": {
+          "currency": "CNY",
+          "inputPerMillion": 3,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 9
+        },
+        "sensenova-v6-turbo": {
+          "currency": "CNY",
+          "inputPerMillion": 1.5,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 4.5
+        },
+        "sensenova-v6-reasoner": {
+          "currency": "CNY",
+          "inputPerMillion": 4,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 16
+        },
+        "sensechat-vision": {
+          "currency": "CNY",
+          "inputPerMillion": 10,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 60
+        },
+        "sensechat-character-pro": {
+          "currency": "CNY",
+          "inputPerMillion": 15,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 15
+        },
+        "sensechat-character": {
+          "currency": "CNY",
+          "inputPerMillion": 12,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 12
+        },
+        "sensenova-6.8-flash-lite": {
+          "currency": "CNY",
+          "inputPerMillion": 0,
+          "cachedInputPerMillion": 0,
+          "outputPerMillion": 0
+        }
+      }
     }
   }
 };

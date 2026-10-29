@@ -25,7 +25,7 @@ const tempDir = mkdtempSync(join(tmpdir(), "heimdall-pricing-refresh-test-"));
 
 // Vendors with a real page fixture: every catalog model must be scraped with
 // an identical entry, and no bogus model may be added.
-const REAL_FIXTURE_VENDORS = ["deepseek", "glm", "kimi", "mimo", "minimax", "stepfun", "qwen", "openai", "google", "anthropic"] as const;
+const REAL_FIXTURE_VENDORS = ["deepseek", "glm", "kimi", "mimo", "minimax", "stepfun", "qwen", "openai", "google", "anthropic", "sensenova"] as const;
 
 // Models that are intentionally kept in the catalog after being removed from
 // the official page (retired, kept by design — see plan §3.2).
@@ -44,6 +44,9 @@ const KNOWN_RETIRED = new Set([
   "claude-sonnet-4.6",
   "claude-sonnet-4.5",
   "claude-haiku-4.5",
+  // SenseNova 6.8 Flash Lite is a free Preview model not listed on the public
+  // pricing page; it is a hand-written catalog entry, so the round-trip skips it.
+  "sensenova-6.8-flash-lite",
 ]);
 
 async function loadParser(vendor: string) {
@@ -63,6 +66,7 @@ for (const vendor of REAL_FIXTURE_VENDORS) {
     openai: "openai-pricing.html",
     google: "google-pricing.html",
     anthropic: "anthropic-pricing.html",
+    sensenova: "sensenova-pricing.html",
   }[vendor];
   const parse = await loadParser(vendor);
   const models = (await parse(readFileSync(join(fixtureDir, fixture), "utf8"), vendor === "google" ? { now: new Date(2026, 9, 27) } : undefined)) as ScrapedModels;
@@ -85,6 +89,44 @@ for (const vendor of REAL_FIXTURE_VENDORS) {
     }
   }
   console.log(`${vendor}: ${Object.keys(models).length} models parsed`);
+}
+
+// --- sensenova parser edge cases --------------------------------------------
+
+{
+  // Synthetic rows: duplicate ID (first valid row wins), a 5-col row with an
+  // empty trailing output cell whose label covers both directions (single-price
+  // fallback), a separate-label row with a blank output cell (skipped, not
+  // back-filled), and a populated free output value (still rejected).
+  const parse = await loadParser("sensenova");
+  const html = `<table>
+    <tr><td>服务</td><td>计费项</td><td>单价</td><td>计费项</td><td>单价</td></tr>
+    <tr><td>SenseNova-Test-A模型调用</td><td>输入tokens</td><td>0.003元/千tokens</td><td>输出tokens</td><td>0.009元/千tokens</td></tr>
+    <tr><td>SenseNova-Test-B模型调用</td><td>输入tokens、输出tokens</td><td>0.015元/千tokens</td><td></td><td></td></tr>
+    <tr><td>SenseNova-Test-A模型调用</td><td>输入tokens</td><td>0.999元/千tokens</td><td>输出tokens</td><td>0.999元/千tokens</td></tr>
+    <tr><td>SenseNova-Test-C模型调用</td><td>输入tokens</td><td>0.001元/千tokens</td><td>输出tokens</td><td>限时免费体验</td></tr>
+    <tr><td>SenseNova-Test-D模型调用</td><td>输入tokens</td><td>0.002元/千tokens</td><td>输出tokens</td><td></td></tr>
+  </table>`;
+  const models = (await parse(html)) as ScrapedModels;
+  assert.deepEqual(models["sensenova-test-a"], {
+    currency: "CNY",
+    inputPerMillion: 3,
+    cachedInputPerMillion: null,
+    outputPerMillion: 9,
+  });
+  assert.deepEqual(models["sensenova-test-b"], {
+    currency: "CNY",
+    inputPerMillion: 15,
+    cachedInputPerMillion: null,
+    outputPerMillion: 15,
+  });
+  assert.equal(models["sensenova-test-c"], undefined, "free output value must be rejected");
+  assert.equal(
+    models["sensenova-test-d"],
+    undefined,
+    "separate-label row with a blank output cell must not be back-filled with the input price",
+  );
+  console.log("sensenova parser: duplicate + shared-price fallback handling works");
 }
 
 // --- merge semantics -------------------------------------------------------

@@ -79,7 +79,7 @@ export interface ResolvedPricing extends Pricing {
 
 export const DEEPSEEK_PEAK_HOURS: [number, number][] = [[1, 4], [6, 10]];
 
-export type PricingCatalogKey = "openai" | "deepseek" | "anthropic" | "google" | "kimi" | "glm" | "mimo" | "minimax" | "stepfun" | "qwen";
+export type PricingCatalogKey = "openai" | "deepseek" | "anthropic" | "google" | "kimi" | "glm" | "mimo" | "minimax" | "stepfun" | "qwen" | "sensenova";
 
 export const PRICING_CATALOG_LABELS: Record<PricingCatalogKey, string> = Object.freeze({
   openai: "OpenAI",
@@ -92,6 +92,7 @@ export const PRICING_CATALOG_LABELS: Record<PricingCatalogKey, string> = Object.
   minimax: "MiniMax",
   stepfun: "StepFun",
   qwen: "Qwen",
+  sensenova: "SenseNova",
 });
 
 export const PRICING_CATALOG_KEYS = Object.keys(PRICING_CATALOG_LABELS) as PricingCatalogKey[];

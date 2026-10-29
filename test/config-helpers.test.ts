@@ -47,5 +47,19 @@ assert.deepEqual(
     { id: "m2", enabled: false },
   ],
 );
+// Every catalog pricing mode (including the newer CNY vendors) must survive
+// normalization; an unknown mode is dropped so the runtime falls back to openai.
+for (const mode of ["mimo", "minimax", "stepfun", "qwen", "sensenova"]) {
+  assert.deepEqual(
+    normalizeVendorModels([{ id: "m", pricing: { mode } }]),
+    [{ id: "m", enabled: true, pricing: { mode } }],
+    `pricing mode ${mode} should be preserved by normalization`,
+  );
+}
+assert.deepEqual(
+  normalizeVendorModels([{ id: "m", pricing: { mode: "unknown-vendor" } }]),
+  [{ id: "m", enabled: true }],
+  "unknown pricing mode should be dropped",
+);
 
 console.log("config-helpers tests passed");
