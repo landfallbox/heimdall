@@ -23,9 +23,11 @@ import {
   type CloseBehavior,
   type ConfigInput,
   type Draft,
+  type ThemeMode,
   type VendorDraft,
   getVendorModels,
 } from "./config-draft.ts";
+import { applyTheme } from "./theme.ts";
 import { useLogsController, useModelInfoCache, usePricingCache, useUpdateController, useUsageController } from "./app-controllers.ts";
 import { getDesktopApi, type DataDirState, type SaveConfigResult } from "./desktop-api.ts";
 import type { HealthState } from "./types.ts";
@@ -356,6 +358,7 @@ export default function App() {
       setConfigRevision(state.revision || "");
       setDraft(loadedDraft);
       setPersistedDraft(loadedDraft);
+      applyTheme(loadedDraft.app.theme);
       setRestartRequired(false);
       setConfigChanged(false);
       configLoaded = true;
@@ -549,9 +552,13 @@ export default function App() {
     }));
   }
 
-  async function setAppSetting(field: "closeBehavior" | "startAtLogin" | "syncVsCodeModels", value: CloseBehavior | boolean) {
+  async function setAppSetting(field: "closeBehavior" | "startAtLogin" | "syncVsCodeModels" | "theme", value: CloseBehavior | boolean | ThemeMode) {
     if (busy === "saveApp" || value === persistedDraft.app[field]) {
       return;
+    }
+
+    if (field === "theme") {
+      applyTheme(value as ThemeMode);
     }
 
     await run("saveApp", async () => {
@@ -567,6 +574,9 @@ export default function App() {
       setPersistedDraft(savedDraft);
       setDraft((current) => ({ ...current, app: savedDraft.app }));
       setConfigChanged(false);
+      if (field === "theme") {
+        void getDesktopApi().setTheme(value as ThemeMode);
+      }
       if (field === "syncVsCodeModels" && value === true) {
         notify(vsCodeSyncToast(result.vsCodeSync));
       }

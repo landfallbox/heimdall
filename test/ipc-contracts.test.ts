@@ -12,6 +12,11 @@ const health = {
 };
 
 assert.deepEqual(parseIpcRequest("router:start", []), []);
+assert.deepEqual(parseIpcRequest("app:setTheme", ["dark"]), ["dark"]);
+assert.throws(
+  () => parseIpcRequest("app:setTheme", ["bogus"]),
+  /Invalid IPC request for app:setTheme: 0/,
+);
 assert.deepEqual(
   parseIpcRequest("logs:read", [{ limit: 80, before: 1024 }]),
   [{ limit: 80, before: 1024 }],

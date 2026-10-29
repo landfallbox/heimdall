@@ -1370,6 +1370,20 @@ async function quitApplication(): Promise<void> {
   }
 }
 
+function updateTitleBarOverlay() {
+  if (!mainWindow || mainWindow.isDestroyed() || process.platform === "darwin") return;
+  const symbolColor = nativeTheme.shouldUseDarkColors ? "#94A3B8" : "#475569";
+  mainWindow.setTitleBarOverlay({ color: "#00000000", symbolColor, height: 34 });
+}
+
+let shellTheme: "system" | "light" | "dark" = "system";
+
+function applyShellTheme(theme: "system" | "light" | "dark") {
+  shellTheme = theme;
+  nativeTheme.themeSource = theme;
+  updateTitleBarOverlay();
+}
+
 function createWindow({ showWhenReady = true }: { showWhenReady?: boolean } = {}): BrowserWindow {
   if (mainWindow && !mainWindow.isDestroyed()) {
     if (showWhenReady) {
@@ -1446,11 +1460,19 @@ function createWindow({ showWhenReady = true }: { showWhenReady?: boolean } = {}
   });
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
 
+  // 首帧主题注入：把可靠的 shellTheme 与系统深色状态传给渲染进程，
+  // 规避首启"跟随系统"时渲染进程 matchMedia 尚未同步 OS 偏好的竞态。
+  const osDark = String(nativeTheme.shouldUseDarkColors);
   const rendererUrl = process.env.ELECTRON_RENDERER_URL;
   if (rendererUrl) {
-    mainWindow.loadURL(validateRendererUrl(rendererUrl));
+    const url = new URL(validateRendererUrl(rendererUrl));
+    url.searchParams.set("theme", shellTheme);
+    url.searchParams.set("osDark", osDark);
+    mainWindow.loadURL(url.toString());
   } else {
-    mainWindow.loadFile(join(__dirname, "..", "dist", "index.html"));
+    mainWindow.loadFile(join(__dirname, "..", "dist", "index.html"), {
+      query: { theme: shellTheme, osDark },
+    });
   }
 
   return mainWindow;
@@ -1532,6 +1554,10 @@ registerIpcHandler("app:rendererReady", (event) => {
   }
   return { ok: true };
 });
+registerIpcHandler("app:setTheme", (_event, theme) => {
+  applyShellTheme(theme as "system" | "light" | "dark");
+  return { ok: true };
+});
 registerIpcHandler("app:hideToTray", () => {
   closePromptActive = false;
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -1594,6 +1620,7 @@ if (!hasSingleInstanceLock) {
     try {
       const { config } = await loadConfig();
       applyPackagedLoginStartup(config.app.startAtLogin);
+      applyShellTheme(config.app.theme);
     } catch (error) {
       trayController.showNotification("Heimdall", `Failed to load startup settings: ${(error as Error).message || String(error)}`);
     }

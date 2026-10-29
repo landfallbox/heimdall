@@ -1,4 +1,5 @@
 export type CloseBehavior = "tray" | "exit" | "ask";
+export type ThemeMode = "system" | "light" | "dark";
 export type RequestFormat = "chat-completions" | "responses" | "embeddings" | "custom";
 export type PricingMode = "openai" | "deepseek" | "anthropic" | "google" | "kimi" | "glm" | "mimo" | "minimax" | "stepfun" | "qwen" | "custom";
 export type Authentication = "none" | "api-key";
@@ -82,7 +83,7 @@ export interface RouterDraft {
 }
 
 export interface Draft {
-  app: { closeBehavior: CloseBehavior; startAtLogin: boolean; syncVsCodeModels: boolean };
+  app: { closeBehavior: CloseBehavior; startAtLogin: boolean; syncVsCodeModels: boolean; theme: ThemeMode };
   router: RouterDraft;
   vendors: VendorDraft[];
 }
@@ -128,7 +129,7 @@ export interface VendorConfig {
 }
 
 export interface Config {
-  app: { closeBehavior: CloseBehavior; startAtLogin: boolean; syncVsCodeModels?: boolean };
+  app: { closeBehavior: CloseBehavior; startAtLogin: boolean; syncVsCodeModels?: boolean; theme: ThemeMode };
   router: RouterConfig;
   vendors: VendorConfig[];
 }
@@ -147,7 +148,7 @@ export interface ConfigVendorInput {
 }
 
 export interface ConfigInput {
-  app?: { closeBehavior?: string; startAtLogin?: boolean; syncVsCodeModels?: boolean };
+  app?: { closeBehavior?: string; startAtLogin?: boolean; syncVsCodeModels?: boolean; theme?: string };
   router?: {
     host?: string;
     port?: number | string;
@@ -161,7 +162,7 @@ export interface ConfigInput {
 }
 
 export const defaultDraft: Draft = {
-  app: { closeBehavior: "tray", startAtLogin: false, syncVsCodeModels: false },
+  app: { closeBehavior: "tray", startAtLogin: false, syncVsCodeModels: false, theme: "system" },
   router: {
     host: "127.0.0.1",
     port: "4000",
@@ -178,6 +179,7 @@ export const defaultDraft: Draft = {
 export const REASONING_EFFORT_LEVELS: ReasoningEffortLevel[] = ["none", "low", "medium", "high", "xhigh", "max"];
 
 const closeBehaviorValues = new Set<CloseBehavior>(["tray", "exit", "ask"]);
+const themeValues = new Set<ThemeMode>(["system", "light", "dark"]);
 const requestFormatValues = new Set<RequestFormat>(["chat-completions", "responses", "embeddings", "custom"]);
 const pricingModeValues = new Set<PricingMode>([
   "openai", "deepseek", "anthropic", "google", "kimi", "glm", "mimo", "minimax", "stepfun", "qwen", "custom",
@@ -195,6 +197,10 @@ export function normalizeRequestFormat(value: unknown): RequestFormat {
 
 export function normalizeCloseBehavior(value: unknown): CloseBehavior {
   return closeBehaviorValues.has(value as CloseBehavior) ? (value as CloseBehavior) : defaultDraft.app.closeBehavior;
+}
+
+export function normalizeTheme(value: unknown): ThemeMode {
+  return themeValues.has(value as ThemeMode) ? (value as ThemeMode) : defaultDraft.app.theme;
 }
 
 export function normalizeVendorModelsForDraft(vendor: ConfigVendorInput | VendorDraft | null | undefined): VendorModelDraft[] {
@@ -310,6 +316,7 @@ export function toDraft(config: ConfigInput): Draft {
       closeBehavior: normalizeCloseBehavior(app.closeBehavior),
       startAtLogin: app.startAtLogin === true,
       syncVsCodeModels: app.syncVsCodeModels === true,
+      theme: normalizeTheme(app.theme),
     },
     router: {
       host: router.host || defaultDraft.router.host,
@@ -342,6 +349,7 @@ export function toConfig(draft: Draft): Config {
       closeBehavior: normalizeCloseBehavior(draft.app?.closeBehavior),
       startAtLogin: draft.app?.startAtLogin === true,
       syncVsCodeModels: draft.app?.syncVsCodeModels === true,
+      theme: normalizeTheme(draft.app?.theme),
     },
     router: {
       host: draft.router.host.trim() || defaultDraft.router.host,

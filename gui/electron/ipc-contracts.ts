@@ -152,6 +152,7 @@ const dataDirChangeResultSchema = z.object({
 export const ipcContracts: Record<string, { request: z.ZodType; response: z.ZodType }> = Object.freeze({
   "app:getState": contract(emptyRequest, configResultSchema.extend({ health: healthSchema, appVersion: z.string() })),
   "app:rendererReady": contract(emptyRequest, okResponse),
+  "app:setTheme": contract(z.tuple([z.enum(["system", "light", "dark"])]), okResponse),
   "app:hideToTray": contract(emptyRequest, okResponse),
   "app:cancelClose": contract(emptyRequest, okResponse),
   "app:quitAndStop": contract(emptyRequest, okResponse),

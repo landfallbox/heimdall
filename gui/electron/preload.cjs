@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld("heimdall", {
   __heimdallPreload: true,
   getState: () => ipcRenderer.invoke("app:getState"),
   rendererReady: () => ipcRenderer.invoke("app:rendererReady"),
+  setTheme: (theme) => ipcRenderer.invoke("app:setTheme", theme),
   hideToTray: () => ipcRenderer.invoke("app:hideToTray"),
   cancelClose: () => ipcRenderer.invoke("app:cancelClose"),
   quitAndStop: () => ipcRenderer.invoke("app:quitAndStop"),

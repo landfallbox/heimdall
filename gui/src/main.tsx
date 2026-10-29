@@ -2,15 +2,10 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
+import { initTheme, readInitialOsDarkFromUrl, readInitialThemeFromUrl } from "./theme.ts";
 import "./index.css";
 
-function applySystemTheme() {
-  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-  document.documentElement.classList.toggle("dark", prefersDark);
-}
-
-applySystemTheme();
-window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applySystemTheme);
+initTheme(readInitialThemeFromUrl(), readInitialOsDarkFromUrl());
 
 // Electron 环境（preload 注入了 __heimdallPreload 标记）启用无边框外壳样式：
 // 半透明底壳、系统材质透出、窗口拖拽区。浏览器中保持普通页面布局。

@@ -300,4 +300,17 @@ assert.equal(toDraft(normalizeConfig({
   router: { apiKey: "test-token" },
 })).app.syncVsCodeModels, false);
 
+// The theme option round-trips through the app section, defaulting to system.
+assert.equal(toConfig(toDraft(normalizeConfig({
+  router: { apiKey: "test-token" },
+  app: { theme: "dark" },
+}))).app.theme, "dark");
+assert.equal(toDraft(normalizeConfig({
+  router: { apiKey: "test-token" },
+})).app.theme, "system");
+assert.equal(toDraft(normalizeConfig({
+  router: { apiKey: "test-token" },
+  app: { theme: "bogus" },
+})).app.theme, "system");
+
 console.log("config draft tests passed");

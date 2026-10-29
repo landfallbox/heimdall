@@ -1,5 +1,6 @@
 import type { RemoteModelInfoData } from "../../src/model-info.ts";
 import type { RemotePricingData } from "../../src/usage.ts";
+import type { ThemeMode } from "./config-draft.ts";
 import type { HealthState, LogPage, UpdateState, UsageSummary } from "./types.ts";
 
 export interface AppState {
@@ -68,6 +69,7 @@ export interface DataDirChangeResult {
 export interface HeimdallDesktopApi {
   getState(): Promise<AppState>;
   rendererReady(): Promise<void>;
+  setTheme(theme: ThemeMode): Promise<{ ok: boolean }>;
   hideToTray(): Promise<void>;
   cancelClose(): Promise<void>;
   quitAndStop(): Promise<void>;
