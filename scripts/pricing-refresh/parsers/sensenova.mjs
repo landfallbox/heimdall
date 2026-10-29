@@ -5,9 +5,13 @@
 // Token-priced models live in HTML tables. Two row layouts appear:
 //   5 cols: 服务 | 输入tokens | 0.003元/千tokens | 输出tokens | 0.009元/千tokens
 //   3 cols: 服务 | 输入tokens、输出tokens | 0.015元/千tokens   (single price)
-// Single-price rows may also appear as 5-col rows with an empty trailing
-// output cell; those fall back to the input price for both directions.
+// A single price covers both directions only when the input label mentions
+// both (e.g. "输入tokens、输出tokens"); such a row may be 3-col, or 5-col with
+// an empty trailing output cell. Separate-label rows with a blank output cell
+// are skipped rather than back-filled with the input price.
 // Duplicate model rows keep the first valid row (first occurrence wins).
+// The hyphen slug (sensenova-v6-5-pro) is derived from the dotted canonical
+// entry so the alias never drifts from the model it aliases.
 // Prices are quoted in CNY per THOUSAND tokens (元/千tokens); the catalog stores
 // CNY per million tokens, so values are multiplied by 1000.
 //
@@ -43,9 +47,16 @@ export async function parse(content) {
       if (hasOutputCell && TOKEN_PRICE.test(row[4].text) && TOKEN_PRICE.test(row[2].text)) {
         input = parsePrice(row[2].text);
         output = parsePrice(row[4].text);
-      } else if ((!hasOutputCell || row[4].text === "") && TOKEN_PRICE.test(row[2].text)) {
-        // Single price for both input and output: 3-col rows, or 5-col rows
-        // whose trailing output cell is empty.
+      } else if (
+        (!hasOutputCell || row[4].text === "") &&
+        TOKEN_PRICE.test(row[2].text) &&
+        /输入/.test(row[1].text) &&
+        /输出/.test(row[1].text)
+      ) {
+        // Single price for both input and output: the billing-item label must
+        // cover both directions (e.g. "输入tokens、输出tokens"). 5-col rows
+        // with separate labels and a blank output cell are skipped rather
+        // than back-filled with the input price.
         input = parsePrice(row[2].text);
         output = input;
       } else {
@@ -62,6 +73,11 @@ export async function parse(content) {
       };
     }
   }
+
+  // The catalog keeps a hyphen alias for the canonical dotted V6.5-Pro id.
+  // Derive it from the parsed entry so a price change keeps both in sync.
+  const canonical = models["sensenova-v6.5-pro"];
+  if (canonical) models["sensenova-v6-5-pro"] = { ...canonical };
 
   if (Object.keys(models).length === 0) {
     throw new Error("sensenova: no models parsed");
