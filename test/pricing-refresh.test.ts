@@ -47,6 +47,10 @@ const KNOWN_RETIRED = new Set([
   // SenseNova 6.8 Flash Lite is a free Preview model not listed on the public
   // pricing page; it is a hand-written catalog entry, so the round-trip skips it.
   "sensenova-6.8-flash-lite",
+  // sensenova-v6-5-pro is the hyphen-form API model ID alias of
+  // sensenova-v6.5-pro (the compatible-mode API uses the hyphen slug); it is a
+  // hand-written catalog entry, so the round-trip skips it.
+  "sensenova-v6-5-pro",
 ]);
 
 async function loadParser(vendor: string) {

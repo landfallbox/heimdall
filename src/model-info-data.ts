@@ -205,14 +205,26 @@ export const BUILTIN_MODEL_INFO_DATA: RemoteModelInfoData = {
         "vision": true
       }
     },
+    "sensenova-v6-5-pro": {
+      "displayName": "SenseNova V6.5 Pro",
+      "contextWindow": 131072,
+      "maxOutputTokens": 32768,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true
+      }
+    },
     "sensenova-v6.5-turbo": {
       "displayName": "SenseNova V6.5 Turbo",
       "contextWindow": 131072,
-      "maxOutputTokens": 32768
+      "maxOutputTokens": 32768,
+      "capabilities": {
+        "vision": true
+      }
     },
     "sensenova-v6-pro": {
       "displayName": "SenseNova V6 Pro",
-      "contextWindow": 131072,
+      "contextWindow": 32768,
       "maxOutputTokens": 32768,
       "capabilities": {
         "toolCalling": true,
@@ -221,14 +233,18 @@ export const BUILTIN_MODEL_INFO_DATA: RemoteModelInfoData = {
     },
     "sensenova-v6-turbo": {
       "displayName": "SenseNova V6 Turbo",
-      "contextWindow": 131072,
-      "maxOutputTokens": 32768
+      "contextWindow": 32768,
+      "maxOutputTokens": 32768,
+      "capabilities": {
+        "vision": true
+      }
     },
     "sensenova-v6-reasoner": {
       "displayName": "SenseNova V6 Reasoner",
-      "contextWindow": 131072,
+      "contextWindow": 32768,
       "maxOutputTokens": 32768,
       "capabilities": {
+        "vision": true,
         "thinking": true
       }
     },

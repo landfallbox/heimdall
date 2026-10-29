@@ -1562,6 +1562,12 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
           "cachedInputPerMillion": null,
           "outputPerMillion": 9
         },
+        "sensenova-v6-5-pro": {
+          "currency": "CNY",
+          "inputPerMillion": 3,
+          "cachedInputPerMillion": null,
+          "outputPerMillion": 9
+        },
         "sensenova-v6.5-turbo": {
           "currency": "CNY",
           "inputPerMillion": 1.5,

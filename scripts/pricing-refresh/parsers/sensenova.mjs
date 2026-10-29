@@ -31,6 +31,7 @@ export async function parse(content) {
       if (!modelCell) continue;
       const idMatch = MODEL_NAME.exec(modelCell);
       if (!idMatch) continue;
+      if (!row[2]) continue; // short colspan rows have no price cell
       const id = idMatch[0].toLowerCase();
 
       let input;
@@ -39,7 +40,8 @@ export async function parse(content) {
       if (hasOutputCell && TOKEN_PRICE.test(row[4].text) && TOKEN_PRICE.test(row[2].text)) {
         input = parsePrice(row[2].text);
         output = parsePrice(row[4].text);
-      } else if (TOKEN_PRICE.test(row[2].text)) {
+      } else if (!hasOutputCell && TOKEN_PRICE.test(row[2].text)) {
+        // 3-col rows quote one price for both input and output
         input = parsePrice(row[2].text);
         output = input;
       } else {
