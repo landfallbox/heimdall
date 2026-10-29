@@ -2,6 +2,7 @@ config.json
 logs/
 usage/
 tmp/
+excalidraw.log
 node_modules/
 dist/
 release/
