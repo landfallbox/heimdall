@@ -14,6 +14,10 @@ export type ModelPricing =
   | { mode: "kimi" }
   | { mode: "glm" }
   | { mode: "mimo" }
+  | { mode: "minimax" }
+  | { mode: "stepfun" }
+  | { mode: "qwen" }
+  | { mode: "sensenova" }
   | {
       mode: "custom";
       currency: string;
@@ -132,6 +136,10 @@ const modelPricingSchema = z.discriminatedUnion("mode", [
   z.object({ mode: z.literal("kimi") }),
   z.object({ mode: z.literal("glm") }),
   z.object({ mode: z.literal("mimo") }),
+  z.object({ mode: z.literal("minimax") }),
+  z.object({ mode: z.literal("stepfun") }),
+  z.object({ mode: z.literal("qwen") }),
+  z.object({ mode: z.literal("sensenova") }),
   customPricingSchema,
 ]);
 
@@ -412,8 +420,10 @@ function normalizeModelPricing(value: any): ModelPricing | undefined {
   }
   if (value.mode === "openai" || value.mode === "deepseek"
     || value.mode === "anthropic" || value.mode === "google"
-    || value.mode === "kimi" || value.mode === "glm" || value.mode === "mimo") {
-    return { mode: value.mode as "openai" | "deepseek" | "anthropic" | "google" | "kimi" | "glm" | "mimo" };
+    || value.mode === "kimi" || value.mode === "glm" || value.mode === "mimo"
+    || value.mode === "minimax" || value.mode === "stepfun" || value.mode === "qwen"
+    || value.mode === "sensenova") {
+    return { mode: value.mode as "openai" | "deepseek" | "anthropic" | "google" | "kimi" | "glm" | "mimo" | "minimax" | "stepfun" | "qwen" | "sensenova" };
   }
   if (value.mode !== "custom") {
     return undefined;

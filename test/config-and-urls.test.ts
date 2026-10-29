@@ -45,6 +45,10 @@ try {
   assert.equal(vendorModelSchema.safeParse({ id: "m", pricing: { mode: "kimi" } }).success, true);
   assert.equal(vendorModelSchema.safeParse({ id: "m", pricing: { mode: "glm" } }).success, true);
   assert.equal(vendorModelSchema.safeParse({ id: "m", pricing: { mode: "mimo" } }).success, true);
+  assert.equal(vendorModelSchema.safeParse({ id: "m", pricing: { mode: "minimax" } }).success, true);
+  assert.equal(vendorModelSchema.safeParse({ id: "m", pricing: { mode: "stepfun" } }).success, true);
+  assert.equal(vendorModelSchema.safeParse({ id: "m", pricing: { mode: "qwen" } }).success, true);
+  assert.equal(vendorModelSchema.safeParse({ id: "m", pricing: { mode: "sensenova" } }).success, true);
   assert.equal(vendorModelSchema.safeParse({ id: "m", pricing: { mode: "unknown-vendor" } }).success, false);
   assert.equal(vendorModelSchema.safeParse({
     id: "m",
