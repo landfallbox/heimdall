@@ -1621,6 +1621,14 @@ if (!hasSingleInstanceLock) {
       const { config } = await loadConfig();
       applyPackagedLoginStartup(config.app.startAtLogin);
       applyShellTheme(config.app.theme);
+      // OS 主题变化时：刷新标题栏符号色（跟随系统模式下 nativeTheme 仍为 system，
+      // 不会触发 applyShellTheme），并权威推送给渲染进程刷新 knownOsDark。
+      nativeTheme.on("updated", () => {
+        updateTitleBarOverlay();
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send("app:osDark", nativeTheme.shouldUseDarkColors);
+        }
+      });
     } catch (error) {
       trayController.showNotification("Heimdall", `Failed to load startup settings: ${(error as Error).message || String(error)}`);
     }

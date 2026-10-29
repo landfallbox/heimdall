@@ -287,6 +287,29 @@ assert.throws(
 - 生产首启（干净数据目录，深色 OS）：`.dark=true`，`matchMedia=true` ✓
 - 模块单测：override=true→dark；无 override 保持 knownOsDark；override=false→light ✓
 
+## 15. PR 评审修复（CodeRabbit 三条）
+
+实机 + 代码复核确认三条均有效，逐一修复：
+
+**① Major（theme.ts / main.ts）：OS 主题变化时 system 模式不刷新。**
+`knownOsDark` 此前只由渲染进程 `matchMedia` 的 `change` 事件刷新，而 Electron 下该事件可能不触发（尤其主进程已注入 `osDark=true` 而 `matchMedia` 仍 `false` 时），导致 OS 切浅色后 system 模式一直停在 `.dark`。
+- `theme.ts`：新增模块级 `let osDarkFromMain: boolean | null = null;` 与导出函数 `setKnownOsDark(osDark)`（写入 `osDarkFromMain` + `knownOsDark`，system 模式立即重应用）。`applyTheme` 的 system 判定优先级改为 **主进程权威推送 `osDarkFromMain` > 首帧注入 `knownOsDark` > `matchMedia` 回退**——主进程值一旦存在，陈旧的 `matchMedia` 变化不再覆盖它。
+- `main.ts` `whenReady`：注册 `nativeTheme.on("updated", ...)`，刷新标题栏符号色并向渲染进程 `webContents.send("app:osDark", nativeTheme.shouldUseDarkColors)`。
+- `preload.cjs`：新增 `onOsDarkChange(callback)`（监听 `app:osDark`，返回退订函数），沿用既有 `on*` 事件模式。
+- `desktop-api.ts`：接口新增 `onOsDarkChange(callback: (osDark: boolean) => void): (() => void) | undefined;`。
+- `mock-desktop-api.ts`：新增 `onOsDarkChange: () => undefined` 桩（浏览器预览无主进程推送）。
+- `App.tsx`：新增 `useEffect` 订阅 `onOsDarkChange` → `setKnownOsDark(osDark)`。
+- **验证**：新增 `test/theme.test.ts`（stub DOM，已加入 `npm test`）8 项全过——浏览器预览（无主进程推送）回退 matchMedia、首帧注入优先于陈旧 matchMedia、`setKnownOsDark` 翻转 system、陈旧 matchMedia 变化被主进程权威值遮蔽、固定模式不受影响。
+
+**② Minor（main.ts）：跟随系统时 OS 主题变化标题栏符号色不刷新。**
+system 模式下 `nativeTheme.themeSource` 保持 `system`，OS 变化不触发 `applyShellTheme`，标题栏符号色停留在旧值。①的 `nativeTheme.on("updated")` 监听器内已调 `updateTitleBarOverlay()`，一并修复。
+
+**③ Minor（App.tsx）：主题保存失败时渲染进程与持久化/外壳不一致。**
+`setAppSetting` 先 `applyTheme(value)` 再 `saveConfig`；若保存因 revision 过期而 reject，渲染进程保留新主题，但持久化配置与外壳仍是旧值，且重选旧值会因 `value === persistedDraft.app[field]` 早退而不重新应用。
+- `setAppSetting`：`saveConfig` 包在 try/catch 内，reject 且 `field === "theme"` 时 `applyTheme(persistedDraft.app.theme)` 回滚，再 `throw` 交由 `run` 的外层 catch 弹错误 toast。
+
+**验证**：`npm run check`（tsc + node --check）exit 0；`npm test` 23 项（含新增 `test/theme.test.ts`）exit 0；`npm run test:electron` exit 0。
+
 ---
 
 ## 影响面 / 可能破坏的现有功能

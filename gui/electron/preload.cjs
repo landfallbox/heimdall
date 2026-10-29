@@ -64,4 +64,9 @@ contextBridge.exposeInMainWorld("heimdall", {
     ipcRenderer.on("update:state", listener);
     return () => ipcRenderer.removeListener("update:state", listener);
   },
+  onOsDarkChange: (callback) => {
+    const listener = (_event, osDark) => callback(Boolean(osDark));
+    ipcRenderer.on("app:osDark", listener);
+    return () => ipcRenderer.removeListener("app:osDark", listener);
+  },
 });

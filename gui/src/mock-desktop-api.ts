@@ -324,6 +324,7 @@ if (!hasRealPreload) {
     onConfirmClose: () => undefined,
     onUpdateState: () => undefined,
     onConfigChanged: () => undefined,
+    onOsDarkChange: () => undefined,
   };
 
   window.heimdall = mock;

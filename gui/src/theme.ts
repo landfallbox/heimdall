@@ -16,6 +16,24 @@ let currentMode: ThemeMode = "system";
 let knownOsDark: boolean | null = null;
 
 /**
+ * 主进程 nativeTheme 权威推送的 OS 深色状态。
+ * 渲染进程 matchMedia 在 Electron 下可能不触发 change 事件（尤其主进程已注入
+ * osDark 而 matchMedia 仍为 false 时），因此 system 模式优先采用主进程推送值，
+ * 保证 OS 主题变化能可靠地刷新主题。
+ */
+let osDarkFromMain: boolean | null = null;
+
+/**
+ * 主进程权威推送的 OS 深色状态更新。system 模式下立即重应用；
+ * 同时刷新 knownOsDark，使后续 applyTheme 跟随真实 OS 偏好。
+ */
+export function setKnownOsDark(osDark: boolean): void {
+  osDarkFromMain = osDark;
+  knownOsDark = osDark;
+  if (currentMode === "system") applyTheme("system");
+}
+
+/**
  * 同步设置 <html> 的 .dark 类。system 读系统偏好，light/dark 固定。
  * 每次调用都会更新模块内的 currentMode，供 initTheme 的常驻监听器判断。
  *
@@ -26,8 +44,11 @@ let knownOsDark: boolean | null = null;
 export function applyTheme(mode: ThemeMode, osDarkOverride?: boolean): void {
   currentMode = mode;
   if (osDarkOverride !== undefined) knownOsDark = osDarkOverride;
+  // system 模式优先级：主进程权威推送 > 首帧注入/knownOsDark > matchMedia 回退。
   const prefersDark =
-    mode === "dark" || (mode === "system" && (knownOsDark ?? window.matchMedia(DARK_MEDIA).matches));
+    mode === "dark" ||
+    (mode === "system" &&
+      (osDarkFromMain ?? knownOsDark ?? window.matchMedia(DARK_MEDIA).matches));
   document.documentElement.classList.toggle("dark", prefersDark);
 }
 

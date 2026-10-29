@@ -102,6 +102,8 @@ export interface HeimdallDesktopApi {
   onUpdateState(callback: (state: UpdateState) => void): (() => void) | undefined;
   /** 配置文件在应用外部被修改时触发（主进程文件监听）。 */
   onConfigChanged(callback: (payload: { revision: string }) => void): (() => void) | undefined;
+  /** 主进程权威推送的 OS 深色状态变化（nativeTheme updated）。 */
+  onOsDarkChange(callback: (osDark: boolean) => void): (() => void) | undefined;
 }
 
 declare global {

@@ -27,7 +27,7 @@ import {
   type VendorDraft,
   getVendorModels,
 } from "./config-draft.ts";
-import { applyTheme } from "./theme.ts";
+import { applyTheme, setKnownOsDark } from "./theme.ts";
 import { useLogsController, useModelInfoCache, usePricingCache, useUpdateController, useUsageController } from "./app-controllers.ts";
 import { getDesktopApi, type DataDirState, type SaveConfigResult } from "./desktop-api.ts";
 import type { HealthState } from "./types.ts";
@@ -338,6 +338,14 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const unsubscribe = getDesktopApi().onOsDarkChange?.((osDark) => {
+      setKnownOsDark(osDark);
+    });
+
+    return typeof unsubscribe === "function" ? unsubscribe : undefined;
+  }, []);
+
+  useEffect(() => {
     if (page === "logs") {
       void run("logs", refreshLogs);
     }
@@ -562,13 +570,22 @@ export default function App() {
     }
 
     await run("saveApp", async () => {
-      const result = await getDesktopApi().saveConfig({
-        config: toConfig({
-          ...persistedDraft,
-          app: { ...persistedDraft.app, [field]: value },
-        }),
-        revision: configRevision,
-      });
+      let result;
+      try {
+        result = await getDesktopApi().saveConfig({
+          config: toConfig({
+            ...persistedDraft,
+            app: { ...persistedDraft.app, [field]: value },
+          }),
+          revision: configRevision,
+        });
+      } catch (error) {
+        // 保存失败（如 revision 过期）时回滚主题，避免渲染进程与持久化/外壳不一致。
+        if (field === "theme") {
+          applyTheme(persistedDraft.app.theme);
+        }
+        throw error;
+      }
       const savedDraft = toDraft(result.config as ConfigInput);
       setConfigRevision(result.revision || "");
       setPersistedDraft(savedDraft);
