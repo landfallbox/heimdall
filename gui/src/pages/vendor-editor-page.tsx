@@ -963,7 +963,7 @@ function VsCodeModelFields({
         <div className="h-px flex-1 bg-border/50" />
       </div>
       <p className="text-[11px] leading-snug text-muted-foreground/60">
-        Auto-matched by model ID; synced to VS Code on save. If you don't use VS Code sync, you can leave these blank or keep the defaults — no need to verify them.
+        Auto-matched by model ID; synced to VS Code on save when VS Code sync is enabled. If you don't use VS Code sync, you can leave these blank or keep the defaults — no need to verify them.
       </p>
       <div className="grid gap-2.5 sm:grid-cols-3">
         <label className="flex min-w-0 flex-col gap-1.5">

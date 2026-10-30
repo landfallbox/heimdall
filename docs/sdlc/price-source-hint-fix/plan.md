@@ -23,7 +23,7 @@
 
 1. **自相矛盾**：Price source 已选 **Custom** 时仍显示 "…use Custom"（截图：Qwen / Qwen3.8-27B）。
 2. **事实错误**：`catalogKey` 在 `pricingMode === "custom"` 时回退为 `"openai"`
-   （[vendor-editor-page.tsx:314](/d:/code/projects/heimdall.worktrees/custom-sdlc-plan-issue-fix/gui/src/pages/vendor-editor-page.tsx)），
+   （[vendor-editor-page.tsx:314](../../../gui/src/pages/vendor-editor-page.tsx)），
    提示对着用户根本没选的 "OpenAI" 目录计算，"Not in OpenAI" 是错的。
 3. **语义过时**：现在选模型 id 时软件会自动匹配价格目录并自动填充模型信息
    （`suggestCatalogSwitch` + `applyModelSwitch`，见 `docs/sdlc/model-info-auto-fill/plan.md`），
@@ -31,10 +31,10 @@
 
 ### 问题 2："VS Code" 小节标题误导
 
-模型卡片里有一块标题为 **`VS Code`** 的小节（[vendor-editor-page.tsx:970](/d:/code/projects/heimdall.worktrees/custom-sdlc-plan-issue-fix/gui/src/pages/vendor-editor-page.tsx)），
+模型卡片里有一块标题为 **`VS Code`** 的小节（[vendor-editor-page.tsx:970](../../../gui/src/pages/vendor-editor-page.tsx)），
 含 Display name / Context window / Max output tokens / Capabilities / Reasoning effort：
 
-- 数据存在 `model.vscode`（[config-draft.ts:14](/d:/code/projects/heimdall.worktrees/custom-sdlc-plan-issue-fix/gui/src/config-draft.ts)），
+- 数据存在 `model.vscode`（[config-draft.ts:14](../../../gui/src/config-draft.ts)），
   **唯一消费方**是 `vscode-sync.ts`（点 "Sync models to VS Code" 时写进 VS Code 的 `chatLanguageModels.json`）。
 - 选模型 id 时这些字段从 `model-info.json` **自动填充**（与价格自动匹配同源）。
 
@@ -56,7 +56,7 @@
 
 链接目标：仓库根 `https://github.com/landfallbox/heimdall`（对 "issue or PR" 最中性的落点，用户可再进 issues/PR）。
 
-结构（替换 L670–691 的三元表达式；`getDesktopApi` 已在 [vendor-editor-page.tsx:43](/d:/code/projects/heimdall.worktrees/custom-sdlc-plan-issue-fix/gui/src/pages/vendor-editor-page.tsx) 导入）：
+结构（替换 L670–691 的三元表达式；`getDesktopApi` 已在 [vendor-editor-page.tsx:43](../../../gui/src/pages/vendor-editor-page.tsx) 导入）：
 
 ```tsx
 {customPricing && !isValidCustomPricing(model) ? (
@@ -87,12 +87,12 @@
 
 #### 新增 IPC：`repo:openRepo`（方案 B 的机制）
 
-完全仿照既有 `update:openReleasePage`（[updater.ts:815](/d:/code/projects/heimdall.worktrees/custom-sdlc-plan-issue-fix/gui/electron/updater.ts)）：
+完全仿照既有 `update:openReleasePage`（[updater.ts:815](../../../gui/electron/updater.ts)）：
 **专用、无参**，URL 由主进程硬编码（不接收渲染层传入的 URL，最安全）。
 
 - 通道名：`repo:openRepo`；请求 `emptyRequest`；响应 `okResponse`（`{ ok: boolean }`）。
 - 主进程 handler：`shell.openExternal(REPO_URL)`，`try/catch` 后返回 `{ ok: true }` / `{ ok: false }`
-  （无默认浏览器时不抛错到渲染层）。`shell` 已在 [main.ts:1](/d:/code/projects/heimdall.worktrees/custom-sdlc-plan-issue-fix/gui/electron/main.ts) 导入，无需改 import。
+  （无默认浏览器时不抛错到渲染层）。`shell` 已在 [main.ts:1](../../../gui/electron/main.ts) 导入，无需改 import。
 - `REPO_URL`：在 `updater.ts` 由既有 `GITHUB_REPO` 派生并 `export`（单一来源），`main.ts` 导入复用。
 
 ### 改动 2：小节标题 `VS Code` → `Model info` + 说明小字（方案 C）
@@ -163,7 +163,7 @@
 ## 最容易出问题的地方
 
 - **IPC 契约测试**：`repo:openRepo` 必须**同时**加进 `main.ts`（`registerIpcHandler`）和
-  `ipc-contracts.ts`，否则 [ipc-contracts.test.ts:49](/d:/code/projects/heimdall.worktrees/custom-sdlc-plan-issue-fix/test/ipc-contracts.test.ts)
+  `ipc-contracts.ts`，否则 [ipc-contracts.test.ts:49](../../../test/ipc-contracts.test.ts)
   的通道一致性断言直接挂。这是本次改动最容易踩的坑。
 - **preload.cjs 是 CJS**：新增的 `openRepo` 必须与 `desktop-api.ts` 的 TS 接口**同名同参**，
   否则渲染层调用 `getDesktopApi().openRepo()` 会在真机（非 mock）上报 undefined。
