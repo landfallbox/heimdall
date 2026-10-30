@@ -36,6 +36,7 @@ import {
   installUpdate,
   onUpdateState,
   openReleasePage,
+  REPO_URL,
 } from "./updater.ts";
 import type { HealthBody, HealthState, RouterActionResult, UpdateState } from "../src/types.ts";
 
@@ -1601,6 +1602,14 @@ registerIpcHandler("update:check", (_event, options) => checkForUpdates(options)
 registerIpcHandler("update:download", downloadUpdate);
 registerIpcHandler("update:install", installDownloadedUpdate);
 registerIpcHandler("update:openReleasePage", openReleasePage);
+registerIpcHandler("repo:openRepo", async () => {
+  try {
+    await shell.openExternal(REPO_URL);
+    return { ok: true };
+  } catch {
+    return { ok: false };
+  }
+});
 registerIpcHandler("clipboard:writeText", (_event, text) => {
   clipboard.writeText(String(text || ""));
   return { ok: true };

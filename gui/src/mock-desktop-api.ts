@@ -312,6 +312,9 @@ if (!hasRealPreload) {
     downloadUpdate: async () => idleUpdateState(),
     installUpdate: async () => idleUpdateState(),
     openReleasePage: async () => undefined,
+    openRepo: async () => {
+      window.open("https://github.com/landfallbox/heimdall", "_blank", "noopener");
+    },
     writeClipboard: async (text) => {
       try {
         await navigator.clipboard.writeText(String(text));

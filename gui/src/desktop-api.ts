@@ -97,6 +97,7 @@ export interface HeimdallDesktopApi {
   downloadUpdate(): Promise<UpdateState>;
   installUpdate(): Promise<UpdateState>;
   openReleasePage(): Promise<void>;
+  openRepo(): Promise<void>;
   writeClipboard(text: string): Promise<void>;
   syncVsCodeModels(): Promise<VsCodeSyncResult>;
   onOpenSettings(callback: () => void): (() => void) | undefined;

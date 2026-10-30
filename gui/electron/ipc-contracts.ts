@@ -194,6 +194,7 @@ export const ipcContracts: Record<string, { request: z.ZodType; response: z.ZodT
   "update:download": contract(emptyRequest, updateStateSchema),
   "update:install": contract(emptyRequest, updateStateSchema),
   "update:openReleasePage": contract(emptyRequest, okResponse),
+  "repo:openRepo": contract(emptyRequest, okResponse),
   "clipboard:writeText": contract(z.tuple([z.string()]), okResponse),
   "vscode:sync": contract(emptyRequest, vscodeSyncResultSchema),
 });
