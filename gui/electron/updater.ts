@@ -10,6 +10,7 @@ import { z } from "zod";
 
 const { app, BrowserWindow, shell } = electron;
 const GITHUB_REPO = "landfallbox/heimdall";
+export const REPO_URL = `https://github.com/${GITHUB_REPO}`;
 const RELEASES_URL = `https://github.com/${GITHUB_REPO}/releases/latest`;
 const LATEST_RELEASE_API_URL = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
 const WINDOWS_INSTALLER_PREFIX = "heimdall-Setup-";

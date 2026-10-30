@@ -12,6 +12,7 @@ const health = {
 };
 
 assert.deepEqual(parseIpcRequest("router:start", []), []);
+assert.deepEqual(parseIpcRequest("repo:openRepo", []), []);
 assert.deepEqual(parseIpcRequest("app:setTheme", ["dark"]), ["dark"]);
 assert.throws(
   () => parseIpcRequest("app:setTheme", ["bogus"]),
@@ -26,6 +27,7 @@ assert.deepEqual(
   [{ vendor: "vendor-a", model: "gpt-5-mini" }],
 );
 assert.equal((parseIpcResponse("router:start", { started: true, via: "process", pid: 1234, health }) as any).health.ok, true);
+assert.deepEqual(parseIpcResponse("repo:openRepo", { ok: true }), { ok: true });
 
 assert.throws(
   () => parseIpcRequest("logs:read", [{ limit: "80" }]),

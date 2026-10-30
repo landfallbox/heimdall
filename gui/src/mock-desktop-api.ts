@@ -290,8 +290,8 @@ if (!hasRealPreload) {
     }),
     loadPricingCache: async () => ({ ok: false, data: null }),
     loadModelInfoCache: async () => ({ ok: false, data: null }),
-    openConfig: async () => undefined,
-    openLog: async () => undefined,
+    openConfig: async () => ({ ok: true }),
+    openLog: async () => ({ ok: true }),
     getDataDirState: async () => ({
       dataDir: "C:\\Users\\demo\\AppData\\Roaming\\local.heimdall",
       defaultDataDir: "C:\\Users\\demo\\AppData\\Roaming\\local.heimdall",
@@ -306,12 +306,17 @@ if (!hasRealPreload) {
     },
     openDataDir: async () => {
       // No file manager in the browser preview.
+      return { ok: true };
     },
     getUpdateState: async () => idleUpdateState(),
     checkForUpdates: async () => idleUpdateState(),
     downloadUpdate: async () => idleUpdateState(),
     installUpdate: async () => idleUpdateState(),
-    openReleasePage: async () => undefined,
+    openReleasePage: async () => ({ ok: true }),
+    openRepo: async () => {
+      window.open("https://github.com/landfallbox/heimdall", "_blank", "noopener");
+      return { ok: true };
+    },
     writeClipboard: async (text) => {
       try {
         await navigator.clipboard.writeText(String(text));

@@ -430,8 +430,20 @@ export default function App() {
 
   async function openDataDir() {
     await run("openDataDir", async () => {
-      await getDesktopApi().openDataDir();
+      const result = await getDesktopApi().openDataDir();
+      if (!result.ok) notify("Could not open the data directory.", "error");
     });
+  }
+
+  async function openRepo() {
+    // 不走 run()：避免覆盖并存的 save 等 busy 状态（Save 按钮凭 busy==="save" 禁用）。
+    try {
+      const result = await getDesktopApi().openRepo();
+      if (!result.ok) notify("Could not open the repository page.", "error");
+    } catch (error) {
+      console.error("[App openRepo] failed:", error);
+      notify(formatUserErrorMessage(error), "error");
+    }
   }
 
   async function confirmChangeDataDir() {
@@ -1174,6 +1186,7 @@ export default function App() {
                           onCopyVendorApiKey={copyVendorApiKey}
                           onSaveVendor={saveVendorEditor}
                           onRevertVendor={requestRevertVendorEditor}
+                          onOpenRepo={openRepo}
                           busy={busy}
                         />
                       ) : (
@@ -1196,8 +1209,14 @@ export default function App() {
                   logs={logs}
                   onRefreshLogs={() => run("logs", refreshLogs)}
                   onLoadOlderLogs={loadOlderLogs}
-                  onOpenLog={() => run("openLog", () => getDesktopApi().openLog())}
-                  onOpenConfig={() => run("openConfig", () => getDesktopApi().openConfig())}
+                  onOpenLog={() => run("openLog", async () => {
+                    const result = await getDesktopApi().openLog();
+                    if (!result.ok) notify("Could not open the log file.", "error");
+                  })}
+                  onOpenConfig={() => run("openConfig", async () => {
+                    const result = await getDesktopApi().openConfig();
+                    if (!result.ok) notify("Could not open the config file.", "error");
+                  })}
                   busy={busy}
                 />
               )}

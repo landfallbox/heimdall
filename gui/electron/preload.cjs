@@ -43,6 +43,7 @@ contextBridge.exposeInMainWorld("heimdall", {
   downloadUpdate: () => ipcRenderer.invoke("update:download"),
   installUpdate: () => ipcRenderer.invoke("update:install"),
   openReleasePage: () => ipcRenderer.invoke("update:openReleasePage"),
+  openRepo: () => ipcRenderer.invoke("repo:openRepo"),
   writeClipboard: (text) => ipcRenderer.invoke("clipboard:writeText", text),
   syncVsCodeModels: () => ipcRenderer.invoke("vscode:sync"),
   onOpenSettings: (callback) => {

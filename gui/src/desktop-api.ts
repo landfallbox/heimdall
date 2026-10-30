@@ -66,6 +66,11 @@ export interface DataDirChangeResult {
   restartScheduled: boolean;
 }
 
+/** 打开外部资源（文件/目录/网页）的结果。失败时渲染层弹固定友好提示，不展示原始错误。 */
+export interface OpenResult {
+  ok: boolean;
+}
+
 export interface HeimdallDesktopApi {
   getState(): Promise<AppState>;
   rendererReady(): Promise<void>;
@@ -86,17 +91,18 @@ export interface HeimdallDesktopApi {
   readUsageSummary(options?: { vendor?: string; model?: string }): Promise<UsageSummary>;
   loadPricingCache(): Promise<PricingCacheResult>;
   loadModelInfoCache(): Promise<ModelInfoCacheResult>;
-  openConfig(): Promise<void>;
-  openLog(): Promise<void>;
+  openConfig(): Promise<OpenResult>;
+  openLog(): Promise<OpenResult>;
   getDataDirState(): Promise<DataDirState>;
   pickDataDir(): Promise<{ canceled: boolean; path: string }>;
   changeDataDir(target: string): Promise<DataDirChangeResult>;
-  openDataDir(): Promise<void>;
+  openDataDir(): Promise<OpenResult>;
   getUpdateState(): Promise<UpdateState>;
   checkForUpdates(options?: { manual?: boolean }): Promise<UpdateState>;
   downloadUpdate(): Promise<UpdateState>;
   installUpdate(): Promise<UpdateState>;
-  openReleasePage(): Promise<void>;
+  openReleasePage(): Promise<OpenResult>;
+  openRepo(): Promise<OpenResult>;
   writeClipboard(text: string): Promise<void>;
   syncVsCodeModels(): Promise<VsCodeSyncResult>;
   onOpenSettings(callback: () => void): (() => void) | undefined;

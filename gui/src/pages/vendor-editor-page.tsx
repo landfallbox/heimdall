@@ -91,6 +91,7 @@ interface VendorEditorPageProps {
   onCopyVendorApiKey: () => Promise<void>;
   onSaveVendor: () => Promise<void>;
   onRevertVendor: () => void;
+  onOpenRepo: () => void;
   busy: string;
 }
 
@@ -110,6 +111,7 @@ export function VendorEditorPage({
   onCopyVendorApiKey,
   onSaveVendor,
   onRevertVendor,
+  onOpenRepo,
   busy,
 }: VendorEditorPageProps) {
   if (!vendor) {
@@ -251,6 +253,7 @@ export function VendorEditorPage({
                   onUpdateVendorModel={onUpdateVendorModel}
                   onRemoveVendorModel={onRemoveVendorModel}
                   onLoadVendorModelsOnSelect={() => void onLoadVendorModelsOnSelect()}
+                  onOpenRepo={onOpenRepo}
                 />
               ))}
             </div>
@@ -302,6 +305,7 @@ function ModelPricingRow({
   onUpdateVendorModel,
   onRemoveVendorModel,
   onLoadVendorModelsOnSelect,
+  onOpenRepo,
 }: {
   model: VendorModelDraft;
   index: number;
@@ -309,16 +313,11 @@ function ModelPricingRow({
   onUpdateVendorModel: (modelIndex: number, field: string, value: unknown) => void;
   onRemoveVendorModel: (modelIndex: number) => void;
   onLoadVendorModelsOnSelect: () => void;
+  onOpenRepo: () => void;
 }) {
   const customPricing = model.pricingMode === "custom";
   const catalogKey = isPricingCatalogKey(model.pricingMode) ? model.pricingMode : "openai";
   const pricingView = getCatalogPriceView(catalogKey, model.id);
-  const otherCatalogKey =
-    !customPricing && !pricingView && model.id
-      ? PRICING_CATALOG_KEYS.find((key) => key !== catalogKey && getCatalogPriceView(key, model.id))
-      : null;
-  const catalogLabel = PRICING_CATALOG_LABELS[catalogKey];
-  const otherCatalogLabel = otherCatalogKey ? PRICING_CATALOG_LABELS[otherCatalogKey] : "";
   const [expanded, setExpanded] = React.useState(index < 2);
   const [copied, setCopied] = React.useState(false);
   const copiedTimeoutRef = React.useRef<number | undefined>(undefined);
@@ -671,23 +670,21 @@ function ModelPricingRow({
             <small className="text-[11px] leading-snug text-destructive">
               Enter valid non-negative prices for {model.id || "this model"}.
             </small>
-          ) : !pricingView && model.id ? (
-            <small className="flex items-start gap-1.5 text-[11px] leading-snug text-warning">
+          ) : model.id ? (
+            <small className="flex items-start gap-1.5 text-[11px] leading-snug text-muted-foreground">
               <Info size={12} className="mt-0.5 shrink-0" />
-              {otherCatalogKey ? (
-                <>
-                  Not in {catalogLabel} —{" "}
-                  <button
-                    type="button"
-                    className="bg-none p-0 font-bold text-primary underline-offset-2 hover:underline"
-                    onClick={() => onUpdateVendorModel(index, "pricingMode", otherCatalogKey)}
-                  >
-                    switch to {otherCatalogLabel}
-                  </button>
-                </>
-              ) : (
-                `Not in ${catalogLabel} — use Custom`
-              )}
+              <span>
+                Prices & details are auto-matched by model ID. If prices don't fit, switch Price source to Custom to override.
+                To improve the built-in data (prices, model info, or other config), submit an issue or PR to{" "}
+                <button
+                  type="button"
+                  className="bg-none p-0 font-bold text-primary underline-offset-2 hover:underline"
+                  onClick={onOpenRepo}
+                >
+                  landfallbox/heimdall
+                </button>
+                .
+              </span>
             </small>
           ) : null}
           </div>
@@ -967,9 +964,12 @@ function VsCodeModelFields({
   return (
     <div className="flex flex-col gap-2.5">
       <div className="flex items-center gap-3 pt-0.5">
-        <span className="shrink-0 text-[11px] font-semibold text-muted-foreground/70">VS Code</span>
+        <span className="shrink-0 text-[11px] font-semibold text-muted-foreground/70">Model info</span>
         <div className="h-px flex-1 bg-border/50" />
       </div>
+      <p className="text-[11px] leading-snug text-muted-foreground/60">
+        Auto-matched by model ID; synced to VS Code on save when VS Code sync is enabled. If you don't use VS Code sync, you can leave these blank or keep the defaults — no need to verify them.
+      </p>
       <div className="grid gap-2.5 sm:grid-cols-3">
         <label className="flex min-w-0 flex-col gap-1.5">
           <span className="text-xs font-semibold text-muted-foreground">Display name</span>
