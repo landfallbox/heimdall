@@ -1340,6 +1340,24 @@ export const BUILTIN_MODEL_INFO_DATA: RemoteModelInfoData = {
       "capabilities": {
         "vision": true
       }
+    },
+    "deepseek-flash": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 393216,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true,
+        "thinking": true
+      }
+    },
+    "deepseek-v4-pro": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 393216,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": false,
+        "thinking": true
+      }
     }
   }
 };

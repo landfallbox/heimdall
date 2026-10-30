@@ -1336,6 +1336,24 @@
       "capabilities": {
         "vision": true
       }
+    },
+    "deepseek-flash": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 393216,
+      "capabilities": {
+        "thinking": true,
+        "toolCalling": true,
+        "vision": true
+      }
+    },
+    "deepseek-v4-pro": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 393216,
+      "capabilities": {
+        "thinking": true,
+        "toolCalling": true,
+        "vision": false
+      }
     }
   }
 }
