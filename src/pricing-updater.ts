@@ -58,6 +58,23 @@ export function parseRemotePricing(value: unknown): RemotePricingData {
   return result.data as RemotePricingData;
 }
 
+// Validates `value` against the remote pricing schema but returns the
+// original object unchanged. Unlike parseRemotePricing, this does NOT
+// re-serialize through zod, so extra top-level fields (e.g. the flat
+// currency/inputPerMillion/... fields kept on tiered entries for legacy
+// clients) are preserved. The refresh pipeline uses this before writing
+// data/pricing.json so untouched vendors and their flat fields survive.
+export function validateRemotePricing(value: unknown): RemotePricingData {
+  const result = remotePricingSchema.safeParse(value);
+  if (!result.success) {
+    const details = result.error.issues
+      .map((issue) => `${issue.path.length ? issue.path.join(".") : "value"}: ${issue.message}`)
+      .join("; ");
+    throw new Error(`Invalid remote pricing data: ${details}`);
+  }
+  return value as RemotePricingData;
+}
+
 export function loadPricingCache(dataDir: string): RemotePricingData | null {
   const path = join(dataDir, PRICING_CACHE_FILENAME);
   if (!existsSync(path)) {

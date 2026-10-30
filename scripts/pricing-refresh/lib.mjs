@@ -4,7 +4,7 @@
 // The merge only adds or modifies models: retired models are never deleted and
 // a vendor whose scrape lost most of its models is skipped entirely (circuit
 // breaker) so a page redesign never commits half-written data.
-import { parseRemotePricing } from "../../src/pricing-updater.ts";
+import { validateRemotePricing } from "../../src/pricing-updater.ts";
 
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
@@ -359,7 +359,10 @@ export function formatPricing(data) {
   return `${JSON.stringify(data, null, 2)}\n`;
 }
 
-// Re-serialize through the zod schema so the output stays valid.
+// Validate against the zod schema, returning the original object unchanged.
+// We deliberately do NOT re-serialize through zod: re-serializing would strip
+// the flat top-level fields (currency/inputPerMillion/...) that tiered entries
+// keep for legacy clients, and would touch vendors the scrape didn't change.
 export function validatePricing(data) {
-  return parseRemotePricing(data);
+  return validateRemotePricing(data);
 }
