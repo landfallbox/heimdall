@@ -325,6 +325,7 @@ if (!hasRealPreload) {
     onUpdateState: () => undefined,
     onConfigChanged: () => undefined,
     onOsDarkChange: () => undefined,
+    getOsDark: () => Promise.resolve(window.matchMedia("(prefers-color-scheme: dark)").matches),
   };
 
   window.heimdall = mock;

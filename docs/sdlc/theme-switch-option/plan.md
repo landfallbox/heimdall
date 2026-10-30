@@ -310,6 +310,12 @@ system 模式下 `nativeTheme.themeSource` 保持 `system`，OS 变化不触发 
 
 **验证**：`npm run check`（tsc + node --check）exit 0；`npm test` 23 项（含新增 `test/theme.test.ts`）exit 0；`npm run test:electron` exit 0。
 
+**④ Minor（评审第二轮）：订阅窗口期推送丢失。**
+`createWindow` 注入 `?osDark=` 快照之后、`App` 安装 `onOsDarkChange` 监听之前，若 OS 主题变化，主进程的 `app:osDark` 推送无监听者而丢失，渲染进程停留在陈旧快照。
+- 订阅握手：新增 invoke 通道 `app:osDark`（`ipc-contracts.ts` 契约 + `main.ts` `registerIpcHandler` 返回 `{ osDark: nativeTheme.shouldUseDarkColors }`）；preload `getOsDark()` 解包为 `Promise<boolean>`；`App.tsx` 在 `onOsDarkChange` 注册后调用 `getOsDark()` 回放当前值 → `setKnownOsDark`（回放值取自主进程当前 `nativeTheme`，晚于注册时刻的推送不晚于它）。
+- `mock-desktop-api.ts`：`getOsDark` 回退 `matchMedia`（浏览器预览无主进程）。
+- **验证**：`npm run check` + `npm run test:ci`（含 `ipc-contracts.test.ts` 校验新通道注册）exit 0。
+
 ---
 
 ## 影响面 / 可能破坏的现有功能

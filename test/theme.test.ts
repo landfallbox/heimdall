@@ -62,4 +62,12 @@ mediaMatches = false;
 listeners.forEach((cb) => cb({ matches: false }));
 assert.equal(state.dark, true, "陈旧 matchMedia 变化应被主进程权威值遮蔽");
 
+// 7) 订阅握手：建窗快照 osDark=true 后 OS 切浅色（推送在监听注册前丢失），
+//    渲染进程仍停留在深色；注册监听后回放主进程当前值（false）应纠正。
+initTheme("system", true);
+assert.equal(state.dark, true, "快照注入后为深色");
+// （此处模拟 OS 已切浅色但推送丢失：无 setKnownOsDark 调用）
+setKnownOsDark(false);
+assert.equal(state.dark, false, "订阅握手回放的当前值应纠正陈旧快照");
+
 console.log("theme tests passed");

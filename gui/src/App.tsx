@@ -338,9 +338,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = getDesktopApi().onOsDarkChange?.((osDark) => {
+    const api = getDesktopApi();
+    const unsubscribe = api.onOsDarkChange?.((osDark) => {
       setKnownOsDark(osDark);
     });
+    // 订阅握手：监听器注册后回放当前 OS 深色状态，覆盖建窗快照与注册之间
+    // OS 切换导致推送丢失的窗口期（回放值取自主进程当前 nativeTheme）。
+    void api.getOsDark().then((osDark) => setKnownOsDark(osDark)).catch(() => {});
 
     return typeof unsubscribe === "function" ? unsubscribe : undefined;
   }, []);

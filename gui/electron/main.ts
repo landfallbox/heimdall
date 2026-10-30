@@ -1558,6 +1558,11 @@ registerIpcHandler("app:setTheme", (_event, theme) => {
   applyShellTheme(theme as "system" | "light" | "dark");
   return { ok: true };
 });
+// 订阅握手：渲染进程注册 onOsDarkChange 后回放当前 OS 深色状态，
+// 覆盖 createWindow 快照与监听器注册之间 OS 切换导致推送丢失的窗口期。
+registerIpcHandler("app:osDark", () => {
+  return { osDark: nativeTheme.shouldUseDarkColors };
+});
 registerIpcHandler("app:hideToTray", () => {
   closePromptActive = false;
   if (mainWindow && !mainWindow.isDestroyed()) {

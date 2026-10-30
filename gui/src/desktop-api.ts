@@ -70,6 +70,8 @@ export interface HeimdallDesktopApi {
   getState(): Promise<AppState>;
   rendererReady(): Promise<void>;
   setTheme(theme: ThemeMode): Promise<{ ok: boolean }>;
+  /** 当前 OS 深色状态（nativeTheme 权威值），用于 onOsDarkChange 订阅握手回放。 */
+  getOsDark(): Promise<boolean>;
   hideToTray(): Promise<void>;
   cancelClose(): Promise<void>;
   quitAndStop(): Promise<void>;
