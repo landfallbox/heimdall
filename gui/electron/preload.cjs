@@ -16,6 +16,8 @@ contextBridge.exposeInMainWorld("heimdall", {
   __heimdallPreload: true,
   getState: () => ipcRenderer.invoke("app:getState"),
   rendererReady: () => ipcRenderer.invoke("app:rendererReady"),
+  setTheme: (theme) => ipcRenderer.invoke("app:setTheme", theme),
+  getOsDark: async () => Boolean((await ipcRenderer.invoke("app:osDark")).osDark),
   hideToTray: () => ipcRenderer.invoke("app:hideToTray"),
   cancelClose: () => ipcRenderer.invoke("app:cancelClose"),
   quitAndStop: () => ipcRenderer.invoke("app:quitAndStop"),
@@ -62,5 +64,10 @@ contextBridge.exposeInMainWorld("heimdall", {
     const listener = (_event, state) => callback(state);
     ipcRenderer.on("update:state", listener);
     return () => ipcRenderer.removeListener("update:state", listener);
+  },
+  onOsDarkChange: (callback) => {
+    const listener = (_event, osDark) => callback(Boolean(osDark));
+    ipcRenderer.on("app:osDark", listener);
+    return () => ipcRenderer.removeListener("app:osDark", listener);
   },
 });

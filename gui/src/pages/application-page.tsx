@@ -7,7 +7,7 @@ import { Button } from "../components/ui/button.tsx";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "../components/ui/card.tsx";
 import { Separator } from "../components/ui/separator.tsx";
 import type { DataDirState } from "../desktop-api.ts";
-import type { CloseBehavior } from "../config-draft.ts";
+import type { CloseBehavior, ThemeMode } from "../config-draft.ts";
 import type { Draft } from "../config-draft.ts";
 import type { UpdateState } from "../types.ts";
 
@@ -17,11 +17,17 @@ const closeBehaviorOptions = [
   { value: "ask" as CloseBehavior, label: "Ask every time" },
 ];
 
+const themeOptions: Array<{ value: ThemeMode; label: string }> = [
+  { value: "system", label: "Follow system" },
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+];
+
 interface AppSettingsPageProps {
   app: Draft["app"];
   appVersion: string;
   updateState: UpdateState;
-  onSetAppSetting: (field: "closeBehavior" | "startAtLogin" | "syncVsCodeModels", value: CloseBehavior | boolean) => Promise<void>;
+  onSetAppSetting: (field: "closeBehavior" | "startAtLogin" | "syncVsCodeModels" | "theme", value: CloseBehavior | boolean | ThemeMode) => Promise<void>;
   onSyncNow: () => Promise<void>;
   onCheckUpdate: () => void;
   onDownloadUpdate: () => void;
@@ -89,6 +95,15 @@ export function AppSettingsPage({
               options={closeBehaviorOptions}
               value={app.closeBehavior}
               onChange={(value) => void onSetAppSetting("closeBehavior", value)}
+              disabled={saving}
+            />
+          </Field>
+          <Separator />
+          <Field label="Theme">
+            <SegmentedControl
+              options={themeOptions}
+              value={app.theme}
+              onChange={(value) => void onSetAppSetting("theme", value)}
               disabled={saving}
             />
           </Field>

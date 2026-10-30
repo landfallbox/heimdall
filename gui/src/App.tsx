@@ -23,9 +23,11 @@ import {
   type CloseBehavior,
   type ConfigInput,
   type Draft,
+  type ThemeMode,
   type VendorDraft,
   getVendorModels,
 } from "./config-draft.ts";
+import { applyTheme, setKnownOsDark } from "./theme.ts";
 import { useLogsController, useModelInfoCache, usePricingCache, useUpdateController, useUsageController } from "./app-controllers.ts";
 import { getDesktopApi, type DataDirState, type SaveConfigResult } from "./desktop-api.ts";
 import type { HealthState } from "./types.ts";
@@ -336,6 +338,18 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const api = getDesktopApi();
+    const unsubscribe = api.onOsDarkChange?.((osDark) => {
+      setKnownOsDark(osDark);
+    });
+    // 订阅握手：监听器注册后回放当前 OS 深色状态，覆盖建窗快照与注册之间
+    // OS 切换导致推送丢失的窗口期（回放值取自主进程当前 nativeTheme）。
+    void api.getOsDark().then((osDark) => setKnownOsDark(osDark)).catch(() => {});
+
+    return typeof unsubscribe === "function" ? unsubscribe : undefined;
+  }, []);
+
+  useEffect(() => {
     if (page === "logs") {
       void run("logs", refreshLogs);
     }
@@ -356,6 +370,7 @@ export default function App() {
       setConfigRevision(state.revision || "");
       setDraft(loadedDraft);
       setPersistedDraft(loadedDraft);
+      applyTheme(loadedDraft.app.theme);
       setRestartRequired(false);
       setConfigChanged(false);
       configLoaded = true;
@@ -549,24 +564,40 @@ export default function App() {
     }));
   }
 
-  async function setAppSetting(field: "closeBehavior" | "startAtLogin" | "syncVsCodeModels", value: CloseBehavior | boolean) {
+  async function setAppSetting(field: "closeBehavior" | "startAtLogin" | "syncVsCodeModels" | "theme", value: CloseBehavior | boolean | ThemeMode) {
     if (busy === "saveApp" || value === persistedDraft.app[field]) {
       return;
     }
 
+    if (field === "theme") {
+      applyTheme(value as ThemeMode);
+    }
+
     await run("saveApp", async () => {
-      const result = await getDesktopApi().saveConfig({
-        config: toConfig({
-          ...persistedDraft,
-          app: { ...persistedDraft.app, [field]: value },
-        }),
-        revision: configRevision,
-      });
+      let result;
+      try {
+        result = await getDesktopApi().saveConfig({
+          config: toConfig({
+            ...persistedDraft,
+            app: { ...persistedDraft.app, [field]: value },
+          }),
+          revision: configRevision,
+        });
+      } catch (error) {
+        // 保存失败（如 revision 过期）时回滚主题，避免渲染进程与持久化/外壳不一致。
+        if (field === "theme") {
+          applyTheme(persistedDraft.app.theme);
+        }
+        throw error;
+      }
       const savedDraft = toDraft(result.config as ConfigInput);
       setConfigRevision(result.revision || "");
       setPersistedDraft(savedDraft);
       setDraft((current) => ({ ...current, app: savedDraft.app }));
       setConfigChanged(false);
+      if (field === "theme") {
+        void getDesktopApi().setTheme(value as ThemeMode);
+      }
       if (field === "syncVsCodeModels" && value === true) {
         notify(vsCodeSyncToast(result.vsCodeSync));
       }

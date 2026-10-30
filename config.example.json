@@ -1,7 +1,8 @@
 {
   "app": {
     "closeBehavior": "tray",
-    "startAtLogin": false
+    "startAtLogin": false,
+    "theme": "system"
   },
   "router": {
     "host": "127.0.0.1",

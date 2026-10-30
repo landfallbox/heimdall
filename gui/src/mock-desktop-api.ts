@@ -21,7 +21,7 @@ const hasRealPreload = Boolean(
 );
 
 interface MockConfig {
-  app: { closeBehavior: string; startAtLogin: boolean; syncVsCodeModels: boolean };
+  app: { closeBehavior: string; startAtLogin: boolean; syncVsCodeModels: boolean; theme: string };
   router: {
     host: string;
     port: number;
@@ -55,7 +55,7 @@ let revision = `mock-${Date.now().toString(16)}`;
 let running = false;
 
 const config: MockConfig = {
-  app: { closeBehavior: "tray", startAtLogin: false, syncVsCodeModels: false },
+  app: { closeBehavior: "tray", startAtLogin: false, syncVsCodeModels: false, theme: "system" },
   router: {
     host: "127.0.0.1",
     port: 4000,
@@ -246,6 +246,7 @@ if (!hasRealPreload) {
       return result;
     },
     rendererReady: async () => undefined,
+    setTheme: async () => ({ ok: true }),
     hideToTray: async () => undefined,
     cancelClose: async () => undefined,
     quitAndStop: async () => undefined,
@@ -323,6 +324,15 @@ if (!hasRealPreload) {
     onConfirmClose: () => undefined,
     onUpdateState: () => undefined,
     onConfigChanged: () => undefined,
+    // 浏览器预览无主进程推送：以 matchMedia 变化作为 OS 主题变化的来源，
+    // 否则握手后 osDarkFromMain 固定为初始值，系统主题切换会停留在旧状态。
+    onOsDarkChange: (callback) => {
+      const media = window.matchMedia("(prefers-color-scheme: dark)");
+      const listener = (event: MediaQueryListEvent) => callback(event.matches);
+      media.addEventListener("change", listener);
+      return () => media.removeEventListener("change", listener);
+    },
+    getOsDark: () => Promise.resolve(window.matchMedia("(prefers-color-scheme: dark)").matches),
   };
 
   window.heimdall = mock;

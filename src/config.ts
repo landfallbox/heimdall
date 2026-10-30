@@ -2,6 +2,7 @@ import { z } from "zod";
 import { normalizeRequestFormat } from "./openai-protocol.ts";
 
 export type CloseBehavior = "tray" | "exit" | "ask";
+export type ThemeMode = "system" | "light" | "dark";
 export type RequestFormat = "chat-completions" | "responses" | "embeddings" | "custom";
 export type ApiKeyHeader = "authorization" | "api-key" | "x-api-key";
 export type VendorAuthentication = "none" | "api-key";
@@ -71,6 +72,7 @@ export type NormalizedAppConfig = {
   closeBehavior: CloseBehavior;
   startAtLogin: boolean;
   syncVsCodeModels: boolean;
+  theme: ThemeMode;
 };
 
 export type NormalizedRouterConfig = {
@@ -94,6 +96,7 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
     closeBehavior: "tray",
     startAtLogin: false,
     syncVsCodeModels: false,
+    theme: "system",
   },
   router: {
     host: "127.0.0.1",
@@ -120,6 +123,7 @@ const httpUrlSchema = z.string().trim().refine((value) => {
 
 const statusCodeSchema = z.number().int().min(100).max(599);
 const closeBehaviorSchema = z.enum(["tray", "exit", "ask"]);
+const themeSchema = z.enum(["system", "light", "dark"]);
 const apiKeyHeaderSchema = z.enum(["authorization", "api-key", "x-api-key"]);
 const customPricingSchema = z.object({
   mode: z.literal("custom"),
@@ -221,6 +225,7 @@ export const configSchema = z.object({
     closeBehavior: closeBehaviorSchema.default(DEFAULT_CONFIG.app.closeBehavior),
     startAtLogin: z.boolean().default(DEFAULT_CONFIG.app.startAtLogin),
     syncVsCodeModels: z.boolean().default(DEFAULT_CONFIG.app.syncVsCodeModels),
+    theme: themeSchema.default(DEFAULT_CONFIG.app.theme),
   }).default(DEFAULT_CONFIG.app),
   router: z.object({
     host: z.string().trim().min(1),
@@ -264,6 +269,7 @@ export function normalizeConfig(config: unknown): NormalizedConfig {
       closeBehavior: normalizeCloseBehavior(app.closeBehavior),
       startAtLogin: app.startAtLogin === true,
       syncVsCodeModels: app.syncVsCodeModels === true,
+      theme: normalizeTheme(app.theme),
     },
     router: {
       host: String(router.host || DEFAULT_CONFIG.router.host).trim() || DEFAULT_CONFIG.router.host,
@@ -280,6 +286,10 @@ export function normalizeConfig(config: unknown): NormalizedConfig {
 
 function normalizeCloseBehavior(value: unknown): CloseBehavior {
   return closeBehaviorSchema.safeParse(value).success ? (value as CloseBehavior) : DEFAULT_CONFIG.app.closeBehavior;
+}
+
+function normalizeTheme(value: unknown): ThemeMode {
+  return themeSchema.safeParse(value).success ? (value as ThemeMode) : DEFAULT_CONFIG.app.theme;
 }
 
 function normalizeStatusCodes(value: unknown): number[] {
