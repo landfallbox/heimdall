@@ -4,7 +4,7 @@ import type { RemoteModelInfoData } from "./model-info.ts";
 
 export const BUILTIN_MODEL_INFO_DATA: RemoteModelInfoData = {
   "schemaVersion": 1,
-  "updatedAt": "2026-10-27",
+  "updatedAt": "2026-10-30",
   "models": {
     "gpt-4o": {
       "displayName": "GPT-4o",
@@ -48,7 +48,7 @@ export const BUILTIN_MODEL_INFO_DATA: RemoteModelInfoData = {
     },
     "gpt-4.1-nano": {
       "displayName": "GPT-4.1 nano",
-      "contextWindow": 1000000,
+      "contextWindow": 1047576,
       "maxOutputTokens": 32768,
       "capabilities": {
         "toolCalling": true,
@@ -79,7 +79,7 @@ export const BUILTIN_MODEL_INFO_DATA: RemoteModelInfoData = {
     "o1-pro": {
       "displayName": "o1-pro",
       "contextWindow": 200000,
-      "maxOutputTokens": 32768,
+      "maxOutputTokens": 100000,
       "capabilities": {
         "toolCalling": true,
         "vision": true,
@@ -262,6 +262,1074 @@ export const BUILTIN_MODEL_INFO_DATA: RemoteModelInfoData = {
     },
     "sensenova-6.8-flash-lite": {
       "displayName": "SenseNova 6.8 Flash Lite"
+    },
+    "claude-fable-5-1": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 131072,
+      "capabilities": {
+        "thinking": true
+      }
+    },
+    "claude-opus-5-5": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 131072,
+      "capabilities": {
+        "thinking": true
+      }
+    },
+    "claude-sonnet-5-5": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 131072,
+      "capabilities": {
+        "thinking": true
+      }
+    },
+    "claude-haiku-5-5": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 131072,
+      "capabilities": {
+        "thinking": true
+      }
+    },
+    "model": {},
+    "deepseek-flash(1)deepseek-v4-pro": {},
+    "gemini-4-argon": {
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true,
+        "thinking": true
+      }
+    },
+    "gemini-3.8-flash": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 65536,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true,
+        "thinking": true
+      }
+    },
+    "gemini-3.8-live": {
+      "contextWindow": 131072,
+      "maxOutputTokens": 65536,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true,
+        "thinking": true
+      }
+    },
+    "gemini-3.8-live-extended-thinking": {
+      "contextWindow": 131072,
+      "maxOutputTokens": 65536,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true,
+        "thinking": true
+      }
+    },
+    "gemini-3.8-flash-tts": {
+      "contextWindow": 8192,
+      "maxOutputTokens": 16384,
+      "capabilities": {
+        "toolCalling": false,
+        "thinking": false
+      }
+    },
+    "gemini-3.8-flash-lite-tts": {
+      "contextWindow": 8192,
+      "maxOutputTokens": 16384,
+      "capabilities": {
+        "toolCalling": false,
+        "thinking": false
+      }
+    },
+    "gemini-3.6-flash": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 65536,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true,
+        "thinking": true
+      }
+    },
+    "gemini-3.5-flash-lite": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 65536,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true,
+        "thinking": true
+      }
+    },
+    "gemini-3.1-flash-lite": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 65536,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true,
+        "thinking": true
+      }
+    },
+    "gemini-nano-banana-2.1": {
+      "contextWindow": 131072,
+      "maxOutputTokens": 32768,
+      "capabilities": {
+        "toolCalling": false,
+        "vision": true,
+        "thinking": true
+      }
+    },
+    "gemini-3.1-flash-image": {
+      "contextWindow": 131072,
+      "maxOutputTokens": 32768,
+      "capabilities": {
+        "toolCalling": false,
+        "vision": true,
+        "thinking": true
+      }
+    },
+    "gemini-3.1-flash-lite-image": {
+      "contextWindow": 65536,
+      "maxOutputTokens": 4096,
+      "capabilities": {
+        "toolCalling": false,
+        "vision": true,
+        "thinking": true
+      }
+    },
+    "gemini-3-pro-image": {
+      "contextWindow": 65536,
+      "maxOutputTokens": 32768,
+      "capabilities": {
+        "toolCalling": false,
+        "vision": true,
+        "thinking": true
+      }
+    },
+    "gemini-3.5-transcribe": {
+      "capabilities": {
+        "toolCalling": false,
+        "thinking": false
+      }
+    },
+    "gemini-3.1-pro-preview": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 65536,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true,
+        "thinking": true
+      }
+    },
+    "gemini-3-flash-preview": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 65536,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true,
+        "thinking": true
+      }
+    },
+    "gemini-3.5-live-translate-preview": {
+      "contextWindow": 131072,
+      "maxOutputTokens": 65536,
+      "capabilities": {
+        "toolCalling": false,
+        "thinking": false
+      }
+    },
+    "gemini-3.1-flash-live-preview": {
+      "contextWindow": 131072,
+      "maxOutputTokens": 65536,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true,
+        "thinking": true
+      }
+    },
+    "gemini-3.1-flash-tts-preview": {
+      "contextWindow": 8192,
+      "maxOutputTokens": 16384,
+      "capabilities": {
+        "toolCalling": false,
+        "thinking": false
+      }
+    },
+    "gemini-2.5-flash-image": {
+      "contextWindow": 65536,
+      "maxOutputTokens": 32768,
+      "capabilities": {
+        "toolCalling": false,
+        "vision": true,
+        "thinking": false
+      }
+    },
+    "gemini-2.5-flash-native-audio-preview-12-2025": {
+      "contextWindow": 131072,
+      "maxOutputTokens": 8192,
+      "capabilities": {
+        "toolCalling": true,
+        "thinking": true
+      }
+    },
+    "gemini-2.5-flash-preview-tts": {
+      "contextWindow": 8192,
+      "maxOutputTokens": 16384,
+      "capabilities": {
+        "toolCalling": false,
+        "thinking": false
+      }
+    },
+    "gemini-2.5-pro-preview-tts": {
+      "contextWindow": 8192,
+      "maxOutputTokens": 16384,
+      "capabilities": {
+        "toolCalling": false,
+        "thinking": false
+      }
+    },
+    "lyria-3.5": {
+      "contextWindow": 131072,
+      "capabilities": {
+        "toolCalling": false,
+        "vision": true,
+        "thinking": false
+      }
+    },
+    "lyria-3-clip-preview": {
+      "contextWindow": 131072,
+      "capabilities": {
+        "toolCalling": false,
+        "vision": true,
+        "thinking": false
+      }
+    },
+    "lyria-3-pro-preview": {
+      "contextWindow": 131072,
+      "capabilities": {
+        "toolCalling": false,
+        "vision": true,
+        "thinking": false
+      }
+    },
+    "deep-research-preview-04-2026": {
+      "maxOutputTokens": 65536
+    },
+    "deep-research-max-preview-04-2026": {
+      "maxOutputTokens": 65536
+    },
+    "antigravity-preview-09-2026": {
+      "maxOutputTokens": 65536
+    },
+    "gemini-embedding-2": {
+      "contextWindow": 8192
+    },
+    "gemini-embedding-001": {
+      "contextWindow": 2048
+    },
+    "kimi-k3.1-pro": {
+      "contextWindow": 1048576,
+      "capabilities": {
+        "vision": true
+      }
+    },
+    "kimi-k3.1-pro-highspeed": {},
+    "kimi-k3": {
+      "contextWindow": 1048576,
+      "capabilities": {
+        "vision": true
+      }
+    },
+    "kimi-k2.7-code": {
+      "contextWindow": 262144
+    },
+    "kimi-k2.7-code-highspeed": {},
+    "kimi-k2.6": {
+      "contextWindow": 262144,
+      "capabilities": {
+        "vision": true,
+        "thinking": true
+      }
+    },
+    "glm-5.3-flash": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 131072,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true,
+        "thinking": true
+      }
+    },
+    "glm-5.3-flashx": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 131072,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true,
+        "thinking": true
+      }
+    },
+    "glm-5.3-flashx-legal": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 131072,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true,
+        "thinking": true
+      }
+    },
+    "glm-5.3": {
+      "capabilities": {
+        "toolCalling": true,
+        "thinking": true
+      }
+    },
+    "glm-5.2": {
+      "contextWindow": 1048576
+    },
+    "glm-ocr": {},
+    "glm-image": {},
+    "gpt-6-astra": {
+      "displayName": "GPT-6 Astra",
+      "contextWindow": 1050000,
+      "maxOutputTokens": 128000,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true,
+        "thinking": true
+      },
+      "supportsReasoningEffort": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    "gpt-6.1-sol": {
+      "displayName": "GPT-6.1 Sol",
+      "contextWindow": 1050000,
+      "maxOutputTokens": 128000,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true,
+        "thinking": true
+      },
+      "supportsReasoningEffort": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    "gpt-6.1-terra": {
+      "displayName": "GPT-6.1 Terra",
+      "contextWindow": 1050000,
+      "maxOutputTokens": 128000,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true,
+        "thinking": true
+      },
+      "supportsReasoningEffort": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    "gpt-6-luna": {
+      "displayName": "GPT-6 Luna",
+      "contextWindow": 1050000,
+      "maxOutputTokens": 128000,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true,
+        "thinking": true
+      },
+      "supportsReasoningEffort": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    "gpt-image-2.5-sunburst": {
+      "displayName": "GPT-Image-2.5 Sunburst",
+      "capabilities": {
+        "toolCalling": false,
+        "vision": true
+      }
+    },
+    "gpt-image-2.5-flare": {
+      "displayName": "GPT-Image-2.5 Flare",
+      "capabilities": {
+        "toolCalling": false,
+        "vision": true
+      }
+    },
+    "gpt-image-2": {
+      "displayName": "GPT-Image-2",
+      "capabilities": {
+        "toolCalling": false,
+        "vision": true
+      }
+    },
+    "gpt-live-1": {
+      "displayName": "GPT-Live 1",
+      "capabilities": {
+        "toolCalling": true,
+        "vision": false
+      }
+    },
+    "gpt-realtime-2.1": {
+      "displayName": "GPT-Realtime-2.1",
+      "contextWindow": 128000,
+      "maxOutputTokens": 32000,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true
+      }
+    },
+    "gpt-realtime-2.1-mini": {
+      "displayName": "GPT-Realtime-2.1 Mini",
+      "contextWindow": 128000,
+      "maxOutputTokens": 32000,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true
+      }
+    },
+    "gpt-realtime-2": {
+      "displayName": "GPT-Realtime-2",
+      "contextWindow": 128000,
+      "maxOutputTokens": 32000,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true
+      }
+    },
+    "gpt-realtime-translate": {
+      "displayName": "GPT-Realtime-Translate",
+      "contextWindow": 16000,
+      "maxOutputTokens": 2000,
+      "capabilities": {
+        "toolCalling": false,
+        "vision": false
+      }
+    },
+    "gpt-live-transcribe": {
+      "displayName": "GPT-Live-Transcribe",
+      "capabilities": {
+        "toolCalling": false,
+        "vision": false
+      }
+    },
+    "gpt-realtime-whisper": {
+      "displayName": "GPT-Realtime-Whisper",
+      "contextWindow": 16000,
+      "maxOutputTokens": 2000,
+      "capabilities": {
+        "toolCalling": false,
+        "vision": false
+      }
+    },
+    "gpt-realtime-1.5": {
+      "displayName": "GPT-Realtime-1.5",
+      "contextWindow": 32000,
+      "maxOutputTokens": 4096,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true
+      }
+    },
+    "gpt-audio-1.5": {
+      "displayName": "GPT-Audio-1.5",
+      "contextWindow": 128000,
+      "maxOutputTokens": 16384,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": false
+      }
+    },
+    "gpt-transcribe": {
+      "displayName": "GPT-Transcribe",
+      "capabilities": {
+        "toolCalling": false,
+        "vision": false
+      }
+    },
+    "gpt-5.6-cyber": {
+      "displayName": "GPT-5.6 Cyber",
+      "contextWindow": 400000,
+      "maxOutputTokens": 128000,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true
+      }
+    },
+    "gpt-oss-120b": {
+      "displayName": "gpt-oss-120b",
+      "contextWindow": 131072,
+      "maxOutputTokens": 131072,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": false
+      }
+    },
+    "gpt-oss-20b": {
+      "displayName": "gpt-oss-20b",
+      "contextWindow": 131072,
+      "maxOutputTokens": 131072,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": false
+      }
+    },
+    "text-embedding-3-large": {
+      "displayName": "text-embedding-3-large",
+      "capabilities": {
+        "vision": false
+      }
+    },
+    "text-embedding-3-small": {
+      "displayName": "text-embedding-3-small",
+      "capabilities": {
+        "vision": false
+      }
+    },
+    "text-embedding-ada-002": {
+      "displayName": "text-embedding-ada-002",
+      "capabilities": {
+        "vision": false
+      }
+    },
+    "gpt-6-sol": {
+      "displayName": "GPT-6 Sol",
+      "contextWindow": 1050000,
+      "maxOutputTokens": 128000,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true,
+        "thinking": true
+      },
+      "supportsReasoningEffort": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    "gpt-5.6-sol": {
+      "displayName": "GPT-5.6 Sol",
+      "contextWindow": 1050000,
+      "maxOutputTokens": 128000,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true,
+        "thinking": true
+      },
+      "supportsReasoningEffort": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    "gpt-5.6-terra": {
+      "displayName": "GPT-5.6 Terra",
+      "contextWindow": 1050000,
+      "maxOutputTokens": 128000,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true,
+        "thinking": true
+      },
+      "supportsReasoningEffort": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    "gpt-5.6-luna": {
+      "displayName": "GPT-5.6 Luna",
+      "contextWindow": 1050000,
+      "maxOutputTokens": 128000,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true,
+        "thinking": true
+      },
+      "supportsReasoningEffort": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    "gpt-5.5": {
+      "displayName": "GPT-5.5",
+      "contextWindow": 1050000,
+      "maxOutputTokens": 128000,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true,
+        "thinking": true
+      },
+      "supportsReasoningEffort": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ]
+    },
+    "gpt-5.5-pro": {
+      "displayName": "GPT-5.5 Pro",
+      "contextWindow": 1050000,
+      "maxOutputTokens": 128000,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true,
+        "thinking": true
+      },
+      "supportsReasoningEffort": [
+        "medium",
+        "high",
+        "xhigh"
+      ]
+    },
+    "gpt-5.4": {
+      "displayName": "GPT-5.4",
+      "contextWindow": 1050000,
+      "maxOutputTokens": 128000,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true,
+        "thinking": true
+      },
+      "supportsReasoningEffort": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ]
+    },
+    "gpt-5.4-pro": {
+      "displayName": "GPT-5.4 Pro",
+      "contextWindow": 1050000,
+      "maxOutputTokens": 128000,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true,
+        "thinking": true
+      },
+      "supportsReasoningEffort": [
+        "medium",
+        "high",
+        "xhigh"
+      ]
+    },
+    "gpt-5.4-mini": {
+      "displayName": "GPT-5.4 Mini",
+      "contextWindow": 400000,
+      "maxOutputTokens": 128000,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true,
+        "thinking": true
+      },
+      "supportsReasoningEffort": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ]
+    },
+    "gpt-5.2": {
+      "displayName": "GPT-5.2",
+      "contextWindow": 400000,
+      "maxOutputTokens": 128000,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true,
+        "thinking": true
+      },
+      "supportsReasoningEffort": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ]
+    },
+    "gpt-5.2-pro": {
+      "displayName": "GPT-5.2 Pro",
+      "contextWindow": 400000,
+      "maxOutputTokens": 128000,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true
+      }
+    },
+    "omni-moderation-latest": {
+      "displayName": "omni-moderation",
+      "capabilities": {
+        "toolCalling": false,
+        "vision": true
+      }
+    },
+    "gpt-5.3-chat-latest": {
+      "displayName": "GPT-5.3 Chat",
+      "contextWindow": 128000,
+      "maxOutputTokens": 16384,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true
+      }
+    },
+    "gpt-5.2-chat-latest": {
+      "displayName": "GPT-5.2 Chat",
+      "contextWindow": 128000,
+      "maxOutputTokens": 16384,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true
+      }
+    },
+    "gpt-5.2-codex": {
+      "displayName": "GPT-5.2-Codex",
+      "contextWindow": 400000,
+      "maxOutputTokens": 128000,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true
+      }
+    },
+    "gpt-image-1": {
+      "displayName": "GPT-Image-1",
+      "capabilities": {
+        "toolCalling": false,
+        "vision": true
+      }
+    },
+    "o3-deep-research": {
+      "displayName": "o3-deep-research",
+      "contextWindow": 200000,
+      "maxOutputTokens": 100000,
+      "capabilities": {
+        "toolCalling": false,
+        "vision": true
+      }
+    },
+    "o4-mini-deep-research": {
+      "displayName": "o4-mini-deep-research",
+      "contextWindow": 200000,
+      "maxOutputTokens": 100000,
+      "capabilities": {
+        "toolCalling": false,
+        "vision": true
+      }
+    },
+    "computer-use-preview": {
+      "displayName": "computer-use-preview",
+      "contextWindow": 8192,
+      "maxOutputTokens": 1024,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true
+      }
+    },
+    "gpt-4o-mini-search-preview": {
+      "displayName": "GPT-4o Mini Search Preview",
+      "contextWindow": 128000,
+      "maxOutputTokens": 16384,
+      "capabilities": {
+        "toolCalling": false,
+        "vision": false
+      }
+    },
+    "gpt-4o-search-preview": {
+      "displayName": "GPT-4o Search Preview",
+      "contextWindow": 128000,
+      "maxOutputTokens": 16384,
+      "capabilities": {
+        "toolCalling": false,
+        "vision": false
+      }
+    },
+    "gpt-4.5-preview": {
+      "displayName": "GPT-4.5 Preview",
+      "contextWindow": 128000,
+      "maxOutputTokens": 16384,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true
+      }
+    },
+    "o1-mini": {
+      "displayName": "o1-mini",
+      "contextWindow": 128000,
+      "maxOutputTokens": 65536,
+      "capabilities": {
+        "toolCalling": false,
+        "vision": false
+      }
+    },
+    "o1-preview": {
+      "displayName": "o1 Preview",
+      "contextWindow": 128000,
+      "maxOutputTokens": 32768,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": false
+      }
+    },
+    "gpt-4o-audio-preview": {
+      "displayName": "GPT-4o Audio",
+      "contextWindow": 128000,
+      "maxOutputTokens": 16384,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": false
+      }
+    },
+    "gpt-4o-mini-audio-preview": {
+      "displayName": "GPT-4o Mini Audio",
+      "contextWindow": 128000,
+      "maxOutputTokens": 16384,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": false
+      }
+    },
+    "gpt-4o-mini-realtime-preview": {
+      "displayName": "GPT-4o Mini Realtime",
+      "contextWindow": 16000,
+      "maxOutputTokens": 4096,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": false
+      }
+    },
+    "gpt-4o-realtime-preview": {
+      "displayName": "GPT-4o Realtime",
+      "contextWindow": 32000,
+      "maxOutputTokens": 4096,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": false
+      }
+    },
+    "gpt-4-turbo": {
+      "displayName": "GPT-4 Turbo",
+      "contextWindow": 128000,
+      "maxOutputTokens": 4096,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true
+      }
+    },
+    "babbage-002": {
+      "displayName": "babbage-002",
+      "maxOutputTokens": 16384,
+      "capabilities": {
+        "toolCalling": false,
+        "vision": false
+      }
+    },
+    "chatgpt-4o-latest": {
+      "displayName": "ChatGPT-4o",
+      "contextWindow": 128000,
+      "maxOutputTokens": 16384,
+      "capabilities": {
+        "toolCalling": false,
+        "vision": true
+      }
+    },
+    "gpt-5.1-codex": {
+      "displayName": "GPT-5.1-Codex",
+      "contextWindow": 400000,
+      "maxOutputTokens": 128000,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true
+      }
+    },
+    "gpt-5.1-codex-max": {
+      "displayName": "GPT-5.1-Codex-Max",
+      "contextWindow": 400000,
+      "maxOutputTokens": 128000,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true
+      }
+    },
+    "gpt-5.1-codex-mini": {
+      "displayName": "GPT-5.1-Codex Mini",
+      "contextWindow": 400000,
+      "maxOutputTokens": 128000,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true
+      }
+    },
+    "gpt-5-codex": {
+      "displayName": "GPT-5-Codex",
+      "contextWindow": 400000,
+      "maxOutputTokens": 128000,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true
+      }
+    },
+    "codex-mini-latest": {
+      "displayName": "codex-mini-latest",
+      "contextWindow": 200000,
+      "maxOutputTokens": 100000,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true
+      }
+    },
+    "davinci-002": {
+      "displayName": "davinci-002",
+      "maxOutputTokens": 16384,
+      "capabilities": {
+        "toolCalling": false,
+        "vision": false
+      }
+    },
+    "gpt-3.5-turbo": {
+      "displayName": "GPT-3.5 Turbo",
+      "contextWindow": 16385,
+      "maxOutputTokens": 4096,
+      "capabilities": {
+        "toolCalling": false,
+        "vision": false
+      }
+    },
+    "gpt-4": {
+      "displayName": "GPT-4",
+      "contextWindow": 8192,
+      "maxOutputTokens": 8192,
+      "capabilities": {
+        "toolCalling": false,
+        "vision": false
+      }
+    },
+    "gpt-4-turbo-preview": {
+      "displayName": "GPT-4 Turbo Preview",
+      "contextWindow": 128000,
+      "maxOutputTokens": 4096,
+      "capabilities": {
+        "toolCalling": false,
+        "vision": false
+      }
+    },
+    "gpt-5.1-chat-latest": {
+      "displayName": "GPT-5.1 Chat",
+      "contextWindow": 128000,
+      "maxOutputTokens": 16384,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true
+      }
+    },
+    "gpt-5-chat-latest": {
+      "displayName": "GPT-5 Chat",
+      "contextWindow": 128000,
+      "maxOutputTokens": 16384,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true
+      }
+    },
+    "text-moderation-latest": {
+      "displayName": "text-moderation",
+      "maxOutputTokens": 32768,
+      "capabilities": {
+        "vision": false
+      }
+    },
+    "text-moderation-stable": {
+      "displayName": "text-moderation-stable",
+      "maxOutputTokens": 32768,
+      "capabilities": {
+        "vision": false
+      }
+    },
+    "chat-latest": {
+      "displayName": "Chat Latest",
+      "contextWindow": 400000,
+      "maxOutputTokens": 128000,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true
+      }
+    },
+    "mimo-v2.6-pro": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 131072,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true,
+        "thinking": true
+      }
+    },
+    "mimo-v2.6-flash": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 131072,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true,
+        "thinking": true
+      }
+    },
+    "mimo-v2.6-pro-ultraspeed": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 131072,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true,
+        "thinking": true
+      }
+    },
+    "MiniMax-M3.1-Flash": {
+      "contextWindow": 1000000,
+      "capabilities": {
+        "vision": true,
+        "thinking": true
+      },
+      "supportsReasoningEffort": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    "MiniMax-M3": {
+      "contextWindow": 1000000,
+      "capabilities": {
+        "vision": true
+      }
     }
   }
 };
