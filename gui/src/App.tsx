@@ -436,10 +436,14 @@ export default function App() {
   }
 
   async function openRepo() {
-    await run("openRepo", async () => {
+    // 不走 run()：避免覆盖并存的 save 等 busy 状态（Save 按钮凭 busy==="save" 禁用）。
+    try {
       const result = await getDesktopApi().openRepo();
       if (!result.ok) notify("Could not open the repository page.", "error");
-    });
+    } catch (error) {
+      console.error("[App openRepo] failed:", error);
+      notify(formatUserErrorMessage(error), "error");
+    }
   }
 
   async function confirmChangeDataDir() {
