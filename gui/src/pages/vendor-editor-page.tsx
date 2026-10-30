@@ -91,6 +91,7 @@ interface VendorEditorPageProps {
   onCopyVendorApiKey: () => Promise<void>;
   onSaveVendor: () => Promise<void>;
   onRevertVendor: () => void;
+  onOpenRepo: () => void;
   busy: string;
 }
 
@@ -110,6 +111,7 @@ export function VendorEditorPage({
   onCopyVendorApiKey,
   onSaveVendor,
   onRevertVendor,
+  onOpenRepo,
   busy,
 }: VendorEditorPageProps) {
   if (!vendor) {
@@ -251,6 +253,7 @@ export function VendorEditorPage({
                   onUpdateVendorModel={onUpdateVendorModel}
                   onRemoveVendorModel={onRemoveVendorModel}
                   onLoadVendorModelsOnSelect={() => void onLoadVendorModelsOnSelect()}
+                  onOpenRepo={onOpenRepo}
                 />
               ))}
             </div>
@@ -302,6 +305,7 @@ function ModelPricingRow({
   onUpdateVendorModel,
   onRemoveVendorModel,
   onLoadVendorModelsOnSelect,
+  onOpenRepo,
 }: {
   model: VendorModelDraft;
   index: number;
@@ -309,6 +313,7 @@ function ModelPricingRow({
   onUpdateVendorModel: (modelIndex: number, field: string, value: unknown) => void;
   onRemoveVendorModel: (modelIndex: number) => void;
   onLoadVendorModelsOnSelect: () => void;
+  onOpenRepo: () => void;
 }) {
   const customPricing = model.pricingMode === "custom";
   const catalogKey = isPricingCatalogKey(model.pricingMode) ? model.pricingMode : "openai";
@@ -674,7 +679,7 @@ function ModelPricingRow({
                 <button
                   type="button"
                   className="bg-none p-0 font-bold text-primary underline-offset-2 hover:underline"
-                  onClick={() => void getDesktopApi().openRepo()}
+                  onClick={onOpenRepo}
                 >
                   landfallbox/heimdall
                 </button>

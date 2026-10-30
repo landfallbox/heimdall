@@ -1038,19 +1038,29 @@ function clampNumber(value: unknown, fallback: number, min: number, max: number)
   return Math.min(max, Math.max(min, Math.trunc(number)));
 }
 
-async function openConfigFile(): Promise<string> {
-  const { paths } = await loadConfig();
-  return shell.openPath(paths.configPath);
+// 打开本地文件/目录：shell.openPath 成功返回 ""、失败返回错误串。
+// 这里只把结果归约为 { ok }，原始错误串不传给渲染层（渲染层弹固定友好提示）。
+async function openPathResult(target: string): Promise<{ ok: boolean }> {
+  try {
+    return { ok: (await shell.openPath(target)) === "" };
+  } catch {
+    return { ok: false };
+  }
 }
 
-async function openLogFile(): Promise<string> {
+async function openConfigFile(): Promise<{ ok: boolean }> {
+  const { paths } = await loadConfig();
+  return openPathResult(paths.configPath);
+}
+
+async function openLogFile(): Promise<{ ok: boolean }> {
   const logPath = await getLogPath();
   await ensureLogFile(logPath);
-  return shell.openPath(logPath);
+  return openPathResult(logPath);
 }
 
-async function openDataDir(): Promise<string> {
-  return shell.openPath(getPaths().dataDir);
+async function openDataDir(): Promise<{ ok: boolean }> {
+  return openPathResult(getPaths().dataDir);
 }
 
 async function getDataDirState() {
