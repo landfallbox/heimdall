@@ -316,6 +316,11 @@ system 模式下 `nativeTheme.themeSource` 保持 `system`，OS 变化不触发 
 - `mock-desktop-api.ts`：`getOsDark` 回退 `matchMedia`（浏览器预览无主进程）。
 - **验证**：`npm run check` + `npm run test:ci`（含 `ipc-contracts.test.ts` 校验新通道注册）exit 0。
 
+**⑤⑥ Minor（评审第二轮 follow-up）：**
+- ⑤ `nativeTheme.on("updated")` 监听器注册在 `loadConfig()` 成功之后：若既有 `config.json` 损坏/不可读，`loadConfig()` 抛错走 catch，监听器从未注册，后续 OS 主题变化标题栏符号色停留在旧值。修复：把监听器注册移到 `try` 之前（`whenReady` 开头），`updateTitleBarOverlay` 本身对无窗口安全早退。
+- ⑥ 浏览器 mock 的 `onOsDarkChange` 是 no-op：握手回放后 `osDarkFromMain` 固定为初始 media 值，浏览器系统主题切换后 `.dark` 停留在旧状态（`applyTheme` 优先 `osDarkFromMain`）。修复：mock 用 `matchMedia("(prefers-color-scheme: dark)")` 的 `change` 事件驱动 `onOsDarkChange`，返回退订函数。
+- **验证**：`npm run check` + `npm run test:ci` exit 0。
+
 ---
 
 ## 影响面 / 可能破坏的现有功能

@@ -324,7 +324,14 @@ if (!hasRealPreload) {
     onConfirmClose: () => undefined,
     onUpdateState: () => undefined,
     onConfigChanged: () => undefined,
-    onOsDarkChange: () => undefined,
+    // 浏览器预览无主进程推送：以 matchMedia 变化作为 OS 主题变化的来源，
+    // 否则握手后 osDarkFromMain 固定为初始值，系统主题切换会停留在旧状态。
+    onOsDarkChange: (callback) => {
+      const media = window.matchMedia("(prefers-color-scheme: dark)");
+      const listener = (event: MediaQueryListEvent) => callback(event.matches);
+      media.addEventListener("change", listener);
+      return () => media.removeEventListener("change", listener);
+    },
     getOsDark: () => Promise.resolve(window.matchMedia("(prefers-color-scheme: dark)").matches),
   };
 
