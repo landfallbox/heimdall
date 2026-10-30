@@ -236,9 +236,23 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
     },
     "deepseek": {
       "sourceUrl": "https://api-docs.deepseek.com/quick_start/pricing",
-      "updatedAt": "2026-10-24",
+      "updatedAt": "2026-10-30",
       "models": {
         "deepseek-flash": {
+          "peak": {
+            "currency": "CNY",
+            "inputPerMillion": 0.3,
+            "cachedInputPerMillion": 0.006,
+            "outputPerMillion": 1.2
+          },
+          "offPeak": {
+            "currency": "CNY",
+            "inputPerMillion": 0.15,
+            "cachedInputPerMillion": 0.003,
+            "outputPerMillion": 0.6
+          }
+        },
+        "deepseek-v4-flash": {
           "peak": {
             "currency": "CNY",
             "inputPerMillion": 0.3,

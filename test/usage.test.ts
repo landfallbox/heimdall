@@ -81,8 +81,16 @@ assert.deepEqual(estimateUsageCost(chatUsage, deepseekPeakPricing), {
   currency: "CNY",
   pricing: deepseekPeakPricing,
 });
-// Retired model names no longer resolve.
-assert.equal(resolveModelPricing("deepseek-v4-flash", { mode: "deepseek" }), null);
+// deepseek-v4-flash is a retired legacy name kept in the catalog by design
+// (official page footnote: still accepted, served by DeepSeek-V4.1-Flash-1017
+// and billed at the Flash price), so it resolves to its own hand-written entry.
+const deepseekLegacyPricing = resolveModelPricing("deepseek-v4-flash", { mode: "deepseek" }, new Date("2026-08-16T02:00:00Z"))!;
+assert.equal(deepseekLegacyPricing.sourceModel, "deepseek-v4-flash");
+assert.equal(deepseekLegacyPricing.card, "peak");
+assert.equal(deepseekLegacyPricing.inputPerMillion, 0.3);
+assert.equal(deepseekLegacyPricing.cachedInputPerMillion, 0.006);
+assert.equal(deepseekLegacyPricing.outputPerMillion, 1.2);
+assert.equal(deepseekLegacyPricing.currency, "CNY");
 
 const deepseekOffPeakPricing = resolveModelPricing("deepseek-v4-pro", { mode: "deepseek" }, new Date("2026-08-16T12:00:00Z"))!;
 assert.equal(deepseekOffPeakPricing.card, "off-peak");

@@ -136,6 +136,16 @@ export const BUILTIN_MODEL_INFO_DATA: RemoteModelInfoData = {
         "thinking": true
       }
     },
+    "deepseek-v4-flash": {
+      "displayName": "DeepSeek V4 Flash",
+      "contextWindow": 1048576,
+      "maxOutputTokens": 393216,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true,
+        "thinking": true
+      }
+    },
     "claude-3-5-sonnet": {
       "displayName": "Claude 3.5 Sonnet",
       "contextWindow": 200000,
