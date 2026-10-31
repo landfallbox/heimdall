@@ -4,7 +4,7 @@ import type { RemoteModelInfoData } from "./model-info.ts";
 
 export const BUILTIN_MODEL_INFO_DATA: RemoteModelInfoData = {
   "schemaVersion": 1,
-  "updatedAt": "2026-10-30",
+  "updatedAt": "2026-10-31",
   "models": {
     "gpt-4o": {
       "displayName": "GPT-4o",
@@ -1339,6 +1339,24 @@ export const BUILTIN_MODEL_INFO_DATA: RemoteModelInfoData = {
       "contextWindow": 1000000,
       "capabilities": {
         "vision": true
+      }
+    },
+    "deepseek-flash": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 393216,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true,
+        "thinking": true
+      }
+    },
+    "deepseek-v4-pro": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 393216,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": false,
+        "thinking": true
       }
     }
   }
