@@ -266,6 +266,20 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
             "outputPerMillion": 0.6
           }
         },
+        "deepseek-v4.1-flash": {
+          "peak": {
+            "currency": "CNY",
+            "inputPerMillion": 0.3,
+            "cachedInputPerMillion": 0.006,
+            "outputPerMillion": 1.2
+          },
+          "offPeak": {
+            "currency": "CNY",
+            "inputPerMillion": 0.15,
+            "cachedInputPerMillion": 0.003,
+            "outputPerMillion": 0.6
+          }
+        },
         "deepseek-v4-pro": {
           "peak": {
             "currency": "CNY",

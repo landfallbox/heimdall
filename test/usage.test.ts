@@ -104,6 +104,17 @@ assert.deepEqual(estimateUsageCost(chatUsage, deepseekOffPeakPricing), {
   pricing: deepseekOffPeakPricing,
 });
 
+// deepseek-v4.1-flash is a hand-written entry (non-official API id kept for
+// upstream gateway compatibility, billed at the Flash price), so it resolves
+// to its own catalog entry.
+const deepseekV41FlashPricing = resolveModelPricing("deepseek-v4.1-flash", { mode: "deepseek" }, new Date("2026-08-16T02:00:00Z"))!;
+assert.equal(deepseekV41FlashPricing.sourceModel, "deepseek-v4.1-flash");
+assert.equal(deepseekV41FlashPricing.card, "peak");
+assert.equal(deepseekV41FlashPricing.inputPerMillion, 0.3);
+assert.equal(deepseekV41FlashPricing.cachedInputPerMillion, 0.006);
+assert.equal(deepseekV41FlashPricing.outputPerMillion, 1.2);
+assert.equal(deepseekV41FlashPricing.currency, "CNY");
+
 assert.equal(resolveModelPricing("deepseek-v4-future", { mode: "deepseek" }), null);
 assert.equal(resolveModelPricing("deepseek-chat", { mode: "deepseek" }), null);
 assert.equal(resolveModelPricing("deepseek-reasoner", { mode: "deepseek" }), null);
@@ -140,7 +151,7 @@ assert.equal(openAIPricingView.pricing.inputPerMillion, 0.25);
 assert.equal(openAIPricingView.offPeakPricing, null);
 assert.equal(openAIPricingView.peakHours, null);
 assert.equal(getCatalogPriceView("deepseek", "deepseek-flash-0731")!.sourceModel, "deepseek-flash");
-assert.equal(getCatalogPriceView("deepseek", "deepseek-v4.1-flash-1017"), null);
+assert.equal(getCatalogPriceView("deepseek", "deepseek-v4.1-flash-1017")!.sourceModel, "deepseek-v4.1-flash");
 assert.equal(getCatalogPriceView("deepseek", "deepseek-v4-pro-0813")!.sourceModel, "deepseek-v4-pro");
 
 const anthropicPricing = resolveModelPricing("claude-haiku-4.5", { mode: "anthropic" })!;

@@ -146,6 +146,36 @@ export const BUILTIN_MODEL_INFO_DATA: RemoteModelInfoData = {
         "thinking": true
       }
     },
+    "deepseek-flash": {
+      "displayName": "DeepSeek Flash",
+      "contextWindow": 1048576,
+      "maxOutputTokens": 393216,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true,
+        "thinking": true
+      }
+    },
+    "deepseek-v4-pro": {
+      "displayName": "DeepSeek V4 Pro",
+      "contextWindow": 1048576,
+      "maxOutputTokens": 393216,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": false,
+        "thinking": true
+      }
+    },
+    "deepseek-v4.1-flash": {
+      "displayName": "DeepSeek V4.1 Flash",
+      "contextWindow": 1048576,
+      "maxOutputTokens": 393216,
+      "capabilities": {
+        "toolCalling": true,
+        "vision": true,
+        "thinking": true
+      }
+    },
     "claude-3-5-sonnet": {
       "displayName": "Claude 3.5 Sonnet",
       "contextWindow": 200000,
@@ -302,7 +332,6 @@ export const BUILTIN_MODEL_INFO_DATA: RemoteModelInfoData = {
       }
     },
     "model": {},
-    "deepseek-flash(1)deepseek-v4-pro": {},
     "gemini-4-argon": {
       "capabilities": {
         "toolCalling": true,
