@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-10-30",
+  "updatedAt": "2026-10-31",
   "models": {
     "gpt-4o": {
       "displayName": "GPT-4o",
@@ -1335,6 +1335,24 @@
       "contextWindow": 1000000,
       "capabilities": {
         "vision": true
+      }
+    },
+    "deepseek-flash": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 393216,
+      "capabilities": {
+        "thinking": true,
+        "toolCalling": true,
+        "vision": true
+      }
+    },
+    "deepseek-v4-pro": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 393216,
+      "capabilities": {
+        "thinking": true,
+        "toolCalling": true,
+        "vision": false
       }
     }
   }
