@@ -29,7 +29,10 @@ const GENERATOR = path.join(ROOT, "scripts", "generate-pricing-data.mjs");
 
 // Vendors that have a parser. Each entry points at the parser module and the
 // fixture used by --from-file / tests (fixture names live in
-// test/fixtures/pricing/).
+// test/fixtures/pricing/). An optional `fetch` field points at a custom
+// fetcher module (default: lib.mjs fetchText); used by vendors whose page
+// cannot be fetched directly from CI (e.g. sensecore.cn WAF-blocks
+// datacenter IPs, so sensenova goes through a residential proxy).
 export const VENDORS = {
   deepseek: { parser: "./parsers/deepseek.mjs", fixture: "deepseek.html" },
   google: { parser: "./parsers/google.mjs", fixture: "google-pricing.html" },
@@ -41,7 +44,7 @@ export const VENDORS = {
   minimax: { parser: "./parsers/minimax.mjs", fixture: "minimax-pricing.html" },
   stepfun: { parser: "./parsers/stepfun.mjs", fixture: "stepfun-pricing.md" },
   qwen: { parser: "./parsers/qwen.mjs", fixture: "qwen-pricing.html" },
-  sensenova: { parser: "./parsers/sensenova.mjs", fixture: "sensenova-pricing.html" },
+  sensenova: { parser: "./parsers/sensenova.mjs", fixture: "sensenova-pricing.html", fetch: "./fetchers/scrapingbee.mjs" },
 };
 
 function parseArgs(argv) {
@@ -127,9 +130,14 @@ async function main() {
     const sourceUrl = existing.catalogs?.[vendor]?.sourceUrl;
     let content;
     try {
-      content = args.fromFile
-        ? await readFile(args.fromFile, "utf8")
-        : await fetchText(sourceUrl);
+      if (args.fromFile) {
+        content = await readFile(args.fromFile, "utf8");
+      } else if (spec.fetch) {
+        const { fetchText: vendorFetchText } = await import(new URL(spec.fetch, import.meta.url));
+        content = await vendorFetchText(sourceUrl);
+      } else {
+        content = await fetchText(sourceUrl);
+      }
     } catch (error) {
       fetchErrors.push(`${vendor}: ${error.message}`);
       continue;
