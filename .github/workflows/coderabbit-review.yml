@@ -1,0 +1,66 @@
+name: CodeRabbit Review
+
+# CodeRabbit 对 < 10 stars 的公开仓库不再自动审查，
+# 这里在 PR 开启时评论 @coderabbitai review 手动触发一次；
+# 触发后同一 PR 的后续 push 由 CodeRabbit 自动增量复审。
+#
+# 注意：CodeRabbit 忽略所有 [bot] 账号的评论（防 bot 互触发死循环），
+# 因此必须用人类账号的 PAT（scope: public_repo）存于
+# CODERABBIT_TRIGGER_TOKEN secret，不能用 GITHUB_TOKEN。
+on:
+  # 用 pull_request_target（而非 pull_request）：对 fork PR 也能触发并评论。
+  # 本 workflow 不 checkout PR 代码、不执行任何来自 PR 的内容，仅读取
+  # PR 编号（数字）与 draft（布尔）并发评论，因此 target 事件无 secret 泄露风险。
+  pull_request_target:
+    types: [opened, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "要触发审查的 PR 编号（留空则不执行）"
+        required: false
+
+jobs:
+  trigger-review:
+    runs-on: windows-latest
+
+    steps:
+      - name: Trigger CodeRabbit review
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.CODERABBIT_TRIGGER_TOKEN }}
+          GH_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          MANUAL_PR_NUMBER: ${{ github.event.inputs.pr_number }}
+          PR_DRAFT: ${{ github.event.pull_request.draft }}
+          EVENT_ACTION: ${{ github.event.action }}
+        run: |
+          if (-not $env:GH_TOKEN) {
+            Write-Error "Missing CODERABBIT_TRIGGER_TOKEN secret. CodeRabbit ignores [bot] comments, so a human-account PAT (scope: public_repo) is required."
+            exit 1
+          }
+          # 手动触发时以输入为准；PR 事件以事件编号为准。
+          $prNumber = if ($env:MANUAL_PR_NUMBER) { $env:MANUAL_PR_NUMBER } else { $env:PR_NUMBER }
+          if (-not $prNumber) {
+            Write-Output "No PR number; nothing to do."
+            exit 0
+          }
+          # 草稿状态：PR 事件用事件载荷；手动 dispatch 时直接查询该 PR。
+          $isDraft = $env:PR_DRAFT
+          if ($env:MANUAL_PR_NUMBER) {
+            $isDraft = gh api "repos/$env:GH_REPOSITORY/pulls/$prNumber" --jq .draft
+          }
+          # 草稿 PR 等转正式时（ready_for_review）再触发，避免重复评论。
+          if ($isDraft -eq "true" -and $env:EVENT_ACTION -ne "ready_for_review") {
+            Write-Output "PR is a draft; will trigger on ready_for_review."
+            exit 0
+          }
+          # 去重：本 PR 若已有 token 账号发过的触发评论则不再发
+          # （避免 close/reopen 或手动重复触发造成重复评论；CodeRabbit 对重复触发也会限流）。
+          $account = gh api user --jq .login
+          $already = gh api "repos/$env:GH_REPOSITORY/issues/$prNumber/comments?per_page=100" --jq "[.[] | select(.user.login == `"$account`" and (.body | contains(`"@coderabbitai review`")))] | length"
+          if ([int]$already -gt 0) {
+            Write-Output "A CodeRabbit trigger comment already exists on this PR; skipping to avoid duplicates."
+            exit 0
+          }
+          # 无 checkout 步骤，显式指定 repo。
+          gh pr comment $prNumber --repo $env:GH_REPOSITORY --body "@coderabbitai review"
