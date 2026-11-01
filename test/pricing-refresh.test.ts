@@ -52,6 +52,10 @@ const KNOWN_RETIRED = new Set([
   // price). It is no longer listed in the page's MODEL row, so the hand-written
   // catalog entry is skipped by the round-trip.
   "deepseek-v4-flash",
+  // deepseek-v4.1-flash is a hand-written entry (non-official API id kept for
+  // upstream gateway compatibility); it is not listed on the official page, so
+  // the round-trip skips it.
+  "deepseek-v4.1-flash",
 ]);
 
 async function loadParser(vendor: string) {
