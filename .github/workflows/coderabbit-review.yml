@@ -6,6 +6,11 @@ name: CodeRabbit Review
 on:
   pull_request:
     types: [opened, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "要触发审查的 PR 编号（留空则不执行）"
+        required: false
 
 permissions:
   pull-requests: write
@@ -19,13 +24,22 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          MANUAL_PR_NUMBER: ${{ github.event.inputs.pr_number }}
           PR_DRAFT: ${{ github.event.pull_request.draft }}
           EVENT_ACTION: ${{ github.event.action }}
         run: |
+          # 手动触发时以输入为准；PR 事件以事件编号为准。
+          $prNumber = if ($env:MANUAL_PR_NUMBER) { $env:MANUAL_PR_NUMBER } else { $env:PR_NUMBER }
+          if (-not $prNumber) {
+            Write-Output "No PR number; nothing to do."
+            exit 0
+          }
           # 草稿 PR 等转正式时（ready_for_review）再触发，避免重复评论。
           if ($env:PR_DRAFT -eq "true" -and $env:EVENT_ACTION -ne "ready_for_review") {
             Write-Output "PR is a draft; will trigger on ready_for_review."
             exit 0
           }
-          gh pr comment $env:PR_NUMBER --body "@coderabbitai review"
+          # 无 checkout 步骤，显式指定 repo。
+          gh pr comment $prNumber --repo $env:GH_REPOSITORY --body "@coderabbitai review"
