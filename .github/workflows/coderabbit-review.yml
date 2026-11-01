@@ -1,0 +1,31 @@
+name: CodeRabbit Review
+
+# CodeRabbit 对 < 10 stars 的公开仓库不再自动审查，
+# 这里在 PR 开启时评论 @coderabbitai review 手动触发一次；
+# 触发后同一 PR 的后续 push 由 CodeRabbit 自动增量复审。
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  trigger-review:
+    runs-on: windows-latest
+
+    steps:
+      - name: Trigger CodeRabbit review
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_DRAFT: ${{ github.event.pull_request.draft }}
+          EVENT_ACTION: ${{ github.event.action }}
+        run: |
+          # 草稿 PR 等转正式时（ready_for_review）再触发，避免重复评论。
+          if ($env:PR_DRAFT -eq "true" -and $env:EVENT_ACTION -ne "ready_for_review") {
+            Write-Output "PR is a draft; will trigger on ready_for_review."
+            exit 0
+          }
+          gh pr comment $env:PR_NUMBER --body "@coderabbitai review"
