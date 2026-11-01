@@ -8,7 +8,10 @@ name: CodeRabbit Review
 # 因此必须用人类账号的 PAT（scope: public_repo）存于
 # CODERABBIT_TRIGGER_TOKEN secret，不能用 GITHUB_TOKEN。
 on:
-  pull_request:
+  # 用 pull_request_target（而非 pull_request）：对 fork PR 也能触发并评论。
+  # 本 workflow 不 checkout PR 代码、不执行任何来自 PR 的内容，仅读取
+  # PR 编号（数字）与 draft（布尔）并发评论，因此 target 事件无 secret 泄露风险。
+  pull_request_target:
     types: [opened, reopened, ready_for_review]
   workflow_dispatch:
     inputs:
@@ -41,9 +44,22 @@ jobs:
             Write-Output "No PR number; nothing to do."
             exit 0
           }
+          # 草稿状态：PR 事件用事件载荷；手动 dispatch 时直接查询该 PR。
+          $isDraft = $env:PR_DRAFT
+          if ($env:MANUAL_PR_NUMBER) {
+            $isDraft = gh api "repos/$env:GH_REPOSITORY/pulls/$prNumber" --jq .draft
+          }
           # 草稿 PR 等转正式时（ready_for_review）再触发，避免重复评论。
-          if ($env:PR_DRAFT -eq "true" -and $env:EVENT_ACTION -ne "ready_for_review") {
+          if ($isDraft -eq "true" -and $env:EVENT_ACTION -ne "ready_for_review") {
             Write-Output "PR is a draft; will trigger on ready_for_review."
+            exit 0
+          }
+          # 去重：本 PR 若已有 token 账号发过的触发评论则不再发
+          # （避免 close/reopen 或手动重复触发造成重复评论；CodeRabbit 对重复触发也会限流）。
+          $account = gh api user --jq .login
+          $already = gh api "repos/$env:GH_REPOSITORY/issues/$prNumber/comments?per_page=100" --jq "[.[] | select(.user.login == `"$account`" and (.body | contains(`"@coderabbitai review`")))] | length"
+          if ([int]$already -gt 0) {
+            Write-Output "A CodeRabbit trigger comment already exists on this PR; skipping to avoid duplicates."
             exit 0
           }
           # 无 checkout 步骤，显式指定 repo。
