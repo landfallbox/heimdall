@@ -67,8 +67,12 @@ Source: "..\release\win-unpacked\*"; DestDir: "{app}"; Flags: recursesubdirs ign
 Name: "{group}\Heimdall"; Filename: "{app}\Heimdall.exe"; Comment: "Launch Heimdall"
 Name: "{autodesktop}\Heimdall"; Filename: "{app}\Heimdall.exe"; Tasks: desktopicon
 
+; No skipifsilent: the in-app updater runs /VERYSILENT and relies on this
+; entry to relaunch Heimdall after the files are replaced. A postinstall
+; entry without skipifsilent still executes in silent mode (the flag only
+; suppresses the GUI checkbox).
 [Run]
-Filename: "{app}\Heimdall.exe"; Description: "Launch Heimdall"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\Heimdall.exe"; Description: "Launch Heimdall"; Flags: nowait postinstall
 
 [Code]
 const
