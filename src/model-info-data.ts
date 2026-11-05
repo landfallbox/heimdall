@@ -4,7 +4,7 @@ import type { RemoteModelInfoData } from "./model-info.ts";
 
 export const BUILTIN_MODEL_INFO_DATA: RemoteModelInfoData = {
   "schemaVersion": 1,
-  "updatedAt": "2026-10-30",
+  "updatedAt": "2026-11-05",
   "models": {
     "gpt-4o": {
       "displayName": "GPT-4o",
@@ -1367,6 +1367,27 @@ export const BUILTIN_MODEL_INFO_DATA: RemoteModelInfoData = {
     "MiniMax-M3": {
       "contextWindow": 1000000,
       "capabilities": {
+        "vision": true
+      }
+    },
+    "gpt-image-2.6-sunburst": {
+      "displayName": "GPT-Image-2.6 Sunburst",
+      "capabilities": {
+        "vision": true
+      }
+    },
+    "gpt-image-2.6-flare": {
+      "displayName": "GPT-Image-2.6 Flare",
+      "capabilities": {
+        "vision": true
+      }
+    },
+    "gpt-6-cyber": {
+      "displayName": "GPT-6-Cyber",
+      "contextWindow": 1050000,
+      "maxOutputTokens": 128000,
+      "capabilities": {
+        "toolCalling": true,
         "vision": true
       }
     }
