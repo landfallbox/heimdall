@@ -1,6 +1,7 @@
 [config]
 model = "gemini/gemini-1.5-flash"
 fallback_models = ["gemini/gemini-1.5-flash"]
+custom_model_max_tokens = 128000
 response_language = "zh-CN"
 
 [pr_reviewer]
