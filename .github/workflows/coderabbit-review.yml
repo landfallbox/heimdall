@@ -18,6 +18,11 @@ on:
         description: "要触发审查的 PR 编号（留空则不执行）"
         required: false
 
+# 避免多 commit 并发触发时重复评论，按 PR 串行执行
+concurrency:
+  group: coderabbit-${{ github.event.pull_request.number || github.event.inputs.pr_number }}
+  cancel-in-progress: false
+
 jobs:
   trigger-review:
     runs-on: windows-latest
@@ -31,6 +36,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           MANUAL_PR_NUMBER: ${{ github.event.inputs.pr_number }}
           PR_DRAFT: ${{ github.event.pull_request.draft }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           EVENT_ACTION: ${{ github.event.action }}
         run: |
           if (-not $env:GH_TOKEN) {
@@ -53,28 +59,47 @@ jobs:
             Write-Output "PR is a draft; will trigger on ready_for_review."
             exit 0
           }
-          # 去重与防抖：
-          # 1. 如果 PR 的最新一条评论已经是 @coderabbitai review（CodeRabbit 尚未响应），跳过避免重复发
-          # 2. 如果距离上一次触发不足 60 秒（防多 commit 并发 push 重复触发），跳过
+
+          # 获取 PR 当前最新的 head commit SHA
+          $headSha = $env:PR_HEAD_SHA
+          if (-not $headSha) {
+            $headSha = gh api "repos/$env:GH_REPOSITORY/pulls/$prNumber" --jq .head.sha
+          }
+
           $account = gh api user --jq .login
-          $rawComments = gh api "repos/$env:GH_REPOSITORY/issues/$prNumber/comments?per_page=100"
+
+          # 全量分页读取所有历史评论（避免只取第一页漏检长 PR 评论）
+          $rawComments = gh api --paginate "repos/$env:GH_REPOSITORY/issues/$prNumber/comments"
           $comments = if ($rawComments) { $rawComments | ConvertFrom-Json } else { @() }
-          $myReviewComments = @($comments | Where-Object { $_.user.login -eq $account -and $_.body -match "@coderabbitai\s+review" })
 
-          if ($myReviewComments.Count -gt 0) {
-            $latestReviewComment = $myReviewComments[-1]
-
-            if ($comments[-1].id -eq $latestReviewComment.id) {
-              Write-Output "Latest comment is already a pending CodeRabbit review request; skipping."
-              exit 0
-            }
-
-            $createdAt = [DateTime]::Parse($latestReviewComment.created_at)
-            $diffSeconds = ([DateTime]::UtcNow - $createdAt.ToUniversalTime()).TotalSeconds
-            if ($diffSeconds -lt 60) {
-              Write-Output "Last CodeRabbit review was requested $diffSeconds seconds ago (< 60s); skipping duplicate trigger."
+          # 1. 精准去重：检查当前 head commit SHA 是否已经请求过审查
+          if ($headSha) {
+            $alreadyRequestedSha = @($comments | Where-Object {
+              $_.user.login -eq $account -and
+              $_.body -match "@coderabbitai\s+review" -and
+              $_.body -match [regex]::Escape($headSha)
+            })
+            if ($alreadyRequestedSha.Count -gt 0) {
+              Write-Output "CodeRabbit review already requested for head commit $headSha; skipping."
               exit 0
             }
           }
+
+          # 2. 兜底去重：如果 PR 最新一条评论仍是该账号发出的 @coderabbitai review（CodeRabbit 尚未响应），跳过
+          if ($comments.Count -gt 0) {
+            $last = $comments[-1]
+            if ($last.user.login -eq $account -and $last.body -match "@coderabbitai\s+review") {
+              Write-Output "Latest comment is already a pending CodeRabbit review request; skipping."
+              exit 0
+            }
+          }
+
+          # 在评论中附带 head commit SHA，便于后续精准去重
+          $commentBody = if ($headSha) {
+            "@coderabbitai review`n<!-- head: $headSha -->"
+          } else {
+            "@coderabbitai review"
+          }
+
           # 无 checkout 步骤，显式指定 repo。
-          gh pr comment $prNumber --repo $env:GH_REPOSITORY --body "@coderabbitai review"
+          gh pr comment $prNumber --repo $env:GH_REPOSITORY --body $commentBody
