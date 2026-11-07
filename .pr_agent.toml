@@ -1,0 +1,30 @@
+[config]
+model = "gemini/gemini-3.5-flash-lite"
+fallback_models = ["gemini/gemini-3.5-flash-lite"]
+custom_model_max_tokens = 1048576
+response_language = "zh-CN"
+
+[pr_reviewer]
+require_score_review = true
+require_tests_review = false
+require_security_review = true
+inline_code_comments = true
+
+[pr_description]
+add_original_user_description = true
+keep_original_user_title = true
+
+[pr_code_suggestions]
+num_code_suggestions_per_chunk = 4
+
+[github_action_config]
+auto_review = true
+auto_describe = true
+auto_improve = true
+pr_actions = ["opened", "reopened", "ready_for_review", "synchronize"]
+handle_push_trigger = true
+push_commands = [
+  "/describe",
+  "/review",
+  "/improve"
+]
