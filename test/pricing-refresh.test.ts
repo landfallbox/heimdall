@@ -5,15 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import {
-  checkPriceDeltas,
-  entriesEqual,
-  evaluatePricingRisk,
-  extractPrices,
-  isValidModelId,
-  mergePricing,
-  validatePriceSanity,
-} from "../scripts/pricing-refresh/lib.mjs";
+import { entriesEqual, mergePricing } from "../scripts/pricing-refresh/lib.mjs";
 
 type ScrapedEntry = {
   currency: string;
@@ -161,8 +153,8 @@ function baseData(): {
         sourceUrl: "https://example.com",
         updatedAt: "2026-01-01",
         models: {
-          "model-a": { currency: "USD", inputPerMillion: 1, cachedInputPerMillion: null, outputPerMillion: 2 },
-          "model-b": { currency: "USD", inputPerMillion: 3, cachedInputPerMillion: null, outputPerMillion: 4 },
+          "a": { currency: "USD", inputPerMillion: 1, cachedInputPerMillion: null, outputPerMillion: 2 },
+          "b": { currency: "USD", inputPerMillion: 3, cachedInputPerMillion: null, outputPerMillion: 4 },
         },
       },
     },
@@ -174,259 +166,47 @@ function baseData(): {
   const result = mergePricing(baseData(), [
     {
       vendor: "test",
-      baselineIds: ["model-a", "model-b"],
+      baselineIds: ["a", "b"],
       models: {
-        "model-b": { currency: "USD", inputPerMillion: 3.5, cachedInputPerMillion: null, outputPerMillion: 4 },
-        "model-c": { currency: "USD", inputPerMillion: 5, cachedInputPerMillion: null, outputPerMillion: 6 },
+        b: { currency: "USD", inputPerMillion: 3.5, cachedInputPerMillion: null, outputPerMillion: 4 },
+        c: { currency: "USD", inputPerMillion: 5, cachedInputPerMillion: null, outputPerMillion: 6 },
       },
     },
   ]);
-  assert.deepEqual(result.added, ["test/model-c"]);
-  assert.deepEqual(result.modified, ["test/model-b"]);
-  assert.deepEqual(result.keptRetired, ["test/model-a"]);
+  assert.deepEqual(result.added, ["test/c"]);
+  assert.deepEqual(result.modified, ["test/b"]);
+  assert.deepEqual(result.keptRetired, ["test/a"]);
   assert.deepEqual(result.acceptedVendors, ["test"]);
-  assert.ok(result.warnings.some((w) => w.includes("keeping retired models: model-a")));
-  assert.equal(result.data.catalogs.test.models["model-a"].outputPerMillion, 2, "retired model must be kept");
-  assert.equal(result.data.catalogs.test.models["model-b"].inputPerMillion, 3.5);
-  assert.equal(result.data.catalogs.test.models["model-c"].outputPerMillion, 6);
+  assert.ok(result.warnings.some((w) => w.includes("keeping retired models: a")));
+  assert.equal(result.data.catalogs.test.models["a"].outputPerMillion, 2, "retired model must be kept");
+  assert.equal(result.data.catalogs.test.models["b"].inputPerMillion, 3.5);
+  assert.equal(result.data.catalogs.test.models["c"].outputPerMillion, 6);
 }
 
 {
   // Circuit breaker: empty parse skips the vendor entirely.
-  const result = mergePricing(baseData(), [{ vendor: "test", baselineIds: ["model-a", "model-b"], models: {} }]);
+  const result = mergePricing(baseData(), [{ vendor: "test", baselineIds: ["a", "b"], models: {} }]);
   assert.deepEqual(result.added, []);
   assert.deepEqual(result.modified, []);
   assert.deepEqual(result.acceptedVendors, []);
   assert.ok(result.warnings.some((w) => w.includes("no models parsed")));
-  assert.equal(result.data.catalogs.test.models["model-a"].outputPerMillion, 2);
+  assert.equal(result.data.catalogs.test.models["a"].outputPerMillion, 2);
 }
 
 {
   // Circuit breaker: model count dropped by more than half skips the vendor.
-  const bigBaseline = ["model-a", "model-b", "model-c", "model-d", "model-e", "model-f"];
+  const bigBaseline = ["a", "b", "c", "d", "e", "f"];
   const data = baseData();
   for (const id of bigBaseline.slice(2)) {
     data.catalogs.test.models[id] = { currency: "USD", inputPerMillion: 1, cachedInputPerMillion: null, outputPerMillion: 1 };
   }
   const result = mergePricing(data, [
-    { vendor: "test", baselineIds: bigBaseline, models: { "model-a": { currency: "USD", inputPerMillion: 9, cachedInputPerMillion: null, outputPerMillion: 9 } } },
+    { vendor: "test", baselineIds: bigBaseline, models: { a: { currency: "USD", inputPerMillion: 9, cachedInputPerMillion: null, outputPerMillion: 9 } } },
   ]);
   assert.deepEqual(result.modified, []);
   assert.deepEqual(result.acceptedVendors, []);
   assert.ok(result.warnings.some((w) => w.includes("model count dropped")));
-  assert.equal(result.data.catalogs.test.models["model-a"].inputPerMillion, 1, "catalog must be untouched");
-}
-
-// --- Guardrail Tests: Model ID & Noise Word Filtering ----------------------
-{
-  assert.equal(isValidModelId("gpt-4o"), true);
-  assert.equal(isValidModelId("claude-3-5-sonnet"), true);
-  assert.equal(isValidModelId("MiniMax-M3.1-Flash"), true);
-  // Noise words
-  assert.equal(isValidModelId("pricing"), false);
-  assert.equal(isValidModelId("Pricing"), false);
-  assert.equal(isValidModelId("overview"), false);
-  assert.equal(isValidModelId("documentation"), false);
-  assert.equal(isValidModelId("learn-more"), false);
-  assert.equal(isValidModelId("contact-us"), false);
-  assert.equal(isValidModelId("tokens"), false);
-  assert.equal(isValidModelId("input"), false);
-  assert.equal(isValidModelId("output"), false);
-  assert.equal(isValidModelId("tier"), false);
-  assert.equal(isValidModelId("model"), false);
-  // Syntax violations
-  assert.equal(isValidModelId("a"), false, "length < 2");
-  assert.equal(isValidModelId("x".repeat(65)), false, "length > 64");
-  assert.equal(isValidModelId("invalid model name"), false, "contains space");
-  assert.equal(isValidModelId("invalid\nmodel"), false, "contains newline");
-  assert.equal(isValidModelId("模型-gpt"), false, "contains chinese");
-  assert.equal(isValidModelId("gpt-4o<br>"), false, "contains html");
-  assert.equal(isValidModelId("## gpt-4o"), false, "contains markdown");
-
-  // Rejection during mergePricing
-  const mergeResult = mergePricing(baseData(), [
-    {
-      vendor: "test",
-      baselineIds: ["model-a", "model-b"],
-      models: {
-        "pricing": { currency: "USD", inputPerMillion: 1, cachedInputPerMillion: null, outputPerMillion: 2 },
-        "valid-model": { currency: "USD", inputPerMillion: 1, cachedInputPerMillion: null, outputPerMillion: 2 },
-      },
-    },
-  ]);
-  assert.ok(mergeResult.added.includes("test/valid-model"));
-  assert.ok(!mergeResult.added.includes("test/pricing"));
-  assert.ok(mergeResult.warnings.some((w) => w.includes('rejected invalid or noisy model id "pricing"')));
-  console.log("model ID & noise word filtering tests passed");
-}
-
-// --- Guardrail Tests: Price Sanity Bounds & Whitelist ----------------------
-{
-  // Reasonable bounds check: 0.001 ~ 200 USD
-  assert.equal(validatePriceSanity(1.5, { currency: "USD", modelId: "model-test" }).valid, true);
-  assert.equal(validatePriceSanity(0.0005, { currency: "USD", modelId: "model-test" }).valid, false);
-  assert.equal(validatePriceSanity(250, { currency: "USD", modelId: "model-test" }).valid, false);
-
-  // Price cannot be 0 for non-whitelisted models
-  const zeroCheck = validatePriceSanity(0, { currency: "USD", modelId: "some-model" });
-  assert.equal(zeroCheck.valid, false);
-  assert.match(zeroCheck.reason ?? "", /cannot be 0 for non-whitelisted/);
-
-  // Whitelisted zero model allowed
-  assert.equal(validatePriceSanity(0, { currency: "CNY", modelId: "sensenova-6.8-flash-lite" }).valid, true);
-
-  // Whitelisted frontier expensive models allowed above 200
-  assert.equal(validatePriceSanity(600, { currency: "USD", modelId: "o1-pro" }).valid, true);
-
-  // Merge pricing rejects sanity-violating model
-  const sanityMerge = mergePricing(baseData(), [
-    {
-      vendor: "test",
-      baselineIds: ["model-a", "model-b"],
-      models: {
-        "bad-price-zero": { currency: "USD", inputPerMillion: 0, cachedInputPerMillion: null, outputPerMillion: 1 },
-        "bad-price-high": { currency: "USD", inputPerMillion: 5000, cachedInputPerMillion: null, outputPerMillion: 1 },
-      },
-    },
-  ]);
-  assert.equal(sanityMerge.added.length, 0);
-  assert.ok(sanityMerge.warnings.some((w) => w.includes("rejected price sanity violation")));
-  console.log("price sanity bounds & whitelist tests passed");
-}
-
-// --- Guardrail Tests: Price Delta Guard (>50% mutation) --------------------
-{
-  // 25% change: 1.0 -> 1.25, not flagged
-  const normalDeltas = checkPriceDeltas(
-    { currency: "USD", inputPerMillion: 1.0, outputPerMillion: 2.0 },
-    { currency: "USD", inputPerMillion: 1.25, outputPerMillion: 2.0 },
-    { vendor: "test", id: "model-a" },
-  );
-  assert.equal(normalDeltas.length, 0);
-
-  // 75% increase: 1.0 -> 1.75, flagged
-  const spikeDeltas = checkPriceDeltas(
-    { currency: "USD", inputPerMillion: 1.0, outputPerMillion: 2.0 },
-    { currency: "USD", inputPerMillion: 1.75, outputPerMillion: 2.0 },
-    { vendor: "test", id: "model-a" },
-  );
-  assert.equal(spikeDeltas.length, 1);
-  assert.equal(spikeDeltas[0].path, "inputPerMillion");
-  assert.equal(spikeDeltas[0].ratio, 0.75);
-
-  // 60% drop: 2.0 -> 0.8, flagged
-  const dropDeltas = checkPriceDeltas(
-    { currency: "USD", inputPerMillion: 1.0, outputPerMillion: 2.0 },
-    { currency: "USD", inputPerMillion: 1.0, outputPerMillion: 0.8 },
-    { vendor: "test", id: "model-a" },
-  );
-  assert.equal(dropDeltas.length, 1);
-  assert.equal(dropDeltas[0].path, "outputPerMillion");
-
-  // Merge pricing registers delta anomaly and warning
-  const deltaMerge = mergePricing(baseData(), [
-    {
-      vendor: "test",
-      baselineIds: ["model-a", "model-b"],
-      models: {
-        "model-a": { currency: "USD", inputPerMillion: 2.5, cachedInputPerMillion: null, outputPerMillion: 2.0 },
-      },
-    },
-  ]);
-  assert.equal(deltaMerge.priceDeltaAnomalies.length, 1);
-  assert.ok(deltaMerge.warnings.some((w) => w.includes("price delta on inputPerMillion exceeded 50%")));
-  console.log("price delta guard tests passed");
-}
-
-// --- Guardrail Tests: Flood Protection Circuit Breaker ---------------------
-{
-  // Adding > 5 new unknown models for a single vendor triggers flood risk warning
-  const floodScrape = {
-    vendor: "test",
-    baselineIds: ["model-a", "model-b"],
-    models: {
-      "model-a": { currency: "USD", inputPerMillion: 1, cachedInputPerMillion: null, outputPerMillion: 2 },
-      "model-new-1": { currency: "USD", inputPerMillion: 1, cachedInputPerMillion: null, outputPerMillion: 2 },
-      "model-new-2": { currency: "USD", inputPerMillion: 1, cachedInputPerMillion: null, outputPerMillion: 2 },
-      "model-new-3": { currency: "USD", inputPerMillion: 1, cachedInputPerMillion: null, outputPerMillion: 2 },
-      "model-new-4": { currency: "USD", inputPerMillion: 1, cachedInputPerMillion: null, outputPerMillion: 2 },
-      "model-new-5": { currency: "USD", inputPerMillion: 1, cachedInputPerMillion: null, outputPerMillion: 2 },
-      "model-new-6": { currency: "USD", inputPerMillion: 1, cachedInputPerMillion: null, outputPerMillion: 2 },
-    },
-  };
-  const floodResult = mergePricing(baseData(), [floodScrape]);
-  assert.ok(floodResult.warnings.some((w) => w.includes("flood risk: abnormally large batch of new models")));
-  console.log("flood protection tests passed");
-}
-
-// --- Guardrail Tests: Gatekeeper Risk Evaluation ---------------------------
-{
-  // Green light: clean run, <= 3 added
-  const green = evaluatePricingRisk({
-    warnings: [],
-    fetchErrors: [],
-    added: ["test/model-c", "test/model-d"],
-    modified: [],
-    priceDeltaAnomalies: [],
-  });
-  assert.equal(green.riskLevel, "green");
-  assert.equal(green.isSafeForAutoMerge, true);
-
-  // Yellow light: warnings present
-  const yellowWarn = evaluatePricingRisk({
-    warnings: ["some minor warning"],
-    fetchErrors: [],
-    added: [],
-    modified: [],
-    priceDeltaAnomalies: [],
-  });
-  assert.equal(yellowWarn.riskLevel, "yellow");
-  assert.equal(yellowWarn.isSafeForAutoMerge, false);
-
-  // Yellow light: price mutation > 50%
-  const yellowDelta = evaluatePricingRisk({
-    warnings: [],
-    fetchErrors: [],
-    added: [],
-    modified: ["test/model-a"],
-    priceDeltaAnomalies: [{ vendor: "test", id: "model-a", path: "inputPerMillion", prevVal: 1, nextVal: 2, ratio: 1.0 }],
-  });
-  assert.equal(yellowDelta.riskLevel, "yellow");
-  assert.equal(yellowDelta.isSafeForAutoMerge, false);
-
-  // Yellow light: added models > 3
-  const yellowAdded = evaluatePricingRisk({
-    warnings: [],
-    fetchErrors: [],
-    added: ["a/1", "a/2", "a/3", "a/4"],
-    modified: [],
-    priceDeltaAnomalies: [],
-  });
-  assert.equal(yellowAdded.riskLevel, "yellow");
-  assert.equal(yellowAdded.isSafeForAutoMerge, false);
-
-  // Red light: fetch error
-  const redError = evaluatePricingRisk({
-    warnings: [],
-    fetchErrors: ["network timeout"],
-    added: [],
-    modified: [],
-    priceDeltaAnomalies: [],
-  });
-  assert.equal(redError.riskLevel, "red");
-  assert.equal(redError.isSafeForAutoMerge, false);
-
-  // Red light: flood risk warning
-  const redFlood = evaluatePricingRisk({
-    warnings: ["test: flood risk: abnormally large batch"],
-    fetchErrors: [],
-    added: [],
-    modified: [],
-    priceDeltaAnomalies: [],
-  });
-  assert.equal(redFlood.riskLevel, "red");
-  assert.equal(redFlood.isSafeForAutoMerge, false);
-  console.log("gatekeeper risk evaluation tests passed");
+  assert.equal(result.data.catalogs.test.models["a"].inputPerMillion, 1, "catalog must be untouched");
 }
 
 // --- CLI dry-run (offline, via --from-file and --data-file) ----------------

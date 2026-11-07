@@ -15,18 +15,11 @@
 //                         instead of the network (used by tests).
 //   --data-file <path>    Read/write model info from <path> instead of
 //                         data/model-info.json (used by tests).
-//   --alert-file <path>   Save refresh warnings and assessment to this JSON file.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-  evaluateModelInfoRisk,
-  fetchText,
-  formatModelInfo,
-  mergeModelInfo,
-  validateModelInfo,
-} from "./lib.mjs";
+import { fetchText, formatModelInfo, mergeModelInfo, validateModelInfo } from "./lib.mjs";
 import * as anthropic from "./parsers/anthropic.mjs";
 import * as deepseek from "./parsers/deepseek.mjs";
 import * as glm from "./parsers/glm.mjs";
@@ -92,7 +85,7 @@ const VENDORS = {
 };
 
 function parseArgs(argv) {
-  const args = { only: [], dryRun: false, commit: false, fromFile: null, dataFile: null, alertFile: null };
+  const args = { only: [], dryRun: false, commit: false, fromFile: null, dataFile: null };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--only") args.only.push(argv[++i]);
@@ -100,7 +93,6 @@ function parseArgs(argv) {
     else if (arg === "--commit") args.commit = true;
     else if (arg === "--from-file") args.fromFile = path.resolve(argv[++i]);
     else if (arg === "--data-file") args.dataFile = path.resolve(argv[++i]);
-    else if (arg === "--alert-file") args.alertFile = path.resolve(argv[++i]);
     else {
       throw new Error(`unknown argument: ${arg}`);
     }
@@ -169,7 +161,6 @@ async function main() {
   const raw = fs.readFileSync(dataFile, "utf8");
   const existing = JSON.parse(raw);
   const warnings = [];
-  const fetchErrors = [];
   const vendorScrapes = [];
   const report = [];
 
@@ -183,7 +174,6 @@ async function main() {
       content = await fetcher(url);
     } catch (error) {
       warnings.push(`${vendor}: failed to fetch ${url}: ${error.message}`);
-      fetchErrors.push(`${vendor}: fetch failed (${error.message})`);
       report.push(`${vendor}: FETCH FAILED (${error.message})`);
       continue;
     }
@@ -196,7 +186,6 @@ async function main() {
       models = await parser.parse(content, ctx);
     } catch (error) {
       warnings.push(`${vendor}: parse failed: ${error.message}`);
-      fetchErrors.push(`${vendor}: parse failed (${error.message})`);
       report.push(`${vendor}: PARSE FAILED (${error.message})`);
       continue;
     }
@@ -222,40 +211,13 @@ async function main() {
     nextRaw = formatModelInfo(data);
   }
 
-  const assessment = evaluateModelInfoRisk({
-    warnings,
-    fetchErrors,
-    added,
-    modified,
-  });
-
   console.log("model-info refresh report");
   for (const line of report) console.log(`  ${line}`);
   console.log(`  added (${added.length}): ${added.join(", ") || "-"}`);
   console.log(`  modified (${modified.length}): ${modified.join(", ") || "-"}`);
   console.log(`  kept retired (${keptRetired.length}): ${keptRetired.join(", ") || "-"}`);
   for (const warning of warnings) console.log(`  warning: ${warning}`);
-  console.log(`  gatekeeper risk: ${assessment.riskLevel.toUpperCase()} (auto-merge safe: ${assessment.isSafeForAutoMerge})`);
-  for (const reason of assessment.reasons) console.log(`  gatekeeper reason: ${reason}`);
   console.log(`  updatedAt: ${existing.updatedAt} -> ${changed ? data.updatedAt : existing.updatedAt}${changed ? "" : " (unchanged)"}`);
-
-  if (args.alertFile) {
-    const alertData = {
-      date: new Date().toISOString().slice(0, 10),
-      runId: process.env.GITHUB_RUN_ID ?? null,
-      vendorsRequested: selected,
-      riskLevel: assessment.riskLevel,
-      isSafeForAutoMerge: assessment.isSafeForAutoMerge,
-      hasErrors: assessment.riskLevel !== "green",
-      fetchErrors,
-      warnings,
-      added,
-      modified,
-      keptRetired,
-      reasons: assessment.reasons,
-    };
-    fs.writeFileSync(args.alertFile, JSON.stringify(alertData, null, 2), "utf8");
-  }
 
   if (!changed) {
     console.log("no changes; nothing to do");
@@ -284,18 +246,8 @@ async function main() {
     // checkout -B reuses the dated branch name on a same-day rerun, so force
     // the push; gh pr create does not push in non-interactive mode.
     run("git", ["push", "--force", "--set-upstream", "origin", branch]);
-
-    const riskBadge = assessment.riskLevel === "green"
-      ? "🟢 GREEN (Safe for auto-merge)"
-      : assessment.riskLevel === "yellow"
-        ? "🟡 YELLOW (Review suggested)"
-        : "🔴 RED (High risk - Manual review required)";
-
     const prBody = [
       "Automatic refresh of `data/model-info.json` from official model documentation.",
-      "",
-      `### Gatekeeper Risk Assessment: ${riskBadge}`,
-      ...(assessment.reasons.length > 0 ? assessment.reasons.map((r) => `- ${r}`) : ["- All guardrail checks passed."]),
       "",
       `**Added (${added.length})**: ${added.join(", ") || "none"}`,
       `**Modified (${modified.length})**: ${modified.join(", ") || "none"}`,
@@ -304,7 +256,6 @@ async function main() {
       "**Warnings**",
       ...(warnings.length > 0 ? warnings.map((w) => `- ${w}`) : ["- none"]),
     ].join("\n");
-
     run("gh", [
       "pr", "create",
       "--head", branch,
@@ -312,17 +263,6 @@ async function main() {
       "--body", prBody,
     ]);
     console.log(`opened PR on branch ${branch}`);
-
-    if (assessment.isSafeForAutoMerge) {
-      try {
-        run("gh", ["pr", "merge", branch, "--auto", "--squash"]);
-        console.log(`auto-merge enabled for PR on branch ${branch} (squash)`);
-      } catch (mergeError) {
-        console.warn(`Could not set auto-merge for PR (repository may have auto-merge disabled): ${mergeError.message}`);
-      }
-    } else {
-      console.log(`PR kept open for manual review (risk level: ${assessment.riskLevel.toUpperCase()}). Auto-merge skipped.`);
-    }
   }
 }
 

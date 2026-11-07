@@ -23,13 +23,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
-import {
-  evaluatePricingRisk,
-  fetchText,
-  formatPricing,
-  mergePricing,
-  validatePricing,
-} from "./lib.mjs";
+import { fetchText, formatPricing, mergePricing, validatePricing } from "./lib.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const GENERATOR = path.join(ROOT, "scripts", "generate-pricing-data.mjs");
@@ -156,8 +150,7 @@ async function main() {
     vendorScrapes.push({ vendor, models, baselineIds: baseline });
   }
 
-  let { data, added, modified, keptRetired, warnings, acceptedVendors, priceDeltaAnomalies = [] } =
-    mergePricing(existing, vendorScrapes);
+  let { data, added, modified, keptRetired, warnings, acceptedVendors } = mergePricing(existing, vendorScrapes);
 
   // Stamp the top-level and per-vendor updatedAt for the vendors this run
   // actually changed. Re-called after a same-day rerun rebase, when the
@@ -174,43 +167,26 @@ async function main() {
   const changed = added.length > 0 || modified.length > 0;
   if (changed) stampChanged();
 
-  const computeAssessment = () =>
-    evaluatePricingRisk({
-      warnings,
-      fetchErrors,
-      added,
-      modified,
-      priceDeltaAnomalies,
-    });
-  let assessment = computeAssessment();
-
   console.log(`vendors: ${vendorNames.join(", ")}`);
   for (const w of warnings) console.log(`warn: ${w}`);
   for (const e of fetchErrors) console.log(`error: ${e}`);
   console.log(`added: ${added.length ? added.join(", ") : "none"}`);
   console.log(`modified: ${modified.length ? modified.join(", ") : "none"}`);
   console.log(`kept retired: ${keptRetired.length ? keptRetired.join(", ") : "none"}`);
-  console.log(`gatekeeper risk: ${assessment.riskLevel.toUpperCase()} (auto-merge safe: ${assessment.isSafeForAutoMerge})`);
-  for (const r of assessment.reasons) console.log(`gatekeeper reason: ${r}`);
 
   // Write alert data for notifications (CI or local observation).
   const writeAlerts = async () => {
     if (!args.alertFile) return;
-    assessment = computeAssessment();
     const alertData = {
       date: today(),
       runId: process.env.GITHUB_RUN_ID ?? null,
       vendorsRequested: vendorNames,
-      riskLevel: assessment.riskLevel,
-      isSafeForAutoMerge: assessment.isSafeForAutoMerge,
-      hasErrors: assessment.riskLevel !== "green",
+      hasErrors: fetchErrors.length > 0 || warnings.some((w) => /skipped vendor entirely/i.test(w)),
       fetchErrors,
       warnings,
-      priceDeltaAnomalies,
       added,
       modified,
       keptRetired,
-      reasons: assessment.reasons,
     };
     await writeFile(path.resolve(ROOT, args.alertFile), JSON.stringify(alertData, null, 2), "utf8");
   };
@@ -259,8 +235,6 @@ async function main() {
       keptRetired = merged.keptRetired;
       warnings = merged.warnings;
       acceptedVendors = merged.acceptedVendors;
-      priceDeltaAnomalies = merged.priceDeltaAnomalies ?? [];
-      assessment = computeAssessment();
       await writeAlerts();
       const revalidated = validatePricing(data);
       await writeFile(dataFile, formatPricing(revalidated), "utf8");
@@ -281,30 +255,13 @@ async function main() {
     const vendorsChanged = [...new Set([...added, ...modified].map((e) => e.split("/")[0]))].sort();
     git(["checkout", "-B", branch]);
     git(["add", "data/pricing.json", "src/pricing-data.ts"]);
-
-    const riskBadge = assessment.riskLevel === "green"
-      ? "🟢 GREEN (Safe for auto-merge)"
-      : assessment.riskLevel === "yellow"
-        ? "🟡 YELLOW (Review suggested)"
-        : "🔴 RED (High risk - Manual review required)";
-
     const bodyLines = [
       `Auto-refreshed model pricing for: ${vendorsChanged.join(", ")}.`,
-      "",
-      `### Gatekeeper Risk Assessment: ${riskBadge}`,
-      ...(assessment.reasons.length > 0 ? assessment.reasons.map((r) => `- ${r}`) : ["- All guardrail checks passed."]),
       "",
       `- added: ${added.length ? added.join(", ") : "none"}`,
       `- modified: ${modified.length ? modified.join(", ") : "none"}`,
       `- kept retired: ${keptRetired.length ? keptRetired.join(", ") : "none"}`,
     ];
-    if (priceDeltaAnomalies.length > 0) {
-      bodyLines.push("", "### ⚠️ Price Delta Anomalies (>50%)");
-      for (const a of priceDeltaAnomalies) {
-        const pct = (a.ratio * 100).toFixed(1);
-        bodyLines.push(`- ${a.vendor}/${a.id}: ${a.path} changed by ${pct}% (${a.prevVal} -> ${a.nextVal})`);
-      }
-    }
     for (const w of warnings) bodyLines.push(`- warn: ${w}`);
     for (const e of fetchErrors) bodyLines.push(`- error: ${e}`);
     const title = `chore(pricing): refresh model pricing (${vendorsChanged.join(", ")})`;
@@ -327,17 +284,6 @@ async function main() {
     } else {
       const prUrl = gh(["pr", "create", "--fill", "--title", title, "-b", body, "--head", branch]);
       console.log(`PR: ${prUrl}`);
-    }
-
-    if (assessment.isSafeForAutoMerge) {
-      try {
-        gh(["pr", "merge", branch, "--auto", "--squash"]);
-        console.log(`Auto-merge enabled for PR on branch ${branch} (squash).`);
-      } catch (mergeError) {
-        console.warn(`Could not set auto-merge for PR (repository may have auto-merge disabled): ${mergeError.message}`);
-      }
-    } else {
-      console.log(`PR kept open for manual review (risk level: ${assessment.riskLevel.toUpperCase()}). Auto-merge skipped.`);
     }
   }
 
