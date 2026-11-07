@@ -5,6 +5,148 @@
 // a vendor whose scrape lost most of its models is skipped entirely (circuit
 // breaker) so a page redesign never commits half-written data.
 import { validateRemotePricing } from "../../src/pricing-updater.ts";
+import { isValidModelId, NOISE_WORDS } from "../../src/model-info-schema.ts";
+
+export { isValidModelId, NOISE_WORDS };
+
+export const ZERO_PRICE_WHITELIST = new Set([
+  "sensenova/sensenova-6.8-flash-lite",
+  "sensenova-6.8-flash-lite",
+]);
+
+export const HIGH_PRICE_WHITELIST = new Set([
+  "openai/o1-pro",
+  "o1-pro",
+  "qwen/qwen-deep-research-2025-12-15",
+  "qwen-deep-research-2025-12-15",
+]);
+
+export const PRICE_BOUNDS = {
+  USD: { min: 0.001, max: 200, highMax: 1000 },
+  CNY: { min: 0.001, max: 1500, highMax: 7000 },
+};
+
+/**
+ * Validates whether a token price is within reasonable common-sense bounds.
+ * @param {number} price
+ * @param {{ currency?: string, modelId?: string, vendor?: string }} [options]
+ * @returns {{ valid: boolean, reason?: string }}
+ */
+export function validatePriceSanity(price, { currency = "USD", modelId = "", vendor = "" } = {}) {
+  if (price === null || price === undefined) return { valid: true };
+  if (typeof price !== "number" || !Number.isFinite(price) || price < 0) {
+    return { valid: false, reason: `price must be a non-negative finite number, got ${price}` };
+  }
+
+  const fullId = vendor ? `${vendor}/${modelId}` : modelId;
+  const isZeroWhitelisted = ZERO_PRICE_WHITELIST.has(modelId) || ZERO_PRICE_WHITELIST.has(fullId);
+
+  if (price === 0) {
+    if (isZeroWhitelisted) {
+      return { valid: true };
+    }
+    return {
+      valid: false,
+      reason: `price cannot be 0 for non-whitelisted model ${fullId || "unknown"}`,
+    };
+  }
+
+  const bounds = PRICE_BOUNDS[currency] ?? PRICE_BOUNDS.USD;
+  const isHighWhitelisted = HIGH_PRICE_WHITELIST.has(modelId) || HIGH_PRICE_WHITELIST.has(fullId);
+  const max = isHighWhitelisted ? bounds.highMax : bounds.max;
+
+  if (price < bounds.min) {
+    return {
+      valid: false,
+      reason: `price ${price} ${currency} is below minimum sanity bound ${bounds.min}`,
+    };
+  }
+  if (price > max) {
+    return {
+      valid: false,
+      reason: `price ${price} ${currency} exceeds maximum sanity bound ${max}`,
+    };
+  }
+  return { valid: true };
+}
+
+/**
+ * Extracts numeric prices and their dot-notation paths from an entry.
+ * @param {any} entry
+ * @returns {Array<{ path: string, value: number }>}
+ */
+export function extractPrices(entry) {
+  const prices = [];
+  if (!entry) return prices;
+
+  const pushIfNumber = (val, path) => {
+    if (typeof val === "number") prices.push({ path, value: val });
+  };
+
+  if (entry.peak && entry.offPeak) {
+    pushIfNumber(entry.peak.inputPerMillion, "peak.inputPerMillion");
+    pushIfNumber(entry.peak.cachedInputPerMillion, "peak.cachedInputPerMillion");
+    pushIfNumber(entry.peak.outputPerMillion, "peak.outputPerMillion");
+    pushIfNumber(entry.offPeak.inputPerMillion, "offPeak.inputPerMillion");
+    pushIfNumber(entry.offPeak.cachedInputPerMillion, "offPeak.cachedInputPerMillion");
+    pushIfNumber(entry.offPeak.outputPerMillion, "offPeak.outputPerMillion");
+  } else if (Array.isArray(entry.tiers)) {
+    const base = entry.pricing ?? entry;
+    pushIfNumber(base.inputPerMillion, "pricing.inputPerMillion");
+    pushIfNumber(base.cachedInputPerMillion, "pricing.cachedInputPerMillion");
+    pushIfNumber(base.outputPerMillion, "pricing.outputPerMillion");
+    entry.tiers.forEach((t, i) => {
+      pushIfNumber(t.inputPerMillion, `tier[${i}].inputPerMillion`);
+      pushIfNumber(t.cachedInputPerMillion, `tier[${i}].cachedInputPerMillion`);
+      pushIfNumber(t.outputPerMillion, `tier[${i}].outputPerMillion`);
+    });
+  } else {
+    pushIfNumber(entry.inputPerMillion, "inputPerMillion");
+    pushIfNumber(entry.cachedInputPerMillion, "cachedInputPerMillion");
+    pushIfNumber(entry.outputPerMillion, "outputPerMillion");
+  }
+  return prices;
+}
+
+/**
+ * Checks price differences between current and incoming entries for sudden mutations (>50%).
+ * @param {any} current
+ * @param {any} incoming
+ * @param {{ vendor?: string, id?: string }} [options]
+ * @returns {Array<{ vendor: string, id: string, path: string, prevVal: any, nextVal: any, ratio: number }>}
+ */
+export function checkPriceDeltas(current, incoming, { vendor = "", id = "" } = {}) {
+  const anomalies = [];
+  if (!current || !incoming) return anomalies;
+
+  const currentPrices = new Map(extractPrices(current).map((p) => [p.path, p.value]));
+  const incomingPrices = extractPrices(incoming);
+
+  for (const { path, value: nextVal } of incomingPrices) {
+    if (currentPrices.has(path)) {
+      const prevVal = currentPrices.get(path);
+      if (prevVal !== nextVal) {
+        const ratio = prevVal > 0 ? Math.abs(nextVal - prevVal) / prevVal : 1.0;
+        if (ratio > 0.5) {
+          anomalies.push({ vendor, id, path, prevVal, nextVal, ratio });
+        }
+      }
+    }
+  }
+
+  if (current.currency && incoming.currency && current.currency !== incoming.currency) {
+    anomalies.push({
+      vendor,
+      id,
+      path: "currency",
+      prevVal: current.currency,
+      nextVal: incoming.currency,
+      ratio: 1.0,
+    });
+  }
+
+  return anomalies;
+}
 
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
@@ -293,7 +435,7 @@ export function entriesEqual(a, b) {
 // pricing entry (Pricing | RateCard | TieredPricing) and baselineIds are the
 // model ids the vendor is expected to own (used by the circuit breaker).
 //
-// Returns { data, added, modified, keptRetired, warnings, acceptedVendors } where
+// Returns { data, added, modified, keptRetired, warnings, acceptedVendors, priceDeltaAnomalies } where
 // data is the merged (unvalidated) object, added/modified/keptRetired are
 // "vendor/id" strings, and acceptedVendors contains vendors passing the circuit breaker.
 export function mergePricing(existing, vendorScrapes) {
@@ -303,6 +445,7 @@ export function mergePricing(existing, vendorScrapes) {
   const keptRetired = [];
   const warnings = [];
   const acceptedVendors = [];
+  const priceDeltaAnomalies = [];
 
   for (const { vendor, models, baselineIds } of vendorScrapes) {
     const scrapedIds = new Set(Object.keys(models));
@@ -322,6 +465,14 @@ export function mergePricing(existing, vendorScrapes) {
       continue;
     }
 
+    // Flood circuit breaker: single vendor adds > 5 unknown new models
+    const newModelsForVendor = Object.keys(models).filter((id) => isValidModelId(id) && !baseline.has(id));
+    if (baseline.size > 0 && newModelsForVendor.length > 5) {
+      warnings.push(
+        `${vendor}: flood risk: abnormally large batch of new models (${newModelsForVendor.length} new models; threshold: 5)`,
+      );
+    }
+
     acceptedVendors.push(vendor);
 
     const catalog = catalogs[vendor] ?? { models: {} };
@@ -335,14 +486,46 @@ export function mergePricing(existing, vendorScrapes) {
     }
 
     for (const [id, incoming] of Object.entries(models)) {
+      if (!isValidModelId(id)) {
+        warnings.push(`${vendor}: rejected invalid or noisy model id "${id}"`);
+        continue;
+      }
+
       const current = currentModels[id];
+      const currency = incoming.currency ?? current?.currency ?? "USD";
+      const prices = extractPrices(incoming);
+      let sanityFailed = false;
+
+      for (const { path, value } of prices) {
+        const check = validatePriceSanity(value, { currency, modelId: id, vendor });
+        if (!check.valid) {
+          warnings.push(`${vendor}/${id}: rejected price sanity violation for ${path}: ${check.reason}`);
+          sanityFailed = true;
+          break;
+        }
+      }
+      if (sanityFailed) {
+        continue;
+      }
+
       if (!current) {
         currentModels[id] = { ...incoming, cachedInputPerMillion: incoming.cachedInputPerMillion ?? null };
         added.push(`${vendor}/${id}`);
         catalogChanged = true;
         continue;
       }
+
       if (!entriesEqual(current, incoming)) {
+        // Delta guard: check for price mutations > 50%
+        const deltas = checkPriceDeltas(current, incoming, { vendor, id });
+        for (const delta of deltas) {
+          const pct = (delta.ratio * 100).toFixed(1);
+          warnings.push(
+            `${vendor}/${id}: price delta on ${delta.path} exceeded 50% (${delta.prevVal} -> ${delta.nextVal}, ${pct}%)`,
+          );
+          priceDeltaAnomalies.push(delta);
+        }
+
         currentModels[id] = { ...incoming, cachedInputPerMillion: incoming.cachedInputPerMillion ?? null };
         modified.push(`${vendor}/${id}`);
         catalogChanged = true;
@@ -354,7 +537,75 @@ export function mergePricing(existing, vendorScrapes) {
     }
   }
 
-  return { data: { ...existing, catalogs }, added, modified, keptRetired, warnings, acceptedVendors };
+  return { data: { ...existing, catalogs }, added, modified, keptRetired, warnings, acceptedVendors, priceDeltaAnomalies };
+}
+
+/**
+ * Evaluates the risk level for auto-merge gatekeeping in pricing refresh.
+ * @param {{
+ *   warnings?: string[],
+ *   fetchErrors?: string[],
+ *   added?: string[],
+ *   modified?: string[],
+ *   priceDeltaAnomalies?: Array<{ vendor: string, id: string, path: string, prevVal: any, nextVal: any, ratio: number }>
+ * }} [options]
+ * @returns {{ riskLevel: "green" | "yellow" | "red", isSafeForAutoMerge: boolean, reasons: string[] }}
+ */
+export function evaluatePricingRisk({
+  warnings = [],
+  fetchErrors = [],
+  added = [],
+  modified = [],
+  priceDeltaAnomalies = [],
+} = {}) {
+  const reasons = [];
+  let isRed = false;
+  let isYellow = false;
+
+  // Red light conditions:
+  if (fetchErrors.length > 0) {
+    isRed = true;
+    reasons.push(`${fetchErrors.length} fetch/parse error(s) occurred`);
+  }
+  if (warnings.some((w) => /skipped vendor entirely|model count dropped/i.test(w))) {
+    isRed = true;
+    reasons.push("Circuit breaker triggered (vendor skipped or model count dropped)");
+  }
+  if (warnings.some((w) => /flood risk/i.test(w))) {
+    isRed = true;
+    reasons.push("Flood risk triggered (>5 new models from single vendor)");
+  }
+  if (warnings.some((w) => /price sanity violation/i.test(w))) {
+    isRed = true;
+    reasons.push("Price sanity check failed");
+  }
+
+  // Yellow light conditions:
+  if (priceDeltaAnomalies.length > 0 || warnings.some((w) => /price delta on/i.test(w))) {
+    isYellow = true;
+    reasons.push(`Price mutation anomaly detected (>50% delta on ${priceDeltaAnomalies.length} field(s))`);
+  }
+  if (warnings.length > 0) {
+    isYellow = true;
+    reasons.push(`${warnings.length} warning(s) reported`);
+  }
+  if (added.length > 3) {
+    isYellow = true;
+    reasons.push(`Batch addition: ${added.length} models added (threshold: <= 3 for green)`);
+  }
+
+  let riskLevel = "green";
+  if (isRed) {
+    riskLevel = "red";
+  } else if (isYellow) {
+    riskLevel = "yellow";
+  }
+
+  return {
+    riskLevel,
+    isSafeForAutoMerge: riskLevel === "green",
+    reasons,
+  };
 }
 
 // Serialize pricing the same way data/pricing.json is formatted.

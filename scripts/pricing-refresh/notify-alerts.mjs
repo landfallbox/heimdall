@@ -97,6 +97,8 @@ async function main() {
   const hasIssues = Boolean(data.hasErrors);
   const fetchErrors = data.fetchErrors ?? [];
   const severeWarnings = (data.warnings ?? []).filter((w) => /skipped vendor entirely/i.test(w));
+  const priceDeltaAnomalies = data.priceDeltaAnomalies ?? [];
+  const floodWarnings = (data.warnings ?? []).filter((w) => /flood risk/i.test(w));
 
   // Find any existing open alert issue.
   let openIssues = [];
@@ -123,27 +125,48 @@ async function main() {
       ...new Set([
         ...fetchErrors.map((e) => e.split(":")[0].trim()),
         ...severeWarnings.map((w) => w.split(":")[0].trim()),
+        ...floodWarnings.map((w) => w.split(":")[0].trim()),
+        ...priceDeltaAnomalies.map((a) => a.vendor),
       ]),
     ].filter(Boolean);
 
-    const title = `[Pricing Alert] 供应商价格更新异常 (${failedVendors.join(", ")})`;
+    const titleVendorPart = failedVendors.length > 0 ? ` (${failedVendors.join(", ")})` : "";
+    const title = `[Pricing Alert] 供应商价格更新风控报警${titleVendorPart}`;
     const bodyLines = [
       `@${owner}`,
       "",
-      `### ⚠️ 模型价格定时更新异常报警`,
+      `### ⚠️ 模型价格定时更新风控报警`,
       "",
-      `在最新的价格自动抓取任务中，以下供应商出现异常，已触发熔断跳过以避免破坏有效数据：`,
+      `在最新的价格自动抓取任务中触发了防错校验或风控警报，相关 PR 已保持打开状态供人工审核：`,
       "",
-      `**异常供应商列表**：${failedVendors.map((v) => `\`${v}\``).join(", ")}`,
+      `**涉及供应商列表**：${failedVendors.length ? failedVendors.map((v) => `\`${v}\``).join(", ") : "无特定供应商"}`,
       "",
-      "#### 详细错误信息",
+      "#### 详细告警信息",
     ];
 
     if (fetchErrors.length > 0) {
-      for (const e of fetchErrors) bodyLines.push(`- ❌ \`${e}\``);
+      for (const e of fetchErrors) bodyLines.push(`- ❌ 抓取错误: \`${e}\``);
     }
     if (severeWarnings.length > 0) {
-      for (const w of severeWarnings) bodyLines.push(`- ⚠️ \`${w}\``);
+      for (const w of severeWarnings) bodyLines.push(`- ⚠️ 熔断跳过: \`${w}\``);
+    }
+    if (floodWarnings.length > 0) {
+      for (const f of floodWarnings) bodyLines.push(`- ⚠️ 新增泛滥: \`${f}\``);
+    }
+    if (priceDeltaAnomalies.length > 0) {
+      bodyLines.push("");
+      bodyLines.push("#### ⚠️ 价格突变告警 (变动幅度超过 50%)");
+      for (const a of priceDeltaAnomalies) {
+        const pct = (a.ratio * 100).toFixed(1);
+        bodyLines.push(`- \`${a.vendor}/${a.id}\`: \`${a.path}\` 突变 ${pct}% (${a.prevVal} -> ${a.nextVal})`);
+      }
+    }
+    if (data.reasons && data.reasons.length > 0) {
+      bodyLines.push("");
+      bodyLines.push("#### 门禁评估未通过原因");
+      for (const r of data.reasons) {
+        bodyLines.push(`- 🚫 ${r}`);
+      }
     }
 
     bodyLines.push("");
@@ -201,7 +224,7 @@ async function main() {
     }
 
     await writeStepSummary(
-      `### ⚠️ Pricing Refresh Alert\n\n**Failed Vendors**: ${failedVendors.join(", ")}\n\n${fetchErrors.map((e) => `- ${e}`).join("\n")}${
+      `### ⚠️ Pricing Refresh Alert\n\n**Failed Vendors**: ${failedVendors.join(", ") || "none"}\n\n${fetchErrors.map((e) => `- ${e}`).join("\n")}${
         deliveryFailed ? `\n\n❌ **Notification Delivery Failed**: ${deliveryError?.message}` : ""
       }`,
     );
