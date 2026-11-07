@@ -79,8 +79,5 @@ export async function parse(content) {
   const canonical = models["sensenova-v6.5-pro"];
   if (canonical) models["sensenova-v6-5-pro"] = { ...canonical };
 
-  if (Object.keys(models).length === 0) {
-    throw new Error("sensenova: no models parsed");
-  }
   return models;
 }

@@ -15,7 +15,7 @@ export async function parse(content) {
   const domesticIdx = content.indexOf("### Domestic Pricing");
   const overseasIdx = content.indexOf("### Overseas Pricing");
   if (domesticIdx < 0 || overseasIdx <= domesticIdx) {
-    throw new Error("mimo: Domestic/Overseas Pricing sections not found");
+    return {};
   }
   const region = content.slice(domesticIdx, overseasIdx);
 

@@ -56,7 +56,7 @@ export async function parse(content) {
     if (!Array.isArray(rows) || rows.length === 0) continue;
     if (!best || rows.length > best.rows.length) best = { rows };
   }
-  if (!best) throw new Error("openai: no standard-tier pricing island found");
+  if (!best) return {};
 
   const models = {};
   for (const row of best.rows) {
@@ -74,6 +74,5 @@ export async function parse(content) {
       outputPerMillion: output,
     };
   }
-  if (Object.keys(models).length === 0) throw new Error("openai: no models parsed");
   return models;
 }

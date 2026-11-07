@@ -176,6 +176,7 @@ function baseData(): {
   assert.deepEqual(result.added, ["test/c"]);
   assert.deepEqual(result.modified, ["test/b"]);
   assert.deepEqual(result.keptRetired, ["test/a"]);
+  assert.deepEqual(result.acceptedVendors, ["test"]);
   assert.ok(result.warnings.some((w) => w.includes("keeping retired models: a")));
   assert.equal(result.data.catalogs.test.models["a"].outputPerMillion, 2, "retired model must be kept");
   assert.equal(result.data.catalogs.test.models["b"].inputPerMillion, 3.5);
@@ -187,6 +188,7 @@ function baseData(): {
   const result = mergePricing(baseData(), [{ vendor: "test", baselineIds: ["a", "b"], models: {} }]);
   assert.deepEqual(result.added, []);
   assert.deepEqual(result.modified, []);
+  assert.deepEqual(result.acceptedVendors, []);
   assert.ok(result.warnings.some((w) => w.includes("no models parsed")));
   assert.equal(result.data.catalogs.test.models["a"].outputPerMillion, 2);
 }
@@ -202,6 +204,7 @@ function baseData(): {
     { vendor: "test", baselineIds: bigBaseline, models: { a: { currency: "USD", inputPerMillion: 9, cachedInputPerMillion: null, outputPerMillion: 9 } } },
   ]);
   assert.deepEqual(result.modified, []);
+  assert.deepEqual(result.acceptedVendors, []);
   assert.ok(result.warnings.some((w) => w.includes("model count dropped")));
   assert.equal(result.data.catalogs.test.models["a"].inputPerMillion, 1, "catalog must be untouched");
 }

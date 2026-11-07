@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  issues: write
 
 jobs:
   refresh:
@@ -34,4 +35,14 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          npm run pricing:refresh -- --commit
+          npm run pricing:refresh -- --commit --alert-file pricing-refresh-alerts.json
+
+      - name: Alert notification (Issue & Email)
+        if: always()
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          node scripts/pricing-refresh/notify-alerts.mjs --alert-file pricing-refresh-alerts.json
