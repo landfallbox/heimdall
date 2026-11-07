@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
+import { isValidModelId } from "./model-info-schema.ts";
 import { applyRemotePricing, type RemotePricingData } from "./usage.ts";
 import type { Logger } from "./logger.ts";
 
@@ -34,7 +35,10 @@ const tieredPricingSchema = z.object({
 const remoteCatalogEntrySchema = z.object({
   sourceUrl: z.string().min(1).optional(),
   updatedAt: z.string().min(1).optional(),
-  models: z.record(z.string(), rateCardSchema.or(tieredPricingSchema).or(pricingSchema)),
+  models: z.record(
+    z.string().refine(isValidModelId, { message: "Invalid model ID" }),
+    rateCardSchema.or(tieredPricingSchema).or(pricingSchema),
+  ),
 });
 export const remotePricingSchema = z.object({
   schemaVersion: z.literal(1),
