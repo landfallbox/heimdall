@@ -65,7 +65,16 @@ Source: "..\release\win-unpacked\*"; DestDir: "{app}"; Flags: recursesubdirs ign
 
 [Icons]
 Name: "{group}\Heimdall"; Filename: "{app}\Heimdall.exe"; Comment: "Launch Heimdall"
-Name: "{autodesktop}\Heimdall"; Filename: "{app}\Heimdall.exe"; Tasks: desktopicon
+Name: "{userdesktop}\Heimdall"; Filename: "{app}\Heimdall.exe"; Tasks: desktopicon
+
+[InstallDelete]
+; Clean up any duplicate or legacy desktop shortcut from the public desktop (e.g. from previous all-users or NSIS installs)
+Type: files; Name: "{commondesktop}\Heimdall.lnk"
+
+[UninstallDelete]
+; Ensure desktop shortcuts are completely removed on uninstall
+Type: files; Name: "{commondesktop}\Heimdall.lnk"
+Type: files; Name: "{userdesktop}\Heimdall.lnk"
 
 ; No skipifsilent: the in-app updater runs /VERYSILENT and relies on this
 ; entry to relaunch Heimdall after the files are replaced. A postinstall
@@ -598,6 +607,9 @@ var
 begin
   Result := '';
   NeedsRestart := False;
+
+  // Drop any stray shortcut on the common (public) desktop left by old all-users/NSIS installs
+  DeleteFile(ExpandConstant('{commondesktop}\Heimdall.lnk'));
 
   // Drop the old NSIS Add/Remove Programs entry and its install-info key.
   RegDeleteKeyIncludingSubkeys(HKCU, 'Software\' + OldNsGuid);
