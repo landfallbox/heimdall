@@ -1,8 +1,7 @@
 name: CodeRabbit Review
 
 # CodeRabbit 对 < 10 stars 的公开仓库不再自动审查，
-# 这里在 PR 开启时评论 @coderabbitai review 手动触发一次；
-# 触发后同一 PR 的后续 push 由 CodeRabbit 自动增量复审。
+# 这里在 PR 开启以及有新代码推送（synchronize）时自动评论 @coderabbitai review 触发审查。
 #
 # 注意：CodeRabbit 忽略所有 [bot] 账号的评论（防 bot 互触发死循环），
 # 因此必须用人类账号的 PAT（scope: public_repo）存于
@@ -12,7 +11,7 @@ on:
   # 本 workflow 不 checkout PR 代码、不执行任何来自 PR 的内容，仅读取
   # PR 编号（数字）与 draft（布尔）并发评论，因此 target 事件无 secret 泄露风险。
   pull_request_target:
-    types: [opened, reopened, ready_for_review]
+    types: [opened, reopened, ready_for_review, synchronize]
   workflow_dispatch:
     inputs:
       pr_number:
@@ -54,13 +53,28 @@ jobs:
             Write-Output "PR is a draft; will trigger on ready_for_review."
             exit 0
           }
-          # 去重：本 PR 若已有 token 账号发过的触发评论则不再发
-          # （避免 close/reopen 或手动重复触发造成重复评论；CodeRabbit 对重复触发也会限流）。
+          # 去重与防抖：
+          # 1. 如果 PR 的最新一条评论已经是 @coderabbitai review（CodeRabbit 尚未响应），跳过避免重复发
+          # 2. 如果距离上一次触发不足 60 秒（防多 commit 并发 push 重复触发），跳过
           $account = gh api user --jq .login
-          $already = gh api "repos/$env:GH_REPOSITORY/issues/$prNumber/comments?per_page=100" --jq "[.[] | select(.user.login == `"$account`" and (.body | contains(`"@coderabbitai review`")))] | length"
-          if ([int]$already -gt 0) {
-            Write-Output "A CodeRabbit trigger comment already exists on this PR; skipping to avoid duplicates."
-            exit 0
+          $rawComments = gh api "repos/$env:GH_REPOSITORY/issues/$prNumber/comments?per_page=100"
+          $comments = if ($rawComments) { $rawComments | ConvertFrom-Json } else { @() }
+          $myReviewComments = @($comments | Where-Object { $_.user.login -eq $account -and $_.body -match "@coderabbitai\s+review" })
+
+          if ($myReviewComments.Count -gt 0) {
+            $latestReviewComment = $myReviewComments[-1]
+
+            if ($comments[-1].id -eq $latestReviewComment.id) {
+              Write-Output "Latest comment is already a pending CodeRabbit review request; skipping."
+              exit 0
+            }
+
+            $createdAt = [DateTime]::Parse($latestReviewComment.created_at)
+            $diffSeconds = ([DateTime]::UtcNow - $createdAt.ToUniversalTime()).TotalSeconds
+            if ($diffSeconds -lt 60) {
+              Write-Output "Last CodeRabbit review was requested $diffSeconds seconds ago (< 60s); skipping duplicate trigger."
+              exit 0
+            }
           }
           # 无 checkout 步骤，显式指定 repo。
           gh pr comment $prNumber --repo $env:GH_REPOSITORY --body "@coderabbitai review"
