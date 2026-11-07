@@ -194,7 +194,9 @@ async function main() {
     vendorScrapes.push({ vendor, models, baselineIds: baselineIds(existing, vendor) });
   }
 
-  const { data, added, modified, keptRetired } = mergeModelInfo(existing, vendorScrapes);
+  const merged = mergeModelInfo(existing, vendorScrapes);
+  const { data, added, modified, keptRetired } = merged;
+  warnings.push(...merged.warnings);
 
   const changed = added.length > 0 || modified.length > 0;
   if (changed) {

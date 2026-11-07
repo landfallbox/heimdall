@@ -47,6 +47,15 @@ const KNOWN_RETIRED = new Set([
   // SenseNova 6.8 Flash Lite is a free Preview model not listed on the public
   // pricing page; it is a hand-written catalog entry, so the round-trip skips it.
   "sensenova-6.8-flash-lite",
+  // deepseek-v4-flash is a retired legacy name (official page footnote: still
+  // accepted, served by DeepSeek-V4.1-Flash-1017 and billed at the Flash
+  // price). It is no longer listed in the page's MODEL row, so the hand-written
+  // catalog entry is skipped by the round-trip.
+  "deepseek-v4-flash",
+  // deepseek-v4.1-flash is a hand-written entry (non-official API id kept for
+  // upstream gateway compatibility); it is not listed on the official page, so
+  // the round-trip skips it.
+  "deepseek-v4.1-flash",
 ]);
 
 async function loadParser(vendor: string) {
