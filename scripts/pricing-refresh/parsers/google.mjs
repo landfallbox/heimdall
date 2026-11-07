@@ -1,8 +1,11 @@
 // Parser for https://ai.google.dev/gemini-api/docs/pricing.
 //
-// Each model is an <h2 id="model-id"> section containing several tables
-// (standard / batch / flex / priority / contributor); the standard table is
-// the first one whose rows are labelled "Input price",
+// The page is either a classic HTML doc or a client-rendered SPA that embeds
+// an agent-oriented markdown document inside a <noscript><pre> block.
+//
+// Each model is an <h2 id="model-id"> (or `## Model {% id="model-id" %}`) section
+// containing several tables (standard / batch / flex / priority / contributor);
+// the standard table is the first one whose rows are labelled "Input price",
 // "Output price (including thinking tokens)" and "Context caching price".
 // That three-row shape is what separates text-chat models from image / TTS /
 // live / transcribe / embedding / robotics sections, so we only emit models
@@ -41,11 +44,80 @@ export function parseGooglePrice(text, now) {
   return first ? Number(first[1]) : null;
 }
 
-export async function parse(content, options = {}) {
-  const now = options.now ?? new Date();
-  const models = {};
+function decodeHtmlEntities(s) {
+  return s
+    .replace(/&gt;/g, ">")
+    .replace(/&lt;/g, "<")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&");
+}
 
-  // Split the document into <h2 id="..."> sections.
+function parseMarkdownTableRows(tableBlock) {
+  const rowBlocks = tableBlock.split(/\n\s*---\s*\n/);
+  return rowBlocks
+    .map((block) => {
+      const cells = [];
+      let currentCell = null;
+      for (const line of block.split("\n")) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith("* ")) {
+          if (currentCell != null) cells.push(currentCell.trim());
+          currentCell = trimmed.slice(2);
+        } else if (currentCell != null) {
+          currentCell += "\n" + trimmed;
+        }
+      }
+      if (currentCell != null) cells.push(currentCell.trim());
+      return cells;
+    })
+    .filter((row) => row.length > 0);
+}
+
+function parseMarkdownFormat(markdown, now) {
+  const models = {};
+  const sectionRegex = /^##\s+.*?\{%\s*id="([^"]+)"\s*%\}/gm;
+  const matches = [...markdown.matchAll(sectionRegex)];
+
+  for (let i = 0; i < matches.length; i++) {
+    const id = matches[i][1];
+    if (/robotics|pricing-for|notes/i.test(id)) continue;
+    const start = matches[i].index;
+    const end = matches[i + 1]?.index ?? markdown.length;
+    const section = markdown.slice(start, end);
+
+    const tables = [...section.matchAll(/\{% table %\}([\s\S]*?)\{% \/table %\}/g)];
+    for (const tableMatch of tables) {
+      const rows = parseMarkdownTableRows(tableMatch[1]);
+      if (rows.length < 2) continue;
+      const labels = rows.map((r) => r[0] ?? "");
+      const inputIdx = labels.findIndex((l) => INPUT_ROW.test(l));
+      const outputIdx = labels.findIndex((l) => OUTPUT_ROW.test(l));
+      const cacheIdx = labels.findIndex((l) => CACHE_ROW.test(l));
+      if (inputIdx < 0 || outputIdx < 0 || cacheIdx < 0) continue;
+
+      const paidCol = rows[0].findIndex((c) => /paid tier/i.test(typeof c === "string" ? c : c?.text));
+      const col = paidCol >= 0 ? paidCol : rows[0].length - 1;
+
+      const input = parseGooglePrice(rows[inputIdx][col], now);
+      const output = parseGooglePrice(rows[outputIdx][col], now);
+      const cache = parseGooglePrice(rows[cacheIdx][col], now);
+      if (input == null || output == null) continue;
+
+      models[id] = {
+        currency: "USD",
+        inputPerMillion: input,
+        ...(cache != null ? { cachedInputPerMillion: cache } : {}),
+        outputPerMillion: output,
+      };
+      break;
+    }
+  }
+  return models;
+}
+
+function parseHtmlFormat(content, now) {
+  const models = {};
   const h2 = [...content.matchAll(/<h2[^>]*\bid="([^"]+)"[^>]*>/g)];
   for (let i = 0; i < h2.length; i++) {
     const id = h2[i][1];
@@ -62,7 +134,6 @@ export async function parse(content, options = {}) {
       const cacheIdx = labels.findIndex((l) => CACHE_ROW.test(l));
       if (inputIdx < 0 || outputIdx < 0 || cacheIdx < 0) continue;
 
-      // Prices are in the "Paid Tier" column (fall back to the last cell).
       const paidCol = rows[0].findIndex((c) => /paid tier/i.test(c.text));
       const col = paidCol >= 0 ? paidCol : rows[0].length - 1;
 
@@ -76,10 +147,24 @@ export async function parse(content, options = {}) {
         ...(cache != null ? { cachedInputPerMillion: cache } : {}),
         outputPerMillion: output,
       };
-      break; // first matching (standard) table wins
+      break;
     }
     if (entry) models[id] = entry;
   }
-  if (Object.keys(models).length === 0) throw new Error("google: no models parsed");
   return models;
+}
+
+export async function parse(content, options = {}) {
+  const now = options.now ?? new Date();
+
+  // Modern SPA documentation page embeds an agent/markdown payload inside <noscript><pre>.
+  const noscriptMatch = content.match(/<noscript[^>]*><pre[^>]*>([\s\S]*?)<\/pre><\/noscript>/i);
+  if (noscriptMatch) {
+    const markdown = decodeHtmlEntities(noscriptMatch[1]);
+    const models = parseMarkdownFormat(markdown, now);
+    if (Object.keys(models).length > 0) return models;
+  }
+
+  // Classic server-rendered HTML documentation.
+  return parseHtmlFormat(content, now);
 }
