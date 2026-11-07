@@ -63,6 +63,5 @@ export async function parse(content) {
     }
     break; // only the main table
   }
-  if (Object.keys(models).length === 0) throw new Error("anthropic: no models parsed");
   return models;
 }

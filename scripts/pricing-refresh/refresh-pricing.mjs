@@ -10,6 +10,7 @@
 //   --from-file <path>  Parse a saved page (fixture) instead of fetching.
 //                       Requires --only with exactly one vendor.
 //   --data-file <path>  Read/write this pricing file (default: data/pricing.json).
+//   --alert-file <path> Save scrape warnings and errors to this JSON file.
 //   --commit            Commit, push a branch and open a PR (CI mode).
 //
 // The merge is add/modify-only (retired models are kept with a warning), and a
@@ -45,13 +46,14 @@ export const VENDORS = {
 };
 
 function parseArgs(argv) {
-  const args = { only: null, dryRun: false, fromFile: null, dataFile: null, commit: false };
+  const args = { only: null, dryRun: false, fromFile: null, dataFile: null, commit: false, alertFile: null };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--only") args.only = argv[++i];
     else if (arg === "--dry-run") args.dryRun = true;
     else if (arg === "--from-file") args.fromFile = argv[++i];
     else if (arg === "--data-file") args.dataFile = argv[++i];
+    else if (arg === "--alert-file") args.alertFile = argv[++i];
     else if (arg === "--commit") args.commit = true;
     else if (arg === "--help" || arg === "-h") args.help = true;
     else {
@@ -88,7 +90,7 @@ function remoteOwner() {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) {
-    console.log("Usage: node scripts/pricing-refresh/refresh-pricing.mjs [--only a,b] [--dry-run] [--from-file <path>] [--data-file <path>] [--commit]");
+    console.log("Usage: node scripts/pricing-refresh/refresh-pricing.mjs [--only a,b] [--dry-run] [--from-file <path>] [--data-file <path>] [--alert-file <path>] [--commit]");
     return;
   }
 
@@ -172,9 +174,30 @@ async function main() {
   console.log(`modified: ${modified.length ? modified.join(", ") : "none"}`);
   console.log(`kept retired: ${keptRetired.length ? keptRetired.join(", ") : "none"}`);
 
+  // Write alert data for notifications (CI or local observation).
+  const writeAlerts = async () => {
+    if (!args.alertFile) return;
+    const alertData = {
+      date: today(),
+      runId: process.env.GITHUB_RUN_ID ?? null,
+      vendorsRequested: vendorNames,
+      hasErrors: fetchErrors.length > 0 || warnings.some((w) => /skipped vendor entirely/i.test(w)),
+      fetchErrors,
+      warnings,
+      added,
+      modified,
+      keptRetired,
+    };
+    await writeFile(path.resolve(ROOT, args.alertFile), JSON.stringify(alertData, null, 2), "utf8");
+  };
+
+  // If every requested vendor failed, this is an unrecoverable run failure.
+  const allRequestedFailed = vendorNames.length > 0 && vendorScrapes.length === 0;
+
   if (!changed) {
     console.log("no changes; nothing to do");
-    if (fetchErrors.length > 0) process.exit(1);
+    await writeAlerts();
+    if (allRequestedFailed) process.exit(1);
     return;
   }
 
@@ -184,7 +207,8 @@ async function main() {
   if (args.dryRun) {
     console.log("dry-run: would update " + path.relative(ROOT, dataFile));
     console.log("dry-run: would regenerate src/pricing-data.ts");
-    if (fetchErrors.length > 0) process.exit(1);
+    await writeAlerts();
+    if (allRequestedFailed) process.exit(1);
     return;
   }
 
@@ -218,7 +242,8 @@ async function main() {
       // Undo the rebase's writes so the working tree stays clean.
       git(["checkout", "--", "data/pricing.json", "src/pricing-data.ts"]);
       console.log("no new changes beyond the refresh branch; nothing to do");
-      if (fetchErrors.length > 0) process.exit(1);
+      await writeAlerts();
+      if (allRequestedFailed) process.exit(1);
       return;
     }
     const vendorsChanged = [...new Set([...added, ...modified].map((e) => e.split("/")[0]))].sort();
@@ -255,6 +280,8 @@ async function main() {
       console.log(`PR: ${prUrl}`);
     }
   }
+
+  await writeAlerts();
 }
 
 main().catch((error) => {

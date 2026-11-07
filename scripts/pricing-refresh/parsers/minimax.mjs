@@ -97,8 +97,5 @@ export async function parse(content) {
     };
   }
 
-  if (Object.keys(models).length === 0) {
-    throw new Error("minimax: no models parsed");
-  }
   return models;
 }
