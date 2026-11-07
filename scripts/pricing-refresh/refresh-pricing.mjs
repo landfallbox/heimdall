@@ -150,7 +150,7 @@ async function main() {
     vendorScrapes.push({ vendor, models, baselineIds: baseline });
   }
 
-  let { data, added, modified, keptRetired, warnings } = mergePricing(existing, vendorScrapes);
+  let { data, added, modified, keptRetired, warnings, acceptedVendors } = mergePricing(existing, vendorScrapes);
 
   // Stamp the top-level and per-vendor updatedAt for the vendors this run
   // actually changed. Re-called after a same-day rerun rebase, when the
@@ -191,8 +191,11 @@ async function main() {
     await writeFile(path.resolve(ROOT, args.alertFile), JSON.stringify(alertData, null, 2), "utf8");
   };
 
-  // If every requested vendor failed, this is an unrecoverable run failure.
-  const allRequestedFailed = vendorNames.length > 0 && vendorScrapes.length === 0;
+  // Write initial collected vendor outcomes before any fallible operations.
+  await writeAlerts();
+
+  // If every requested vendor failed (or was rejected by circuit breaker), this is an unrecoverable run failure.
+  const allRequestedFailed = vendorNames.length > 0 && acceptedVendors.length === 0;
 
   if (!changed) {
     console.log("no changes; nothing to do");
@@ -212,6 +215,7 @@ async function main() {
     return;
   }
 
+  await writeAlerts();
   await writeFile(dataFile, serialized, "utf8");
   execFileSync(process.execPath, [GENERATOR], { cwd: ROOT, stdio: "inherit" });
   console.log(`updated ${path.relative(ROOT, dataFile)} and regenerated src/pricing-data.ts`);
@@ -230,6 +234,8 @@ async function main() {
       modified = merged.modified;
       keptRetired = merged.keptRetired;
       warnings = merged.warnings;
+      acceptedVendors = merged.acceptedVendors;
+      await writeAlerts();
       const revalidated = validatePricing(data);
       await writeFile(dataFile, formatPricing(revalidated), "utf8");
       execFileSync(process.execPath, [GENERATOR], { cwd: ROOT, stdio: "inherit" });

@@ -19,15 +19,23 @@ const INPUT_ROW = /^input price/i;
 const OUTPUT_ROW = /^output price \(including thinking tokens\)/i;
 const CACHE_ROW = /^context caching price/i;
 
-// Normalize a date to local start-of-day so "through Nov 30" / "starting Dec 1"
-// compare against the calendar day, not the time of day.
+/**
+ * Normalizes a date to local start-of-day for calendar comparison.
+ * @param {Date} d
+ * @returns {Date}
+ */
 function startOfDay(d) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
-// Parse a Paid-Tier price cell. Handles dual prices
-// ("$X through <date>. $Y starting <date>") by picking the value active on
-// `now`, and plain / tiered / multi-modality cells by taking the first $ value.
+/**
+ * Parses a Paid-Tier price cell. Handles dual prices
+ * ("$X through <date>. $Y starting <date>") by picking the value active on
+ * `now`, and plain / tiered / multi-modality cells by taking the first $ value.
+ * @param {unknown} text
+ * @param {Date} now
+ * @returns {number | null}
+ */
 export function parseGooglePrice(text, now) {
   if (text == null) return null;
   const s = String(text);
@@ -44,6 +52,11 @@ export function parseGooglePrice(text, now) {
   return first ? Number(first[1]) : null;
 }
 
+/**
+ * Decodes basic HTML entities into plain characters.
+ * @param {string} s
+ * @returns {string}
+ */
 function decodeHtmlEntities(s) {
   return s
     .replace(/&gt;/g, ">")
@@ -53,6 +66,11 @@ function decodeHtmlEntities(s) {
     .replace(/&amp;/g, "&");
 }
 
+/**
+ * Parses markdown table rows from a `{% table %}` block.
+ * @param {string} tableBlock
+ * @returns {string[][]}
+ */
 function parseMarkdownTableRows(tableBlock) {
   const rowBlocks = tableBlock.split(/\n\s*---\s*\n/);
   return rowBlocks
@@ -74,6 +92,12 @@ function parseMarkdownTableRows(tableBlock) {
     .filter((row) => row.length > 0);
 }
 
+/**
+ * Parses Google pricing from embedded Markdown format inside `<noscript><pre>`.
+ * @param {string} markdown
+ * @param {Date} now
+ * @returns {Record<string, { currency: string, inputPerMillion: number, cachedInputPerMillion?: number, outputPerMillion: number }>}
+ */
 function parseMarkdownFormat(markdown, now) {
   const models = {};
   const sectionRegex = /^##\s+.*?\{%\s*id="([^"]+)"\s*%\}/gm;
@@ -116,6 +140,12 @@ function parseMarkdownFormat(markdown, now) {
   return models;
 }
 
+/**
+ * Parses Google pricing from classic HTML documentation.
+ * @param {string} content
+ * @param {Date} now
+ * @returns {Record<string, { currency: string, inputPerMillion: number, cachedInputPerMillion?: number, outputPerMillion: number }>}
+ */
 function parseHtmlFormat(content, now) {
   const models = {};
   const h2 = [...content.matchAll(/<h2[^>]*\bid="([^"]+)"[^>]*>/g)];
@@ -154,11 +184,17 @@ function parseHtmlFormat(content, now) {
   return models;
 }
 
+/**
+ * Parses Google Gemini API pricing documentation (supporting both SPA noscript markdown and classic HTML).
+ * @param {string} content
+ * @param {{ now?: Date }} [options]
+ * @returns {Promise<Record<string, { currency: string, inputPerMillion: number, cachedInputPerMillion?: number, outputPerMillion: number }>>}
+ */
 export async function parse(content, options = {}) {
   const now = options.now ?? new Date();
 
   // Modern SPA documentation page embeds an agent/markdown payload inside <noscript><pre>.
-  const noscriptMatch = content.match(/<noscript[^>]*><pre[^>]*>([\s\S]*?)<\/pre><\/noscript>/i);
+  const noscriptMatch = content.match(/<noscript[^>]*>\s*<pre[^>]*>([\s\S]*?)<\/pre>\s*<\/noscript>/i);
   if (noscriptMatch) {
     const markdown = decodeHtmlEntities(noscriptMatch[1]);
     const models = parseMarkdownFormat(markdown, now);

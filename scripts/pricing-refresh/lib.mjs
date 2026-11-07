@@ -293,15 +293,16 @@ export function entriesEqual(a, b) {
 // pricing entry (Pricing | RateCard | TieredPricing) and baselineIds are the
 // model ids the vendor is expected to own (used by the circuit breaker).
 //
-// Returns { data, added, modified, keptRetired, warnings } where data is the
-// merged (unvalidated) object and added/modified/keptRetired are "vendor/id"
-// strings.
+// Returns { data, added, modified, keptRetired, warnings, acceptedVendors } where
+// data is the merged (unvalidated) object, added/modified/keptRetired are
+// "vendor/id" strings, and acceptedVendors contains vendors passing the circuit breaker.
 export function mergePricing(existing, vendorScrapes) {
   const catalogs = { ...(existing.catalogs ?? {}) };
   const added = [];
   const modified = [];
   const keptRetired = [];
   const warnings = [];
+  const acceptedVendors = [];
 
   for (const { vendor, models, baselineIds } of vendorScrapes) {
     const scrapedIds = new Set(Object.keys(models));
@@ -320,6 +321,8 @@ export function mergePricing(existing, vendorScrapes) {
       );
       continue;
     }
+
+    acceptedVendors.push(vendor);
 
     const catalog = catalogs[vendor] ?? { models: {} };
     const currentModels = { ...(catalog.models ?? {}) };
@@ -351,7 +354,7 @@ export function mergePricing(existing, vendorScrapes) {
     }
   }
 
-  return { data: { ...existing, catalogs }, added, modified, keptRetired, warnings };
+  return { data: { ...existing, catalogs }, added, modified, keptRetired, warnings, acceptedVendors };
 }
 
 // Serialize pricing the same way data/pricing.json is formatted.
