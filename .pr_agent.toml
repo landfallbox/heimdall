@@ -1,6 +1,6 @@
 [config]
-model = "gemini/gemini-3.8-flash"
-fallback_models = ["gemini/gemini-3.8-flash", "gemini/gemini-3.5-flash-lite"]
+model = "gemini/gemini-3.5-flash-lite"
+fallback_models = ["gemini/gemini-3.5-flash-lite"]
 custom_model_max_tokens = 1048576
 response_language = "zh-CN"
 
