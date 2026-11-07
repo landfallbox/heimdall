@@ -331,7 +331,6 @@ export const BUILTIN_MODEL_INFO_DATA: RemoteModelInfoData = {
         "thinking": true
       }
     },
-    "model": {},
     "gemini-4-argon": {
       "capabilities": {
         "toolCalling": true,

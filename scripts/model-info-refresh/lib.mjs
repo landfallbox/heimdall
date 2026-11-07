@@ -1,6 +1,13 @@
 // Shared helpers for the model-info refresh scripts: fetching, token-value
 // parsing, and the merge logic for data/model-info.json.
-import { parseRemoteModelInfo } from "../../src/model-info-schema.ts";
+import {
+  isValidModelId,
+  MODEL_ID_REGEX,
+  NOISE_WORDS,
+  parseRemoteModelInfo,
+} from "../../src/model-info-schema.ts";
+
+export { isValidModelId, MODEL_ID_REGEX, NOISE_WORDS };
 
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
@@ -213,6 +220,14 @@ export function mergeModelInfo(existing, vendorScrapes) {
       continue;
     }
 
+    // Flood protection: single vendor adding > 5 new unknown models
+    const newVendorModels = Object.keys(scraped).filter((id) => isValidModelId(id) && !baseline.has(id));
+    if (baseline.size > 0 && newVendorModels.length > 5) {
+      warnings.push(
+        `${vendor}: flood risk: abnormally large batch of new models (${newVendorModels.length} new models; threshold: 5)`,
+      );
+    }
+
     const retiredForVendor = [...baseline].filter((id) => !scrapedIds.has(id));
     if (retiredForVendor.length > 0) {
       keptRetired.push(...retiredForVendor);
@@ -220,24 +235,37 @@ export function mergeModelInfo(existing, vendorScrapes) {
     }
 
     for (const [id, incoming] of Object.entries(scraped)) {
+      if (!isValidModelId(id)) {
+        warnings.push(`${vendor}: rejected invalid or noisy model id "${id}"`);
+        continue;
+      }
+
+      const nextIncoming = { ...incoming };
+      if (nextIncoming.contextWindow !== undefined && (nextIncoming.contextWindow < 1000 || nextIncoming.contextWindow > 10000000)) {
+        warnings.push(
+          `${vendor}: rejected invalid contextWindow ${nextIncoming.contextWindow} for model "${id}" (expected 1,000 - 10,000,000)`,
+        );
+        delete nextIncoming.contextWindow;
+      }
+
       const current = models[id];
       if (!current) {
-        models[id] = incoming;
+        models[id] = nextIncoming;
         added.push(id);
         continue;
       }
       const next = { ...current };
-      if (incoming.contextWindow !== undefined && incoming.contextWindow !== current.contextWindow) {
-        next.contextWindow = incoming.contextWindow;
+      if (nextIncoming.contextWindow !== undefined && nextIncoming.contextWindow !== current.contextWindow) {
+        next.contextWindow = nextIncoming.contextWindow;
       }
-      if (incoming.maxOutputTokens !== undefined && incoming.maxOutputTokens !== current.maxOutputTokens) {
-        next.maxOutputTokens = incoming.maxOutputTokens;
+      if (nextIncoming.maxOutputTokens !== undefined && nextIncoming.maxOutputTokens !== current.maxOutputTokens) {
+        next.maxOutputTokens = nextIncoming.maxOutputTokens;
       }
-      if (incoming.capabilities) {
+      if (nextIncoming.capabilities) {
         const capabilities = { ...(current.capabilities ?? {}) };
         for (const key of ["toolCalling", "vision", "thinking"]) {
-          if (incoming.capabilities[key] !== undefined && incoming.capabilities[key] !== capabilities[key]) {
-            capabilities[key] = incoming.capabilities[key];
+          if (nextIncoming.capabilities[key] !== undefined && nextIncoming.capabilities[key] !== capabilities[key]) {
+            capabilities[key] = nextIncoming.capabilities[key];
           }
         }
         next.capabilities = capabilities;
@@ -252,6 +280,61 @@ export function mergeModelInfo(existing, vendorScrapes) {
   }
 
   return { data: { ...existing, models }, added, modified, keptRetired, warnings };
+}
+
+/**
+ * Evaluates the risk level for auto-merge gatekeeping in model-info refresh.
+ * @param {{
+ *   warnings?: string[],
+ *   fetchErrors?: string[],
+ *   added?: string[],
+ *   modified?: string[]
+ * }} [options]
+ * @returns {{ riskLevel: "green" | "yellow" | "red", isSafeForAutoMerge: boolean, reasons: string[] }}
+ */
+export function evaluateModelInfoRisk({
+  warnings = [],
+  fetchErrors = [],
+  added = [],
+  modified = [],
+} = {}) {
+  const reasons = [];
+  let isRed = false;
+  let isYellow = false;
+
+  if (fetchErrors.length > 0) {
+    isRed = true;
+    reasons.push(`${fetchErrors.length} fetch/parse error(s) occurred`);
+  }
+  if (warnings.some((w) => /skipped vendor entirely|model count dropped/i.test(w))) {
+    isRed = true;
+    reasons.push("Circuit breaker triggered (vendor skipped or model count dropped)");
+  }
+  if (warnings.some((w) => /flood risk/i.test(w))) {
+    isRed = true;
+    reasons.push("Flood risk triggered (>5 new models from single vendor)");
+  }
+  if (warnings.length > 0) {
+    isYellow = true;
+    reasons.push(`${warnings.length} warning(s) reported`);
+  }
+  if (added.length > 3) {
+    isYellow = true;
+    reasons.push(`Batch addition: ${added.length} models added (threshold: <= 3 for green)`);
+  }
+
+  let riskLevel = "green";
+  if (isRed) {
+    riskLevel = "red";
+  } else if (isYellow) {
+    riskLevel = "yellow";
+  }
+
+  return {
+    riskLevel,
+    isSafeForAutoMerge: riskLevel === "green",
+    reasons,
+  };
 }
 
 // Serialize model info the same way data/model-info.json is formatted.
