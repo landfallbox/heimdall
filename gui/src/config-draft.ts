@@ -79,7 +79,6 @@ export interface RouterDraft {
   maxBodyMb: string;
   maxBodyBytes: number;
   fallbackStatusCodesText: string;
-  logFile: string;
 }
 
 export interface Draft {
@@ -95,7 +94,6 @@ export interface RouterConfig {
   requestTimeoutMs: number;
   maxBodyBytes: number;
   fallbackStatusCodes: number[];
-  logFile: string;
 }
 
 export interface VendorModelConfig {
@@ -156,7 +154,6 @@ export interface ConfigInput {
     requestTimeoutMs?: number | string;
     maxBodyBytes?: number;
     fallbackStatusCodes?: number[];
-    logFile?: string;
   };
   vendors?: ConfigVendorInput[];
 }
@@ -171,7 +168,6 @@ export const defaultDraft: Draft = {
     maxBodyMb: "50",
     maxBodyBytes: 50 * 1024 * 1024,
     fallbackStatusCodesText: "408, 409, 425, 429, 500, 502, 503, 504",
-    logFile: "logs/router.log",
   },
   vendors: [],
 };
@@ -329,7 +325,6 @@ export function toDraft(config: ConfigInput): Draft {
       fallbackStatusCodesText: Array.isArray(router.fallbackStatusCodes)
         ? router.fallbackStatusCodes.join(", ")
         : defaultDraft.router.fallbackStatusCodesText,
-      logFile: router.logFile || defaultDraft.router.logFile,
     },
     vendors: Array.isArray(config.vendors)
       ? config.vendors.map((vendor) => ({
@@ -358,7 +353,6 @@ export function toConfig(draft: Draft): Config {
       requestTimeoutMs: numberValue(draft.router.requestTimeoutMs, 30000),
       maxBodyBytes: megabytesToBytes(draft.router.maxBodyMb, draft.router.maxBodyBytes),
       fallbackStatusCodes: parseStatusCodes(draft.router.fallbackStatusCodesText),
-      logFile: draft.router.logFile.trim() || defaultDraft.router.logFile,
     },
     vendors: draft.vendors.map((vendor) => {
       const normalized: VendorConfig = {

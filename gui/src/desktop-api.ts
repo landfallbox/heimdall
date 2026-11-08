@@ -1,7 +1,7 @@
 import type { RemoteModelInfoData } from "../../src/model-info.ts";
 import type { RemotePricingData } from "../../src/usage.ts";
 import type { ThemeMode } from "./config-draft.ts";
-import type { HealthState, LogPage, UpdateState, UsageSummary } from "./types.ts";
+import type { HealthState, LogAppendEvent, LogFilter, LogPage, UpdateState, UsageSummary } from "./types.ts";
 
 export interface AppState {
   appName: string;
@@ -87,7 +87,7 @@ export interface HeimdallDesktopApi {
   stopRouter(): Promise<RouterActionResult>;
   restartRouter(): Promise<RouterActionResult>;
   checkHealth(options?: { includeProcessCount?: boolean }): Promise<HealthState>;
-  readLogs(options?: { limit?: number; before?: number | null }): Promise<LogPage>;
+  readLogs(options?: { limit?: number; cursor?: string | null } & LogFilter): Promise<LogPage>;
   readUsageSummary(options?: { vendor?: string; model?: string }): Promise<UsageSummary>;
   loadPricingCache(): Promise<PricingCacheResult>;
   loadModelInfoCache(): Promise<ModelInfoCacheResult>;
@@ -112,6 +112,8 @@ export interface HeimdallDesktopApi {
   onConfigChanged(callback: (payload: { revision: string }) => void): (() => void) | undefined;
   /** 主进程权威推送的 OS 深色状态变化（nativeTheme updated）。 */
   onOsDarkChange(callback: (osDark: boolean) => void): (() => void) | undefined;
+  /** router 运行期间日志文件新增行时触发（主进程 fs.watch，推送原始行）。 */
+  onLogsAppended(callback: (event: LogAppendEvent) => void): (() => void) | undefined;
 }
 
 declare global {

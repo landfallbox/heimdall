@@ -82,7 +82,6 @@ export type NormalizedRouterConfig = {
   requestTimeoutMs: number;
   maxBodyBytes: number;
   fallbackStatusCodes: number[];
-  logFile: string;
 };
 
 export type NormalizedConfig = {
@@ -105,7 +104,6 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
     requestTimeoutMs: 30000,
     maxBodyBytes: 50 * 1024 * 1024,
     fallbackStatusCodes: [408, 409, 425, 429, 500, 502, 503, 504],
-    logFile: "logs/router.log",
   },
   vendors: [],
 };
@@ -234,7 +232,6 @@ export const configSchema = z.object({
     requestTimeoutMs: z.number().int().min(100),
     maxBodyBytes: z.number().int().min(1024),
     fallbackStatusCodes: z.array(statusCodeSchema).min(1),
-    logFile: z.string().trim().min(1),
   }),
   vendors: z.array(vendorSchema),
 });
@@ -278,7 +275,6 @@ export function normalizeConfig(config: unknown): NormalizedConfig {
       requestTimeoutMs: Number(router.requestTimeoutMs || DEFAULT_CONFIG.router.requestTimeoutMs),
       maxBodyBytes: Number(router.maxBodyBytes || DEFAULT_CONFIG.router.maxBodyBytes),
       fallbackStatusCodes: normalizeStatusCodes(router.fallbackStatusCodes),
-      logFile: String(router.logFile || DEFAULT_CONFIG.router.logFile).trim() || DEFAULT_CONFIG.router.logFile,
     },
     vendors: Array.isArray(merged.vendors) ? merged.vendors.map((vendor: any) => normalizeVendor(vendor)) : [],
   };

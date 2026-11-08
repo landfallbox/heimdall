@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { ipcContractChannels, parseIpcRequest, parseIpcResponse } from "../gui/electron/ipc-contracts.ts";
+import {
+  ipcContractChannels,
+  ipcEventChannels,
+  parseIpcEvent,
+  parseIpcRequest,
+  parseIpcResponse,
+} from "../gui/electron/ipc-contracts.ts";
 
 const health = {
   ok: true,
@@ -19,8 +25,12 @@ assert.throws(
   /Invalid IPC request for app:setTheme: 0/,
 );
 assert.deepEqual(
-  parseIpcRequest("logs:read", [{ limit: 80, before: 1024 }]),
-  [{ limit: 80, before: 1024 }],
+  parseIpcRequest("logs:read", [{ limit: 80, cursor: "cm91dGVyLTIwMjYtMDEtMDEubG9n", levels: ["error"], keyword: "REQ-1", startTime: 1, endTime: 2 }]),
+  [{ limit: 80, cursor: "cm91dGVyLTIwMjYtMDEtMDEubG9n", levels: ["error"], keyword: "REQ-1", startTime: 1, endTime: 2 }],
+);
+assert.deepEqual(
+  parseIpcRequest("logs:read", [{ cursor: null }]),
+  [{ cursor: null }],
 );
 assert.deepEqual(
   parseIpcRequest("usage:summary", [{ vendor: "vendor-a", model: "gpt-5-mini" }]),
@@ -46,8 +56,25 @@ assert.throws(
   /Missing IPC request contract for unknown:channel/,
 );
 
+assert.deepEqual(
+  parseIpcEvent("logs:appended", { lines: ["{\"a\":1}", "{\"b\":2}"], ts: 1700000000000 }),
+  { lines: ["{\"a\":1}", "{\"b\":2}"], ts: 1700000000000 },
+);
+assert.throws(
+  () => parseIpcEvent("logs:appended", { lines: "not-an-array", ts: 1 }),
+  /Invalid IPC event for logs:appended: lines/,
+);
+assert.throws(
+  () => parseIpcEvent("unknown:event", {}),
+  /Missing IPC event contract for unknown:event/,
+);
+
 const mainSource = readFileSync(new URL("../gui/electron/main.ts", import.meta.url), "utf8");
 const registeredChannels = [...mainSource.matchAll(/registerIpcHandler\("([^"]+)"/g)].map((match) => match[1]).sort();
 assert.deepEqual([...ipcContractChannels].sort(), registeredChannels);
+const sentChannels = [...mainSource.matchAll(/webContents\.send\("([^"]+)"/g)].map((match) => match[1]);
+for (const channel of ipcEventChannels) {
+  assert.ok(sentChannels.includes(channel), `main.ts never sends event ${channel}`);
+}
 
 console.log("IPC contract tests passed");

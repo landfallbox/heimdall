@@ -56,7 +56,7 @@ const HOP_BY_HOP_HEADERS = new Set([
   "transfer-encoding",
   "upgrade",
 ]);
-const RESTART_REQUIRED_FIELDS = ["router.host", "router.port", "router.logFile"];
+const RESTART_REQUIRED_FIELDS = ["router.host", "router.port"];
 const CONFIG_WATCH_DEBOUNCE_MS = 200;
 
 function sendParentMessage(message: unknown): Promise<void> {
@@ -790,7 +790,7 @@ async function handleRequest(
 
 function main() {
   const { config, configPath } = loadRuntimeConfig();
-  const logger = createLogger(config, runtimeRoot);
+  const logger = createLogger(runtimeRoot);
   const usageStore = createUsageStore(runtimeRoot, {
     onError: (error, entry) => logger.error("usage_write_failed", {
       requestId: entry.requestId,

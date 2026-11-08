@@ -27,7 +27,6 @@ function createConfig(port: number) {
       requestTimeoutMs: 30000,
       maxBodyBytes: 52428800,
       fallbackStatusCodes: [408, 409, 425, 429, 500, 502, 503, 504],
-      logFile: "logs/router.log",
     },
     vendors: [{
       name: "test-vendor",

@@ -262,7 +262,25 @@ export default function App() {
   const status = useMemo(() => getStatus(health), [health]);
   const routerValidation = useMemo(() => validateRouter(draft.router), [draft.router]);
   const routerActive = health?.ok || Number(health?.processCount || 0) > 0;
-  const { logs, refreshLogs, loadOlderLogs } = useLogsController({ busy, run });
+  const {
+    logs,
+    refreshLogs,
+    loadOlderLogs,
+    filterState: logsFilterState,
+    updateFilterState: updateLogsFilterState,
+  } = useLogsController({ busy, run, active: page === "logs" });
+  const logVendorOptions = useMemo(() => draft.vendors.map((vendor) => vendor.name).filter((name): name is string => Boolean(name)), [draft.vendors]);
+  const logModelOptions = useMemo(() => {
+    const models = new Set<string>();
+    for (const vendor of draft.vendors) {
+      for (const model of getVendorModels(vendor)) {
+        if (model.id) {
+          models.add(model.id);
+        }
+      }
+    }
+    return [...models].sort();
+  }, [draft.vendors]);
   const { usage, refreshUsage } = useUsageController();
   const { updateState, checkAppUpdate, downloadAppUpdate, installAppUpdate } = useUpdateController({ run, setToast: notify });
   usePricingCache();
@@ -1218,6 +1236,10 @@ export default function App() {
                     if (!result.ok) notify("Could not open the config file.", "error");
                   })}
                   busy={busy}
+                  filterState={logsFilterState}
+                  onFilterChange={updateLogsFilterState}
+                  vendorOptions={logVendorOptions}
+                  modelOptions={logModelOptions}
                 />
               )}
             </motion.div>

@@ -56,6 +56,11 @@ contextBridge.exposeInMainWorld("heimdall", {
     ipcRenderer.on("config:changed", listener);
     return () => ipcRenderer.removeListener("config:changed", listener);
   },
+  onLogsAppended: (callback) => {
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on("logs:appended", listener);
+    return () => ipcRenderer.removeListener("logs:appended", listener);
+  },
   onConfirmClose: (callback) => {
     const listener = () => callback();
     ipcRenderer.on("app:confirmClose", listener);

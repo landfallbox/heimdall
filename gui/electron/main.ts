@@ -4,7 +4,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { closeSync, existsSync, openSync, renameSync, watch, type FSWatcher } from "node:fs";
 import fs from "node:fs/promises";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { basename, dirname, isAbsolute, join, normalize, relative, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DEFAULT_CONFIG, normalizeConfig } from "../../src/config.ts";
 import { getChatCompletionsUrl, getRouterBaseUrl } from "../../src/router-urls.ts";
@@ -15,7 +15,6 @@ import { readConfigStore, revisionFor, writeConfigStore } from "./config-store.t
 import {
   ensureDataDirUsable,
   formatDataDirPointer,
-  isWithinDirectory,
   listMigrationConflicts,
   migrateDataDirContents,
   pointerFilePath,
@@ -26,7 +25,8 @@ import {
 } from "./data-location.ts";
 import { parseIpcRequest, parseIpcResponse } from "./ipc-contracts.ts";
 import { syncVsCodeModels, type VsCodeSyncResult } from "../../src/vscode-sync.ts";
-import { ensureLogFile, readLogPage, resolveLogPath } from "./log-store.ts";
+import { logFileName } from "../../src/logger.ts";
+import { cleanupOldLogs, DATED_LOG_FILE, listLogFiles, readLogPage, resolveLogDirectory, type LogFilter } from "./log-store.ts";
 import { createTrayController, healthDetail } from "./tray-controller.ts";
 import {
   checkForUpdates,
@@ -640,6 +640,8 @@ async function startRouterInternal(): Promise<RouterActionResult> {
   const existingHealth = await getHealth(config, { includeProcessCount: true });
   if (existingHealth.ok || Number(existingHealth.processCount || 0) > 0) {
     await trayController.refreshStatus(existingHealth);
+    // 非本实例托管的 router 无法感知其退出，watcher 随应用生命周期卸载
+    startLogFollow();
     return { started: false, via: "existing", health: existingHealth };
   }
 
@@ -673,7 +675,7 @@ async function startRouterInternal(): Promise<RouterActionResult> {
     const health = await getHealth(config);
     const message = `Router process could not start: ${(error as Error).message || String(error)}`;
     const failedHealth: HealthState = { ...health, ok: false, error: message, processLogPath: processLog.path };
-    await recordRouterStartFailure(config, message, processLog.path);
+    await recordRouterStartFailure(message, processLog.path);
     await trayController.refreshStatus(failedHealth);
     return { started: false, via: "process", health: failedHealth, error: message };
   }
@@ -693,7 +695,7 @@ async function startRouterInternal(): Promise<RouterActionResult> {
     const detail = summarizeProcessOutput(output) || health.error || "Router process exited before becoming healthy.";
     const message = `Router failed to start: ${detail}`;
     const failedHealth: HealthState = { ...health, error: message, processLogPath: processLog.path };
-    await recordRouterStartFailure(config, message, processLog.path);
+    await recordRouterStartFailure(message, processLog.path);
     await trayController.refreshStatus(failedHealth);
     return {
       started: false,
@@ -709,6 +711,7 @@ async function startRouterInternal(): Promise<RouterActionResult> {
 
 function trackManagedRouterChild(child: ChildProcess, paths: Paths, instanceId: string) {
   managedRouterChild = child;
+  startLogFollow();
 
   child.on("message", (message: any) => {
     if (!message?.requestId || !["config-reloaded", "config-reload-failed"].includes(message.type)) {
@@ -729,6 +732,7 @@ function trackManagedRouterChild(child: ChildProcess, paths: Paths, instanceId: 
   const clearManagedChild = () => {
     if (managedRouterChild === child) {
       managedRouterChild = null;
+      stopLogFollow();
     }
     for (const [requestId, pending] of pendingRouterReloads) {
       pendingRouterReloads.delete(requestId);
@@ -798,11 +802,11 @@ function summarizeProcessOutput(output: string): string {
   return lines.find((line) => /^Error(?:\s|\[|:)/.test(line)) || lines.at(-1) || "";
 }
 
-async function recordRouterStartFailure(config: NormalizedConfig, message: string, processLogPath: string): Promise<void> {
+async function recordRouterStartFailure(message: string, processLogPath: string): Promise<void> {
   try {
-    const logPath = await getLogPath(config);
-    await fs.mkdir(dirname(logPath), { recursive: true });
-    await fs.appendFile(logPath, `${JSON.stringify({
+    const logDirectory = getLogPath();
+    await fs.mkdir(logDirectory, { recursive: true });
+    await fs.appendFile(join(logDirectory, logFileName(new Date())), `${JSON.stringify({
       time: new Date().toISOString(),
       level: "error",
       event: "router_start_failed",
@@ -819,6 +823,7 @@ function stopRouter(): Promise<RouterActionResult> {
 }
 
 async function stopRouterInternal(): Promise<RouterActionResult> {
+  stopLogFollow();
   const paths = getPaths();
   const child = getRunningManagedRouterChild();
   if (child) {
@@ -994,22 +999,123 @@ async function getHealth(configArg: NormalizedConfig | null = null, options: Hea
   }
 }
 
-async function getLogPath(configArg: NormalizedConfig | null = null): Promise<string> {
-  const { config, paths } = configArg ? { config: configArg, paths: getPaths() } : await loadConfig();
-  return resolveLogPath(config, paths.dataDir);
+function getLogPath(): string {
+  return resolveLogDirectory(getPaths().dataDir);
 }
 
-async function readLogs(_event: IpcMainInvokeEvent, options: { limit?: number; before?: number } = {}) {
-  const { config } = await loadConfig();
-  const logPath = await getLogPath(config);
+async function readLogs(_event: IpcMainInvokeEvent, options: { limit?: number; cursor?: string | null } & LogFilter = {}) {
+  const logDirectory = getLogPath();
   const limit = clampNumber(options.limit, 80, 20, 500);
-  const before: number | null = Number.isInteger(options.before) ? (options.before as number) : null;
+  const cursor = typeof options.cursor === "string" ? options.cursor : null;
+  const filter: LogFilter = {
+    levels: Array.isArray(options.levels) ? options.levels.filter((level): level is string => typeof level === "string") : undefined,
+    vendor: typeof options.vendor === "string" && options.vendor ? options.vendor : undefined,
+    model: typeof options.model === "string" && options.model ? options.model : undefined,
+    keyword: typeof options.keyword === "string" && options.keyword ? options.keyword : undefined,
+    startTime: Number.isFinite(options.startTime) ? (options.startTime as number) : undefined,
+    endTime: Number.isFinite(options.endTime) ? (options.endTime as number) : undefined,
+  };
 
-  if (!existsSync(logPath)) {
-    return { path: logPath, lines: [], nextBefore: null, hasMore: false };
+  return readLogPage(logDirectory, { limit, cursor, filter });
+}
+
+// 实时跟随：router 运行期间监听 logs 目录，防抖后读取最新日期文件的新增行，
+// 经 logs:appended 推给渲染进程（推送原始行，过滤在渲染端做）。
+let logFollowWatcher: FSWatcher | null = null;
+let logFollowTimer: NodeJS.Timeout | null = null;
+let logFollowFile = "";
+let logFollowOffset = 0;
+
+function startLogFollow(): void {
+  stopLogFollow();
+  const logDirectory = getLogPath();
+  try {
+    mkdirSync(logDirectory, { recursive: true });
+    const watcher = watch(logDirectory, { persistent: false }, () => scheduleLogFollowFlush());
+    watcher.on("error", () => stopLogFollow());
+    logFollowWatcher = watcher;
+  } catch (error) {
+    console.warn(`Failed to start log follow watcher: ${(error as Error).message || String(error)}`);
   }
+}
 
-  return readLogPage(logPath, { limit, before });
+function stopLogFollow(): void {
+  if (logFollowTimer) {
+    clearTimeout(logFollowTimer);
+    logFollowTimer = null;
+  }
+  logFollowWatcher?.close();
+  logFollowWatcher = null;
+  logFollowFile = "";
+  logFollowOffset = 0;
+}
+
+function scheduleLogFollowFlush(): void {
+  if (logFollowTimer) {
+    clearTimeout(logFollowTimer);
+  }
+  logFollowTimer = setTimeout(() => {
+    logFollowTimer = null;
+    void flushLogFollow();
+  }, 200);
+}
+
+async function flushLogFollow(): Promise<void> {
+  if (!logFollowWatcher) {
+    return;
+  }
+  try {
+    const logDirectory = getLogPath();
+    const files = await listLogFiles(logDirectory);
+    const newest = files.find((name) => DATED_LOG_FILE.test(name));
+    if (!newest) {
+      return;
+    }
+    // 首次 flush 以当前文件尺寸为起点，只推送监听开始之后写入的行
+    if (logFollowFile === "") {
+      logFollowFile = newest;
+      logFollowOffset = (await fs.stat(join(logDirectory, newest))).size;
+      return;
+    }
+    if (newest !== logFollowFile) {
+      // 跨天轮转到新文件：从头读取
+      logFollowFile = newest;
+      logFollowOffset = 0;
+    }
+    const filePath = join(logDirectory, newest);
+    const stat = await fs.stat(filePath);
+    if (stat.size < logFollowOffset) {
+      // 文件被截断：从头读取
+      logFollowOffset = 0;
+    }
+    if (stat.size <= logFollowOffset) {
+      return;
+    }
+    const handle = await fs.open(filePath, "r");
+    try {
+      const buffer = Buffer.alloc(stat.size - logFollowOffset);
+      await handle.read(buffer, 0, buffer.length, logFollowOffset);
+      const text = buffer.toString("utf8");
+      const lastNewline = text.lastIndexOf("\n");
+      if (lastNewline === -1) {
+        return; // 尚无完整行，等下一次事件
+      }
+      const lines = text.slice(0, lastNewline).split("\n").filter((line) => line.length > 0);
+      logFollowOffset += lastNewline + 1;
+      if (lines.length === 0) {
+        return;
+      }
+      for (const win of BrowserWindow.getAllWindows()) {
+        win.webContents.send("logs:appended", { lines, ts: Date.now() });
+      }
+    } finally {
+      await handle.close();
+    }
+  } catch {
+    // 文件可能正被清理/轮转；重置状态，下一次事件重新校准
+    logFollowFile = "";
+    logFollowOffset = 0;
+  }
 }
 
 async function readUsage(_event: IpcMainInvokeEvent, options: { vendor?: string; model?: string } = {}) {
@@ -1054,9 +1160,12 @@ async function openConfigFile(): Promise<{ ok: boolean }> {
 }
 
 async function openLogFile(): Promise<{ ok: boolean }> {
-  const logPath = await getLogPath();
-  await ensureLogFile(logPath);
-  return openPathResult(logPath);
+  const logDirectory = getLogPath();
+  await fs.mkdir(logDirectory, { recursive: true });
+  const logFile = join(logDirectory, logFileName(new Date()));
+  // 当天文件可能尚未产生（router 未运行过）：touch 一个空文件保证可打开
+  await fs.appendFile(logFile, "", "utf8");
+  return openPathResult(logFile);
 }
 
 async function openDataDir(): Promise<{ ok: boolean }> {
@@ -1156,9 +1265,6 @@ async function changeDataDir(_event: IpcMainInvokeEvent, payload: { target?: str
     process.env.ROUTER_CONFIG = join(check.path, "config.json");
   }
 
-  // A failed log-file relocation must not block the relaunch; the log path is
-  // re-resolved on the next start.
-  await relocateLogFileInsideDataDir(paths.dataDir).catch(() => null);
   scheduleDataDirRestart();
 
   return {
@@ -1169,21 +1275,6 @@ async function changeDataDir(_event: IpcMainInvokeEvent, payload: { target?: str
     skipped: migration.skipped.length,
     restartScheduled: true,
   };
-}
-
-/**
- * An absolute `router.logFile` inside the directory we just emptied would make
- * the Router write logs back into the abandoned location.
- */
-async function relocateLogFileInsideDataDir(previousDataDir: string): Promise<void> {
-  const paths = getPaths();
-  const { config, revision } = await readConfigStore(paths.configPath);
-  const logFile = config.router.logFile;
-
-  if (isAbsolute(logFile) && isWithinDirectory(previousDataDir, logFile)) {
-    const nextLogFile = normalize(join(paths.dataDir, relative(previousDataDir, logFile)));
-    await writeConfigStore(paths.configPath, { ...config, router: { ...config.router, logFile: nextLogFile } }, revision);
-  }
 }
 
 function scheduleDataDirRestart(): void {
@@ -1662,6 +1753,8 @@ if (!hasSingleInstanceLock) {
     }
 
     startConfigWatcher();
+    // 一次性日志清理（幂等、非致命）
+    void cleanupOldLogs(getLogPath()).catch(() => null);
     initializeUpdater();
     onUpdateState(handleUpdateStateChanged);
     trayController.create();
@@ -1680,6 +1773,7 @@ if (!hasSingleInstanceLock) {
   app.on("before-quit", () => {
     isQuitting = true;
     stopConfigWatcher();
+    stopLogFollow();
     trayController.dispose();
   });
 

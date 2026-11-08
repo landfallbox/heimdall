@@ -119,12 +119,13 @@ The target file follows VS Code's per-platform user settings directory (`%APPDAT
 - Circuit breaking is tracked independently for each vendor and model. Two consecutive fallback-eligible failures open the circuit for 10 seconds. Repeated failed probes increase that duration linearly up to 60 seconds; one successful probe restores the configured vendor priority.
 - When every matching vendor has an open circuit, the Router probes the vendor whose circuit expires first instead of immediately reporting that no vendor is available.
 - Saved Router credentials, limits, fallback settings, vendors, priorities, and models are applied to new requests without restarting the Router. Requests already in progress continue with the configuration snapshot they started with.
-- Changes to `router.host`, `router.port`, or `router.logFile` require a Router restart. Other changes in the same save are still applied immediately.
+- Changes to `router.host` or `router.port` require a Router restart. Other changes in the same save are still applied immediately.
 - Manual edits to `config.json` are detected automatically. Invalid or incomplete edits are logged and ignored, so the Router keeps serving with its last valid configuration.
 - Requests and responses are forwarded unchanged when the client and vendor use the same format, including streaming. For different formats, the Router converts common non-streaming text and function-call payloads. Cross-format streaming and format-specific parameters that cannot be converted safely return `400` instead of being silently discarded.
 - If an upstream fails before streaming starts, another vendor can be tried. Once partial output has reached the client, the router cannot switch vendors without corrupting the stream.
 - Token totals depend on the upstream response's `usage` metadata. Streaming providers that omit final usage are counted as requests but excluded from token and cost totals; the Usage page displays token and price coverage instead of treating missing metadata as zero.
 - Usage events contain request metadata and token counts, not prompts or generated content. They are stored as monthly JSONL files under the data directory's `usage` folder.
+- Runtime logs are stored as daily JSONL files under the data directory's `logs` folder (`router-YYYY-MM-DD.log`, local date), and files older than 30 days are removed when the app starts. The legacy single `router.log` file is kept as-is and stays readable from the Logs page.
 - Packaged builds keep every local file in one data directory: configuration, logs, usage journals, and Electron state. The Windows installer asks where to put it, and the Application settings page can move it later; moving stops the Router, copies the existing files, verifies them, and restarts the app.
 - The chosen directory is recorded in a pointer file that always stays in the default location, so the app can find it on the next start:
   - Windows: `%APPDATA%\Heimdall\data-location.ini`, with `%APPDATA%\Heimdall` as the default data directory.
@@ -146,7 +147,7 @@ The main runtime boundaries are:
 - `gui/electron/main.ts`: Electron lifecycle, tray, IPC registration, and orchestration.
 - `gui/electron/config-store.ts`: validated, revision-checked, atomic configuration writes.
 - `gui/electron/data-location.ts`: data directory pointer, target validation, and file migration.
-- `gui/electron/log-store.ts`: byte-cursor log pagination.
+- `gui/electron/log-store.ts`: cross-file log reading with cursor pagination, server-side filtering, and 30-day cleanup.
 - `src/vscode-sync.ts`: builds the model entries from the config and merges them into VS Code's `chatLanguageModels.json` (other providers, secret references, and existing metadata are preserved).
 - `gui/src/config-draft.ts`: lossless conversion between persisted configuration and form state.
 
