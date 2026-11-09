@@ -120,6 +120,7 @@ const vscodeSyncResultSchema = z.object({
   filePath: z.string(),
   modelCount: z.number().int().nonnegative(),
   createdProvider: z.boolean(),
+  removedCount: z.number().int().nonnegative(),
   error: z.string().optional(),
 }).loose();
 

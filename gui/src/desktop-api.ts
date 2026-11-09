@@ -16,6 +16,7 @@ export interface VsCodeSyncResult {
   filePath: string;
   modelCount: number;
   createdProvider: boolean;
+  removedCount: number;
   error?: string;
 }
 

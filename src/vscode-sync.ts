@@ -32,6 +32,8 @@ export interface VsCodeSyncResult {
   filePath: string;
   modelCount: number;
   createdProvider: boolean;
+  /** Number of entries removed from the Heimdall provider by this sync. */
+  removedCount: number;
   error?: string;
 }
 
@@ -122,27 +124,27 @@ function toModelEntry(model: NormalizedVendorModel, url: string): VsCodeModelEnt
 }
 
 /**
- * Pure merge of the heimdall model entries into the parsed VS Code file.
+ * Full model-level sync of the heimdall entries into the parsed VS Code file.
  *
  * - Other providers are preserved verbatim.
  * - The Heimdall provider is created if missing.
- * - Existing per-model metadata is kept; heimdall only overrides the fields it
- *   explicitly provides.
- * - The merge is additive only: entries heimdall does not update in this run
- *   (disabled models, removed models, manually added ones) are preserved.
- *   VS Code does not hot-reload chatLanguageModels.json, so dropping entries
- *   would only take effect after a manual window reload while risking the loss
- *   of entries heimdall does not manage.
+ * - The Heimdall provider's `models` array is replaced wholesale with this
+ *   run's entries: disabled, removed, or manually added models are dropped so
+ *   the provider always mirrors the heimdall config. This is safe because
+ *   every request under the Heimdall provider is routed through the heimdall
+ *   router, so a model that does not exist there cannot work anyway.
+ * - VS Code does not hot-reload chatLanguageModels.json, so removals only take
+ *   effect after a window reload; callers surface that in their messaging.
  * - A VS Code secret reference for apiKey (`${input:...}`) is never replaced.
  * - The provider-level apiKey is the router key and is sent to every model
- *   under the provider, including manually added ones with a different url;
- *   models needing their own key must live under a separate provider.
+ *   under the provider; models needing their own key must live under a
+ *   separate provider.
  */
 export function mergeVsCodeModelsFile(
   existing: unknown,
   entries: VsCodeModelEntry[],
   options: { apiKey?: string } = {},
-): { providers: Record<string, unknown>[]; createdProvider: boolean } {
+): { providers: Record<string, unknown>[]; createdProvider: boolean; removedCount: number } {
   let providers: Record<string, unknown>[];
   if (existing == null) {
     providers = [];
@@ -173,32 +175,24 @@ export function mergeVsCodeModelsFile(
   const existingModels = Array.isArray(provider.models)
     ? (provider.models as unknown[]).filter((item): item is Record<string, unknown> => isPlainObject(item))
     : [];
-  // Additive-only merge: keep every existing model (disabled in heimdall,
-  // removed from the config, or added by hand) and update the ones this run
-  // provides in place; new entries are appended. Existing order is preserved.
-  const mergedModels: Record<string, unknown>[] = [...existingModels];
-  const byId = new Map<string, number>();
-  mergedModels.forEach((model, index) => {
-    if (typeof model.id === "string" && model.id && !byId.has(model.id)) {
-      byId.set(model.id, index);
+  // Full sync: rebuild the provider's model list from this run's entries so it
+  // always mirrors the heimdall config. Entries that fall out of the config
+  // (disabled, removed, or added by hand) are dropped; VS Code picks them up
+  // on the next window reload.
+  const syncedModels: Record<string, unknown>[] = entries.map((entry) => {
+    const model: Record<string, unknown> = { ...entry };
+    if (typeof model.name !== "string" || !model.name) {
+      model.name = entry.id;
     }
+    return model;
   });
-  for (const entry of entries) {
-    const index = byId.get(entry.id);
-    if (index !== undefined) {
-      mergedModels[index] = { ...mergedModels[index], ...entry };
-      continue;
-    }
-    const fresh: Record<string, unknown> = { ...entry };
-    if (typeof fresh.name !== "string" || !fresh.name) {
-      fresh.name = entry.id;
-    }
-    byId.set(entry.id, mergedModels.length);
-    mergedModels.push(fresh);
-  }
+  const keptIds = new Set(entries.map((entry) => entry.id));
+  const removedCount = existingModels.filter(
+    (model) => typeof model.id === "string" && model.id && !keptIds.has(model.id),
+  ).length;
 
-  provider.models = mergedModels;
-  return { providers, createdProvider };
+  provider.models = syncedModels;
+  return { providers, createdProvider, removedCount };
 }
 
 function applyApiKey(provider: Record<string, unknown>, apiKey: string | undefined): void {
@@ -262,17 +256,18 @@ export async function syncVsCodeModels(
   try {
     const existing = await readVsCodeModelsFile(filePath);
     const entries = buildVsCodeModelEntries(config);
-    const { providers, createdProvider } = mergeVsCodeModelsFile(existing, entries, {
+    const { providers, createdProvider, removedCount } = mergeVsCodeModelsFile(existing, entries, {
       apiKey: config.router?.apiKey,
     });
     await writeVsCodeModelsFile(filePath, providers);
-    return { ok: true, filePath, modelCount: entries.length, createdProvider };
+    return { ok: true, filePath, modelCount: entries.length, createdProvider, removedCount };
   } catch (error) {
     return {
       ok: false,
       filePath,
       modelCount: 0,
       createdProvider: false,
+      removedCount: 0,
       error: (error as Error).message || String(error),
     };
   }

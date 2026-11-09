@@ -86,7 +86,8 @@ assert.equal((created.providers[0]!.models as any[]).length, 2);
 // A brand-new model without a name falls back to its id.
 assert.equal((created.providers[0]!.models as any[])[0]!.name, "model-a");
 
-// 2. Other providers are preserved verbatim and the Heimdall provider is merged in.
+// 2. Other providers are preserved verbatim; the Heimdall provider's models
+// array is replaced wholesale with this run's entries.
 const otherProvider = { name: "Copilot", vendor: "agent-host-copilotcli", models: [{ id: "x" }] };
 const existingFile = [otherProvider, {
   name: VSCODE_PROVIDER_NAME,
@@ -106,27 +107,27 @@ assert.deepEqual(merged.providers[0], otherProvider, "other providers are untouc
 const heimdall = merged.providers[1]!;
 // The secret reference is never replaced.
 assert.equal(heimdall.apiKey, "${input:chat.lm.secret.abc123}");
-// Provider-level settings are preserved.
+// Provider-level settings are preserved (only the models array is replaced).
 assert.deepEqual(heimdall.settings, { "customendpoint/Heimdall/model-a": { thinkingLevel: "high" } });
 const mergedModels = heimdall.models as any[];
-// Additive-only merge: model-b (updated in place, order kept) and the stale
-// model (not enabled in heimdall, preserved) remain; model-a is appended.
+// Full sync: the provider mirrors the config exactly (model-a, model-b). The
+// stale model and model-b's hand-edited metadata are dropped.
 assert.deepEqual(
   mergedModels.map((m) => m.id),
-  ["model-b", "stale-model", "model-a"],
+  ["model-a", "model-b"],
 );
+// The stale model (not enabled in heimdall) is removed and counted.
+assert.equal(merged.removedCount, 1);
 const mergedA = mergedModels.find((m) => m.id === "model-a")!;
 const mergedB = mergedModels.find((m) => m.id === "model-b")!;
-const mergedStale = mergedModels.find((m) => m.id === "stale-model")!;
-// model-a is new in this run: name falls back to id.
+// model-a: name falls back to id, structural fields come from the config.
 assert.equal(mergedA.name, "model-a");
 assert.equal(mergedA.url, "http://127.0.0.1:4000/v1");
-// model-b already existed: heimdall fields override, unknown fields are kept.
-assert.equal(mergedB.name, "Model B", "heimdall-provided name wins");
-assert.equal(mergedB.contextWindow, 128000, "heimdall-provided contextWindow wins");
-assert.equal(mergedB.extra, "keep-me", "unknown fields are preserved");
-// The stale model is preserved untouched.
-assert.deepEqual(mergedStale, { id: "stale-model", name: "Stale" });
+// model-b: rebuilt from the config entry; the hand-edited name/contextWindow/
+// extra from the file are not carried over.
+assert.equal(mergedB.name, "Model B");
+assert.equal(mergedB.contextWindow, 128000);
+assert.equal(mergedB.extra, undefined, "hand-edited fields are not preserved");
 
 // 3. A plain (non-secret) apiKey is updated, but a secret reference is not.
 const plainKey = mergeVsCodeModelsFile([
@@ -149,17 +150,40 @@ try {
   assert.equal(first.ok, true, first.error ?? "unexpected sync failure");
   assert.equal(first.createdProvider, true);
   assert.equal(first.modelCount, 2);
+  assert.equal(first.removedCount, 0);
   assert.ok(readFileSync(vsCodeFile, "utf8").length > 0);
 
-  // A second sync merges with what was written and does not create the provider again.
+  // A second sync mirrors the same config: no removals, provider not recreated.
   const second = await syncVsCodeModels(config, { filePath: vsCodeFile });
   assert.equal(second.ok, true, second.error ?? "unexpected sync failure");
   assert.equal(second.createdProvider, false);
   assert.equal(second.modelCount, 2);
+  assert.equal(second.removedCount, 0);
   const written = JSON.parse(readFileSync(vsCodeFile, "utf8"));
   assert.equal(written.length, 1);
   assert.equal(written[0].name, VSCODE_PROVIDER_NAME);
   assert.equal((written[0].models as any[]).length, 2);
+
+  // Disabling a model in the config removes it on the next sync.
+  const configWithoutB = normalizeConfig({
+    router: { apiKey: "test-token", port: 4000 },
+    vendors: [
+      {
+        name: "local",
+        baseUrl: "http://127.0.0.1:8000/v1",
+        models: [{ id: "model-a", enabled: true }, { id: "model-b", enabled: false }],
+      },
+    ],
+  });
+  const third = await syncVsCodeModels(configWithoutB, { filePath: vsCodeFile });
+  assert.equal(third.ok, true, third.error ?? "unexpected sync failure");
+  assert.equal(third.modelCount, 1);
+  assert.equal(third.removedCount, 1, "the disabled model is removed");
+  const afterRemove = JSON.parse(readFileSync(vsCodeFile, "utf8"));
+  assert.deepEqual(
+    (afterRemove[0].models as any[]).map((m: any) => m.id),
+    ["model-a"],
+  );
 
   // A malformed file produces a structured failure instead of throwing.
   writeFileSync(vsCodeFile, "{ this is not json", "utf8");
