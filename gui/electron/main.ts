@@ -30,6 +30,8 @@ import { cleanupOldLogs, DATED_LOG_FILE, listLogFiles, readLogPage, resolveLogDi
 import { createTrayController, healthDetail } from "./tray-controller.ts";
 import {
   checkForUpdates,
+  configureUpdaterLogging,
+  disposeUpdaterLogging,
   downloadUpdate,
   getUpdateState,
   initializeUpdater,
@@ -1755,6 +1757,7 @@ if (!hasSingleInstanceLock) {
     startConfigWatcher();
     // 一次性日志清理（幂等、非致命）
     void cleanupOldLogs(getLogPath()).catch(() => null);
+    configureUpdaterLogging(getPaths().dataDir);
     initializeUpdater();
     onUpdateState(handleUpdateStateChanged);
     trayController.create();
@@ -1774,6 +1777,7 @@ if (!hasSingleInstanceLock) {
     isQuitting = true;
     stopConfigWatcher();
     stopLogFollow();
+    disposeUpdaterLogging();
     trayController.dispose();
   });
 
