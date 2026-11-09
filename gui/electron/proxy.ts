@@ -119,8 +119,10 @@ export function resolveProxyUrl(targetUrl: string, options: ProxyResolutionOptio
     return normalizeProxyUrl(envProxy);
   }
 
-  if (process.platform === "win32") {
-    const systemProxy = (options.systemProxyReader || cachedSystemProxy)();
+  // 显式注入的 reader 跨平台生效（测试用）；默认 WinINET 读取器仅 Windows。
+  const reader = options.systemProxyReader ?? (process.platform === "win32" ? cachedSystemProxy : null);
+  if (reader) {
+    const systemProxy = reader();
     if (systemProxy) {
       return normalizeProxyUrl(systemProxy);
     }
