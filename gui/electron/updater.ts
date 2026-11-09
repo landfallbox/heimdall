@@ -2,9 +2,18 @@ import electron from "electron";
 import electronUpdater from "electron-updater";
 import type { UpdateDownloadedEvent } from "electron-updater";
 import type { ProgressInfo, UpdateInfo } from "builder-util-runtime";
+import {
+  fetch as proxyFetch,
+  ProxyAgent,
+  type Dispatcher,
+  type RequestInit as ProxyRequestInit,
+  type Response as ProxyResponse,
+} from "undici";
 import { spawn } from "node:child_process";
 import { createWriteStream, existsSync } from "node:fs";
 import { join } from "node:path";
+import { createLogger, type Logger } from "../../src/logger.ts";
+import { resolveProxyUrl } from "./proxy.ts";
 import { updateStateSchema } from "./ipc-contracts.ts";
 import { z } from "zod";
 
@@ -46,6 +55,80 @@ let updater: AutoUpdater | null = null;
 let pendingRelease: PendingRelease | null = null;
 let windowsInstallerPath = "";
 const stateListeners = new Set<(state: UpdateState) => void>();
+
+let updaterLogger: Logger | null = null;
+let proxyAgent: ProxyAgent | null = null;
+let proxyAgentUrl: string | null = null;
+
+// 更新器事件写入与 router 相同的日期日志文件，Logs 页可直接看到失败原因。
+export function configureUpdaterLogging(dataDirectory: string): void {
+  if (updaterLogger) {
+    return;
+  }
+  try {
+    updaterLogger = createLogger(dataDirectory);
+  } catch (error) {
+    console.error("[Updater] failed to create log writer:", error);
+  }
+}
+
+export function disposeUpdaterLogging(): void {
+  updaterLogger?.close();
+  updaterLogger = null;
+}
+
+function logUpdaterEvent(level: "info" | "warn" | "error", event: string, data: Record<string, unknown> = {}): void {
+  if (!updaterLogger) {
+    return;
+  }
+  try {
+    updaterLogger[level](event, data);
+  } catch {
+    // 日志失败不影响更新流程。
+  }
+}
+
+// 展开 fetch 错误的 cause 链（如 ECONNRESET/ETIMEDOUT 挂在 cause.code 上），供日志定位。
+function errorChain(error: unknown): { name: string; message: string; code?: string | number }[] {
+  const chain: { name: string; message: string; code?: string | number }[] = [];
+  let current: unknown = error;
+  while (current && chain.length < 4) {
+    const item = current as { name?: unknown; message?: unknown; code?: unknown };
+    chain.push({
+      name: typeof item.name === "string" ? item.name : "Error",
+      message: typeof item.message === "string" ? item.message : String(current),
+      ...(typeof item.code === "string" || typeof item.code === "number" ? { code: item.code } : {}),
+    });
+    current = (current as { cause?: unknown }).cause;
+  }
+  return chain;
+}
+
+/**
+ * 解析目标 URL 的代理（环境变量 → Windows 系统代理）并返回可复用的 dispatcher；
+ * 无代理时返回 undefined（直连）。Node 内置 fetch 不遵循任何代理配置，
+ * 直连 GitHub 在需要代理的网络上会极慢或卡死，因此统一走这里。
+ */
+function proxyDispatcherFor(targetUrl: string): Dispatcher | undefined {
+  const proxyUrl = resolveProxyUrl(targetUrl);
+  if (!proxyUrl) {
+    return undefined;
+  }
+  if (!proxyAgent || proxyAgentUrl !== proxyUrl) {
+    void proxyAgent?.close();
+    proxyAgent = new ProxyAgent(proxyUrl);
+    proxyAgentUrl = proxyUrl;
+  }
+  return proxyAgent;
+}
+
+function proxyDescriptionFor(targetUrl: string): string {
+  return resolveProxyUrl(targetUrl) || "direct";
+}
+
+export async function fetchWithProxy(url: string, init: ProxyRequestInit = {}): Promise<ProxyResponse> {
+  return proxyFetch(url, { ...init, dispatcher: proxyDispatcherFor(url) });
+}
 
 function formatUpdaterError(error: unknown, fallback: string): string {
   if (!error) {
@@ -282,6 +365,8 @@ export async function checkForUpdates({ manual = false }: { manual?: boolean } =
     });
   }
 
+  logUpdaterEvent("info", "updater_check_started", { manual });
+
   if (isMacUpdaterSupported) {
     return checkForMacUpdates();
   }
@@ -293,6 +378,10 @@ export async function checkForUpdates({ manual = false }: { manual?: boolean } =
   checkingPromise = checkForWindowsUpdates()
     .catch((error: unknown) => {
       console.error("[Updater] check failed:", error);
+      logUpdaterEvent("error", "updater_check_failed", {
+        error: errorChain(error),
+        proxy: proxyDescriptionFor(LATEST_RELEASE_API_URL),
+      });
       pendingRelease = null;
       update({
         status: "error",
@@ -320,6 +409,7 @@ async function checkForMacUpdates(): Promise<UpdateState> {
     .then(() => updateState)
     .catch((error: unknown) => {
       console.error("[Updater] check failed:", error);
+      logUpdaterEvent("error", "updater_check_failed", { error: errorChain(error) });
       update({
         status: "error",
         availableVersion: "",
@@ -343,6 +433,12 @@ async function checkForWindowsUpdates(): Promise<UpdateState> {
   const release = await fetchLatestRelease();
   const version = stripVersionPrefix(String(release.tag_name || ""));
   const currentVersion = getCurrentVersion();
+
+  logUpdaterEvent("info", "updater_check_completed", {
+    latestVersion: version,
+    currentVersion,
+    result: isVersionNewer(version, currentVersion) ? "available" : "not-available",
+  });
 
   if (!isVersionNewer(version, currentVersion)) {
     pendingRelease = null;
@@ -389,7 +485,7 @@ async function fetchLatestRelease(): Promise<Record<string, unknown>> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), CHECK_TIMEOUT_MS);
   try {
-    const response = await fetch(LATEST_RELEASE_API_URL, {
+    const response = await fetchWithProxy(LATEST_RELEASE_API_URL, {
       headers: {
         Accept: "application/vnd.github+json",
         "User-Agent": "Heimdall-Updater",
@@ -454,10 +550,20 @@ export async function downloadUpdate(): Promise<UpdateState> {
 
   const release = pendingRelease;
   update({ status: "downloading", error: "", progress: normalizeProgress() });
+  logUpdaterEvent("info", "updater_download_started", {
+    version: release.version,
+    url: release.assetUrl,
+    proxy: proxyDescriptionFor(release.assetUrl),
+  });
   downloadPromise = downloadWindowsInstaller(release)
     .then(() => updateState)
     .catch((error: unknown) => {
       console.error("[Updater] download failed:", error);
+      logUpdaterEvent("error", "updater_download_failed", {
+        version: release.version,
+        error: errorChain(error),
+        proxy: proxyDescriptionFor(release.assetUrl),
+      });
       update({
         status: "error",
         error: formatUpdaterError(error, "Failed to download update."),
@@ -489,6 +595,7 @@ async function downloadMacUpdate(): Promise<UpdateState> {
     .then(() => updateState)
     .catch((error: unknown) => {
       console.error("[Updater] download failed:", error);
+      logUpdaterEvent("error", "updater_download_failed", { error: errorChain(error) });
       update({
         status: "error",
         error: formatUpdaterError(error, "Failed to download update."),
@@ -523,10 +630,10 @@ async function downloadWindowsInstaller(release: PendingRelease): Promise<void> 
     }
   };
 
-  let response: Response;
+  let response: ProxyResponse;
   try {
     armIdleTimeout();
-    response = await fetch(release.assetUrl, {
+    response = await fetchWithProxy(release.assetUrl, {
       headers: { "User-Agent": "Heimdall-Updater" },
       signal: controller.signal,
     });
@@ -619,6 +726,13 @@ async function downloadWindowsInstaller(release: PendingRelease): Promise<void> 
     throw new Error(`Downloaded update is incomplete (${transferred} of ${total} bytes). Download it again.`);
   }
 
+  logUpdaterEvent("info", "updater_download_completed", {
+    version: release.version,
+    bytes: transferred,
+    total,
+    seconds: Math.round((Date.now() - startedAt) / 1000),
+  });
+
   windowsInstallerPath = destination;
   emitDownloadProgress(transferred, total, startedAt);
   update({
@@ -708,12 +822,17 @@ export async function installUpdate(): Promise<UpdateState> {
   // arrive asynchronously through the "error" event, and quitting on top of
   // them would lose the app and the Router without installing anything.
   return new Promise<UpdateState>((resolveInstall) => {
+    logUpdaterEvent("info", "updater_install_started", {
+      version: updateState.availableVersion,
+      installer: windowsInstallerPath,
+    });
     const childProcess = spawn(
       windowsInstallerPath,
       ["/VERYSILENT", "/SUPPRESSMSGBOXES", "/CLOSEAPPLICATIONS", "/NORESTART"],
       { detached: true, stdio: "ignore" },
     );
     childProcess.once("error", (error: Error) => {
+      logUpdaterEvent("error", "updater_install_failed", { error: errorChain(error) });
       resolveInstall(
         update({ status: "error", error: `Failed to start the installer: ${error.message}`, progress: null }),
       );
