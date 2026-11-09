@@ -113,7 +113,11 @@ function vsCodeSyncToast(result: SaveConfigResult["vsCodeSync"]) {
     return `VS Code sync failed: ${result.error || "unknown error"}`;
   }
   const created = result.createdProvider ? " Created the Heimdall provider." : "";
-  return `Synced ${result.modelCount} model${result.modelCount === 1 ? "" : "s"} to VS Code.${created}`;
+  const removed =
+    result.removedCount > 0
+      ? ` Removed ${result.removedCount} stale model${result.removedCount === 1 ? "" : "s"} (visible after reloading VS Code windows).`
+      : "";
+  return `Synced ${result.modelCount} model${result.modelCount === 1 ? "" : "s"} to VS Code.${created}${removed}`;
 }
 
 function titleForPage(page: Page) {

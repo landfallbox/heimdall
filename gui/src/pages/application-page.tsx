@@ -146,7 +146,7 @@ export function AppSettingsPage({
             checked={app.syncVsCodeModels === true}
             onCheckedChange={(checked) => void onSetAppSetting("syncVsCodeModels", checked)}
             disabled={saving}
-            description="On every save, merge enabled models into VS Code's chatLanguageModels.json without touching other providers or VS Code secrets."
+            description="On every save, sync enabled models into VS Code's chatLanguageModels.json (disabled or removed models are dropped) without touching other providers or VS Code secrets."
           />
         </CardContent>
       </Card>

@@ -100,15 +100,14 @@ Example client entry:
 
 Instead of hand-editing VS Code's `chatLanguageModels.json`, the GUI can write the file for you. On the Application page, turn on **Sync models to VS Code**. From then on, every time you save the configuration, Heimdall merges your enabled models into VS Code's file under a dedicated `Heimdall` provider (the router base URL plus `/v1`, and your `router.apiKey`).
 
-The merge is conservative:
+The sync keeps the rest of the file intact but makes the `Heimdall` provider mirror your configuration:
 
 - Other providers in the file (for example VS Code's own `Copilot` provider) and their settings are left untouched.
-- A model's existing metadata is kept; Heimdall only overrides the fields it explicitly provides.
-- The merge is additive only: models you disable or remove in heimdall stay in the `Heimdall` provider (as do models you add by hand). VS Code does not hot-reload this file, so a dropped entry would only disappear after a manual window reload — while risking the loss of entries heimdall does not manage.
+- The `Heimdall` provider's model list is rebuilt from your enabled models on every sync, so models you disable or remove in heimdall are dropped from the file. VS Code does not hot-reload this file, so a removal only takes effect after a window reload.
 - If VS Code already stores the provider's `apiKey` as a secret reference (`${input:chat.lm.secret.…}`), that reference is never replaced — opaque secrets can only be managed inside VS Code.
-- Heimdall only manages the provider-level `apiKey` (the router key) and each model's `url` (the router's `/v1` endpoint). A model you add by hand under the `Heimdall` provider that points to a different `url` will still be called with the provider-level key — if such a model needs its own key, keep it under a separate provider.
+- Every request under the `Heimdall` provider is routed through the heimdall router, so a model that is not enabled in heimdall cannot work anyway — there is no need to keep one around.
 
-Per-model VS Code metadata (display name, tool calling, vision, thinking, context window, max output tokens, supported reasoning effort) is optional. Expand **VS Code metadata** on a model row in Vendor Settings to fill it in; only the fields you set are written, so a partial entry never clobbers richer metadata you already have in the file.
+Per-model VS Code metadata (display name, tool calling, vision, thinking, context window, max output tokens, supported reasoning effort) is optional. Expand **VS Code metadata** on a model row in Vendor Settings to fill it in; only the fields you set are written.
 
 The target file follows VS Code's per-platform user settings directory (`%APPDATA%\Code\User\chatLanguageModels.json` on Windows, `~/Library/Application Support/Code/User/chatLanguageModels.json` on macOS, `~/.config/Code/User/chatLanguageModels.json` on Linux) and can be overridden with `HEIMDALL_VSCODE_MODELS_FILE`. A **Sync now** button on the Application page runs the merge immediately without changing the configuration.
 
@@ -148,7 +147,7 @@ The main runtime boundaries are:
 - `gui/electron/config-store.ts`: validated, revision-checked, atomic configuration writes.
 - `gui/electron/data-location.ts`: data directory pointer, target validation, and file migration.
 - `gui/electron/log-store.ts`: cross-file log reading with cursor pagination, server-side filtering, and 30-day cleanup.
-- `src/vscode-sync.ts`: builds the model entries from the config and merges them into VS Code's `chatLanguageModels.json` (other providers, secret references, and existing metadata are preserved).
+- `src/vscode-sync.ts`: builds the model entries from the config and syncs them into VS Code's `chatLanguageModels.json` (other providers and secret references are preserved; the `Heimdall` provider's model list mirrors the enabled models).
 - `gui/src/config-draft.ts`: lossless conversion between persisted configuration and form state.
 
 The Router process is owned by the Electron main process and does not outlive an explicit app exit. The current app session uses a private parent-child IPC channel for graceful shutdown, with forced termination only as a timeout fallback. PID metadata and instance identity are retained for recovery after an abnormal app exit.

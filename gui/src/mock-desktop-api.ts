@@ -177,6 +177,7 @@ const vscodeSync = () => ({
   filePath: "C:\\Users\\mock\\AppData\\Roaming\\Code\\User\\chatLanguageModels.json",
   modelCount: enabledModelCount(),
   createdProvider: false,
+  removedCount: 0,
 });
 
 const emptyPeriod = () => ({
