@@ -4,7 +4,7 @@ import type { RemotePricingData } from "./usage.ts";
 
 export const BUILTIN_PRICING_DATA: RemotePricingData = {
   "schemaVersion": 1,
-  "updatedAt": "2026-10-30",
+  "updatedAt": "2026-11-10",
   "catalogs": {
     "openai": {
       "sourceUrl": "https://developers.openai.com/api/docs/pricing",
@@ -298,7 +298,7 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
     },
     "anthropic": {
       "sourceUrl": "https://platform.claude.com/docs/en/about-claude/pricing",
-      "updatedAt": "2026-10-30",
+      "updatedAt": "2026-11-10",
       "models": {
         "claude-opus-5-5": {
           "currency": "USD",
@@ -449,12 +449,24 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
           "inputPerMillion": 10,
           "cachedInputPerMillion": 1,
           "outputPerMillion": 50
+        },
+        "claude-fable-5-2": {
+          "currency": "USD",
+          "inputPerMillion": 8,
+          "cachedInputPerMillion": 0.2,
+          "outputPerMillion": 40
+        },
+        "claude-mythos-5-2": {
+          "currency": "USD",
+          "inputPerMillion": 8,
+          "cachedInputPerMillion": 0.2,
+          "outputPerMillion": 40
         }
       }
     },
     "google": {
       "sourceUrl": "https://ai.google.dev/gemini-api/docs/pricing",
-      "updatedAt": "2026-10-30",
+      "updatedAt": "2026-11-10",
       "models": {
         "gemini-4-argon": {
           "currency": "USD",
@@ -515,6 +527,12 @@ export const BUILTIN_PRICING_DATA: RemotePricingData = {
           "inputPerMillion": 0.5,
           "cachedInputPerMillion": 0.05,
           "outputPerMillion": 3
+        },
+        "gemini-4-carbon": {
+          "currency": "USD",
+          "inputPerMillion": 2,
+          "cachedInputPerMillion": 0.1,
+          "outputPerMillion": 10
         }
       }
     },
