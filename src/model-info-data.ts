@@ -4,7 +4,7 @@ import type { RemoteModelInfoData } from "./model-info.ts";
 
 export const BUILTIN_MODEL_INFO_DATA: RemoteModelInfoData = {
   "schemaVersion": 1,
-  "updatedAt": "2026-11-06",
+  "updatedAt": "2026-11-11",
   "models": {
     "gpt-4o": {
       "displayName": "GPT-4o",
@@ -1388,6 +1388,13 @@ export const BUILTIN_MODEL_INFO_DATA: RemoteModelInfoData = {
       "capabilities": {
         "toolCalling": true,
         "vision": true
+      }
+    },
+    "claude-fable-5-2": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 131072,
+      "capabilities": {
+        "thinking": true
       }
     }
   }
