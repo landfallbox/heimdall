@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-10-30",
+  "updatedAt": "2026-11-12",
   "catalogs": {
     "openai": {
       "sourceUrl": "https://developers.openai.com/api/docs/pricing",
@@ -294,7 +294,7 @@
     },
     "anthropic": {
       "sourceUrl": "https://platform.claude.com/docs/en/about-claude/pricing",
-      "updatedAt": "2026-10-30",
+      "updatedAt": "2026-11-12",
       "models": {
         "claude-opus-5-5": {
           "currency": "USD",
@@ -445,12 +445,24 @@
           "inputPerMillion": 10,
           "cachedInputPerMillion": 1,
           "outputPerMillion": 50
+        },
+        "claude-fable-5-2": {
+          "currency": "USD",
+          "inputPerMillion": 8,
+          "cachedInputPerMillion": 0.2,
+          "outputPerMillion": 40
+        },
+        "claude-mythos-5-2": {
+          "currency": "USD",
+          "inputPerMillion": 8,
+          "cachedInputPerMillion": 0.2,
+          "outputPerMillion": 40
         }
       }
     },
     "google": {
       "sourceUrl": "https://ai.google.dev/gemini-api/docs/pricing",
-      "updatedAt": "2026-10-30",
+      "updatedAt": "2026-11-12",
       "models": {
         "gemini-4-argon": {
           "currency": "USD",
@@ -511,6 +523,18 @@
           "inputPerMillion": 0.5,
           "cachedInputPerMillion": 0.05,
           "outputPerMillion": 3
+        },
+        "gemini-4-carbon": {
+          "currency": "USD",
+          "inputPerMillion": 2,
+          "cachedInputPerMillion": 0.1,
+          "outputPerMillion": 10
+        },
+        "gemini-4-hydrogen": {
+          "currency": "USD",
+          "inputPerMillion": 1.5,
+          "cachedInputPerMillion": 0.075,
+          "outputPerMillion": 7.5
         }
       }
     },
