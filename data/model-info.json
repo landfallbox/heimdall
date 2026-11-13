@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-11-06",
+  "updatedAt": "2026-11-13",
   "models": {
     "gpt-4o": {
       "displayName": "GPT-4o",
@@ -1384,6 +1384,13 @@
       "capabilities": {
         "toolCalling": true,
         "vision": true
+      }
+    },
+    "claude-fable-5-2": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 131072,
+      "capabilities": {
+        "thinking": true
       }
     }
   }
