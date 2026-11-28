@@ -45,6 +45,9 @@ const KNOWN_RETIRED = new Set([
   // glm-4.6v is a vision model listed only in the page's blockquote "更多视觉模型"
   // section, which the parser skips by design.
   "glm-4.6v",
+  // claude-3-5-haiku was removed from the official pricing page; the refresh
+  // keeps it in the catalog by design (retired-keep warning), so the round-trip skips it.
+  "claude-3-5-haiku",
   // The six anthropic dot aliases (claude-opus-4.6 etc.) are kept in the catalog by design; the live page only lists hyphen slugs, so they are skipped here.
   "claude-opus-4.6",
   "claude-opus-4.5",
