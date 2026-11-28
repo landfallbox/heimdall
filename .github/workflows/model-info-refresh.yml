@@ -16,6 +16,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          # PAT (trusted user) so the PR is authored by a human, not
+          # github-actions[bot]; bot-authored PRs require manual CI approval.
+          token: ${{ secrets.REFRESH_PAT }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
@@ -30,8 +34,8 @@ jobs:
       - name: Refresh model info
         shell: pwsh
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.REFRESH_PAT }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "landfallbox"
+          git config user.email "landfallbox@gmail.com"
           npm run modelinfo:refresh -- --commit
