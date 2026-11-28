@@ -305,6 +305,17 @@ async function main() {
       ...(warnings.length > 0 ? warnings.map((w) => `- ${w}`) : ["- none"]),
     ].join("\n");
 
+    // 关闭同系列（model-info-refresh-*）的旧 PR：每日刷新只保留最新一个，避免 PR 列表积压。
+    {
+      const staleJq =
+        `[.[] | select((.headRefName // "") | startswith("model-info-refresh-")) | select(.headRefName != "${branch}") | .number] | .[]`;
+      const staleOut = run("gh", ["pr", "list", "--state", "open", "--json", "number,headRefName", "--jq", staleJq]);
+      for (const num of staleOut.split("\n").map((s) => s.trim()).filter(Boolean)) {
+        console.log(`closing stale refresh PR #${num}`);
+        run("gh", ["pr", "close", num]);
+      }
+    }
+
     run("gh", [
       "pr", "create",
       "--head", branch,
