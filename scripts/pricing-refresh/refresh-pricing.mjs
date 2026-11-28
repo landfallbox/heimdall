@@ -315,6 +315,18 @@ async function main() {
     // duplicating. --head matches on branch name only, so also require the
     // head repo to be this repository to ignore same-named fork PRs.
     const owner = remoteOwner();
+    // 关闭同系列（pricing-refresh-*）的旧 PR：每日刷新只保留最新一个，避免 PR 列表积压。
+    {
+      const staleJq =
+        `[.[] | select((.headRefName // "") | startswith("pricing-refresh-")) | select(.headRefName != "${branch}") | .number] | .[]`;
+      const staleOut = gh(
+        ["pr", "list", "--state", "open", "--json", "number,headRefName", "--jq", staleJq],
+      );
+      for (const num of staleOut.split("\n").map((s) => s.trim()).filter(Boolean)) {
+        console.log(`closing stale refresh PR #${num}`);
+        gh(["pr", "close", num]);
+      }
+    }
     const existingPr = gh([
       "pr", "list", "--head", branch, "--state", "open",
       "--json", "url,headRepositoryOwner",
